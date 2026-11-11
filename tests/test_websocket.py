@@ -292,3 +292,82 @@ async def test_labels_is_available_to_non_admins(
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"] == {"labels": [], "entities": {}}
+
+
+async def test_update_config_stores_device_names(hass, hass_ws_client, entry) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {
+                "device_names": {
+                    "sensor.wallbox_leistung": " Wallbox ",
+                    "sensor.herd_leistung": "Herd",
+                }
+            },
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["device_names"] == {
+        "sensor.wallbox_leistung": "Wallbox",
+        "sensor.herd_leistung": "Herd",
+    }
+    assert entry.options["device_names"] == msg["result"]["device_names"]
+    assert msg["result"]["grid_import"] == ["sensor.gi"]  # other settings untouched
+
+
+async def test_device_names_are_replaced_as_a_whole_and_can_be_emptied(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    for names, expected in (
+        ({"sensor.a_leistung": "A", "sensor.b_leistung": "B"}, 2),
+        ({"sensor.a_leistung": "A2", "sensor.b_leistung": "   "}, 1),  # blank resets B
+        ({}, 0),
+    ):
+        await client.send_json_auto_id(
+            {"type": "energyboard/update_config", "config": {"device_names": names}}
+        )
+        msg = await client.receive_json()
+        assert msg["success"]
+        assert len(msg["result"]["device_names"]) == expected
+    assert "device_names" not in entry.options
+
+
+async def test_update_config_rejects_bad_device_names(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    for names in (
+        {"nope": "Name"},  # not an entity id
+        {"sensor.a_leistung": "x" * 81},  # too long
+    ):
+        await client.send_json_auto_id(
+            {"type": "energyboard/update_config", "config": {"device_names": names}}
+        )
+        msg = await client.receive_json()
+        assert not msg["success"]
+        assert msg["error"]["code"] == "invalid_format"
+    assert entry.options == {}
+
+
+async def test_renaming_keeps_names_when_other_settings_change(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"device_names": {"sensor.a_leistung": "A"}},
+        }
+    )
+    await client.receive_json()
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"device_patterns": ["*_leistung"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["result"]["device_names"] == {"sensor.a_leistung": "A"}

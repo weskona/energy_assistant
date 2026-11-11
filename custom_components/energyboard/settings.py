@@ -11,6 +11,7 @@ from .const import (
     CONF_GRID_POWER,
     CONF_HOUSE_POWER,
     CONFIG_KEYS,
+    DICT_KEYS,
     LABEL_KEYS,
     LIST_KEYS,
     PATTERN_REGEX,
@@ -46,6 +47,18 @@ def clean_ids(value: str | list[str] | None) -> list[str]:
     return seen
 
 
+def clean_names(value: Any) -> dict[str, str]:
+    """Display names per entity id: strip them and drop empty names (an empty name resets it)."""
+    if not isinstance(value, dict):
+        return {}
+    names: dict[str, str] = {}
+    for entity_id, name in value.items():
+        text = str(name).strip() if name is not None else ""
+        if text and isinstance(entity_id, str) and entity_id:
+            names[entity_id] = text
+    return names
+
+
 def valid_patterns(patterns: list[str]) -> bool:
     """Patterns may only contain entity id characters, * and ?."""
     return all(re.fullmatch(PATTERN_REGEX[1:-1], p) for p in patterns)
@@ -56,6 +69,8 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
     return {
         key: clean_patterns(data.get(key))
         if key in TEXT_KEYS
+        else clean_names(data.get(key))
+        if key in DICT_KEYS
         else clean_ids(data.get(key))
         if key in LABEL_KEYS
         else as_list(data.get(key))
@@ -85,6 +100,9 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             items = as_list(value)
             if items:
                 stored[key] = items[0]
+        elif key in DICT_KEYS:
+            if value:
+                stored[key] = clean_names(value)
         elif key in LIST_KEYS or key in LABEL_KEYS:
             stored[key] = as_list(value)
         elif key in BOOL_KEYS:

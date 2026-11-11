@@ -7,7 +7,11 @@ globalThis.HTMLElement = class {
   attachShadow() { return {}; }
 };
 globalThis.document = { getElementById: () => ({}), createElement: () => ({}), head: { appendChild() {} } };
-globalThis.customElements = { define: (_n, cls) => { Panel = cls; } };
+// <ha-icon> exists in Home Assistant only. Tests switch it on with globalThis.haIcon = true.
+globalThis.customElements = {
+  define: (_n, cls) => { Panel = cls; },
+  get: (name) => (name === "ha-icon" && globalThis.haIcon ? class {} : undefined),
+};
 
 await import("../custom_components/energyboard/frontend/energyboard-panel.js");
 
@@ -812,10 +816,10 @@ test("labels: the settings list shows the existing labels with their sensor coun
   p._ready = true;
   const html = p._renderSettings();
   assert.match(html, /data-label="klima" checked/);
-  assert.match(html, /data-label="unbenutzt"\s+>/);
+  assert.doesNotMatch(html, /data-label="unbenutzt"/); // no power sensors, so it is not offered
   // same count as the card: klimaanlage, lüftung, split (the excluded and the grid sensor do not count)
-  assert.match(html, /Klima<\/span><span class="mi">3 power sensors/);
-  assert.match(html, /Unbenutzt<\/span><span class="mi">0 power sensors/);
+  assert.match(html, /Klima<\/span><\/span><span class="mi">3 power sensors · 1\.6 kW/);
+  assert.match(html, /Licht<\/span><\/span><span class="mi">1 power sensor · 15 W</);
 });
 
 test("labels: ticking a label in the settings selects it", () => {
@@ -855,4 +859,352 @@ test("labels: read-only for non-admins, hint when no labels exist, escaped names
   const html = evil._renderSettings();
   assert.doesNotMatch(html, /<img/);
   assert.doesNotMatch(html, /<script>/);
+});
+
+
+function pickerPanel(selected = []) {
+  const p = labelPanel({ label_ids: selected });
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._ready = true;
+  p._edited = () => {};
+  return p;
+}
+const lseg = (value) => ({ target: { closest: (s) => (s === "[data-lseg]" ? { dataset: { lseg: value } } : null) } });
+const names = (p) => p._labelPicker().shown.map((x) => x.label.name);
+
+test("label picker: only labels with power sensors are offered", () => {
+  const p = pickerPanel();
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+  assert.equal(p._labelPicker().counts.all, 2);
+});
+
+test("label picker: a selected label without power sensors stays so it can be unselected", () => {
+  const p = pickerPanel(["unbenutzt"]);
+  assert.deepEqual(names(p), ["Klima", "Licht", "Unbenutzt"]);
+  const html = p._renderSettings();
+  assert.match(html, /data-label="unbenutzt" checked/);
+  p._onChange({ target: { dataset: { label: "unbenutzt" }, checked: false } });
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+});
+
+test("label picker: hint when no label has power sensors", () => {
+  const p = pickerPanel();
+  p._labelData.entities = {};
+  assert.match(p._renderSettings(), /No label has power sensors yet/);
+});
+
+test("label picker: activity filter uses the summed power of the label", () => {
+  const p = pickerPanel();
+  p._hass.states["sensor.licht_flur_leistung"].state = "2"; // Licht drops below 5 W
+  assert.deepEqual(p._labelPicker().counts, { all: 2, active: 1, idle: 1, selected: 0, unselected: 2 });
+  p._onClick(lseg("state:active"));
+  assert.deepEqual(names(p), ["Klima"]);
+  p._onClick(lseg("state:idle"));
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("state:all"));
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+});
+
+test("label picker: selection filter and combination with the text filter", () => {
+  const p = pickerPanel(["klima"]);
+  p._onClick(lseg("sel:selected"));
+  assert.deepEqual(names(p), ["Klima"]);
+  p._onClick(lseg("sel:unselected"));
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("sel:all"));
+  p._lFilter = "lic";
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("state:idle"));
+  assert.deepEqual(names(p), []);
+  assert.match(p._renderLabelRows(false), /No label matches the filters/);
+});
+
+test("label picker: the filter also finds labels by their id", () => {
+  const p = pickerPanel();
+  p._labelData.labels[0].name = "Raumklima";
+  p._lFilter = "klima";
+  assert.deepEqual(names(p), ["Raumklima"]);
+});
+
+test("label picker: buttons show counts and mark the chosen filter, read-only for non-admins still filters", () => {
+  const p = pickerPanel(["klima"]);
+  p._onClick(lseg("sel:selected"));
+  const html = p._renderSettings();
+  assert.match(html, /class="seg on" data-lseg="sel:selected"[^>]*>Selected <small>1<\/small>/);
+  assert.match(html, /class="seg" data-lseg="sel:unselected"[^>]*>Not selected <small>1<\/small>/);
+  assert.match(html, /data-lfilter/);
+  assert.match(html, /id="llist"/);
+  p._hass.user = { is_admin: false };
+  p._onClick(lseg("sel:all"));
+  assert.equal(names(p).length, 2);
+});
+
+
+function withIcons(fn) {
+  globalThis.haIcon = true;
+  try {
+    fn();
+  } finally {
+    globalThis.haIcon = false;
+  }
+}
+
+test("icons: areas show their Home Assistant icon, with defaults for areas without one and for no area", () => {
+  withIcons(() => {
+    const p = areaPanel(undefined, {
+      areas: { kueche: { name: "Küche", icon: "mdi:silverware-fork-knife" }, wohnzimmer: { name: "Wohnzimmer" }, technik: { name: "Technik" }, keller: { name: "Keller" } },
+    });
+    const html = p._renderAreas(2000);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:silverware-fork-knife"><\/ha-icon><span class="nt">Küche/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:texture-box"><\/ha-icon><span class="nt">Wohnzimmer/); // no icon set
+    assert.match(html, /<ha-icon class="ico" icon="mdi:help-circle-outline"><\/ha-icon><span class="nt">No area/);
+  });
+});
+
+test("icons: labels show their icon tinted with the label color, default mdi:label", () => {
+  withIcons(() => {
+    const p = labelPanel();
+    p._labelData.labels[0].icon = "mdi:snowflake"; // Klima, color blue
+    const html = p._renderLabels(2000);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:snowflake" style="color:var\(--blue-color, var\(--eb-muted\)\)"><\/ha-icon><span class="nt">Klima/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:label"><\/ha-icon><span class="nt">Licht/); // no icon, no color
+  });
+});
+
+test("icons: the label picker uses the icons too", () => {
+  withIcons(() => {
+    const p = pickerPanel();
+    p._labelData.labels[0].icon = "mdi:snowflake";
+    const html = p._renderSettings();
+    assert.match(html, /<ha-icon class="ico" icon="mdi:snowflake"[^>]*><\/ha-icon><span class="nt">Klima/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:label"><\/ha-icon><span class="nt">Licht/);
+  });
+});
+
+test("icons: without the ha-icon element a colored label falls back to a dot, areas show nothing", () => {
+  const labels = labelPanel()._renderLabels(2000);
+  assert.doesNotMatch(labels, /ha-icon/);
+  assert.match(labels, /<i class="dot" style="background:var\(--blue-color/); // Klima
+  assert.doesNotMatch(areaPanel()._renderAreas(2000), /ha-icon|class="dot"/);
+});
+
+test("icons: invalid icon names and colors are not put into the page", () => {
+  withIcons(() => {
+    const p = labelPanel();
+    p._labelData.labels[0].icon = 'x" onmouseover="alert(1)';
+    p._labelData.labels[0].color = 'red;background:url(x)';
+    const html = p._renderLabels(2000);
+    assert.doesNotMatch(html, /onmouseover/);
+    assert.doesNotMatch(html, /url\(x\)/);
+    assert.match(html, /<span class="name"[^>]*><span class="nt">Klima/); // neither icon nor dot
+  });
+});
+
+function renamePanel({ admin = true, names = {}, fail = false } = {}) {
+  const dev = (name, w) => ({ state: String(w), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+  const states = {
+    "sensor.wallbox_leistung": dev("Wallbox 3EM Leistung", 1400),
+    "sensor.herd_leistung": dev("Herd Leistung", 900),
+  };
+  const p = discoverPanel({ device_patterns: ["*_leistung"], device_names: names }, states);
+  p._hass.user = { is_admin: admin };
+  p._hass.calls = [];
+  p._hass.callWS = async (msg) => {
+    p._hass.calls.push(msg);
+    if (fail) throw new Error("boom");
+    // like the real backend: the complete settings come back
+    return { ...p._cfg, device_names: msg.config.device_names };
+  };
+  p._draft = p._normalize(p._cfg);
+  p._render = () => {}; // no shadow DOM in this test
+  p.shadowRoot = { getElementById: () => ({ querySelector: () => null }) };
+  p._editName = "sensor.wallbox_leistung";
+  return p;
+}
+
+test("names: an own name wins over the friendly name, which wins over the entity id", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
+  assert.equal(p._deviceName("sensor.unknown"), "sensor.unknown");
+});
+
+test("names: the device list shows own names, sorting stays by power, the original is kept", () => {
+  const p = renamePanel({ names: { "sensor.herd_leistung": "AAA first in the alphabet" } });
+  const [first, second] = p._devices();
+  assert.equal(first.name, "Wallbox 3EM Leistung"); // strongest first
+  assert.equal(second.name, "AAA first in the alphabet");
+  assert.equal(second.original, "Herd Leistung");
+});
+
+test("names: admins get a pencil on every device row but not on the unmeasured rest", () => {
+  const p = renamePanel();
+  p._editName = null;
+  const html = p._renderDevices(2500);
+  assert.equal((html.match(/data-rename="/g) || []).length, 2);
+  assert.match(html, /data-rename="sensor.wallbox_leistung"/);
+  assert.match(html, /Other \(not measured\)/);
+  assert.doesNotMatch(html.slice(html.indexOf("Other (not measured)")), /data-rename/);
+});
+
+test("names: no pencil and no editing for non-admins", async () => {
+  const p = renamePanel({ admin: false });
+  assert.doesNotMatch(p._renderDevices(2500), /data-rename|rename/);
+  await p._commitRename("sensor.wallbox_leistung", "Hacked");
+  assert.deepEqual(p._hass.calls, []);
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox 3EM Leistung");
+});
+
+test("names: the row in edit mode is a text field with the own name as value and the original as placeholder", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  const html = p._renderDevices(2500);
+  const input = html.match(/<input class="rename"[^>]*>/)[0];
+  assert.match(input, /data-rename-input="sensor.wallbox_leistung"/);
+  assert.match(input, /value="Wallbox"/);
+  assert.match(input, /placeholder="Wallbox 3EM Leistung"/);
+  assert.match(input, /maxlength="80"/);
+  assert.match(html, /data-rename="sensor.herd_leistung"/); // the other row stays a normal row
+  const plain = renamePanel();
+  assert.match(plain._renderDevices(2500).match(/<input class="rename"[^>]*>/)[0], /value=""/); // no own name yet
+});
+
+test("names: the tooltip names the original when a row was renamed", () => {
+  const html = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } })._renderDevices(2500);
+  assert.match(html, /title="[^"]*Original: Wallbox 3EM Leistung"/);
+});
+
+test("names: names and placeholders are HTML-escaped", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": '<img src=x onerror="x">' } });
+  const html = p._renderDevices(2500);
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img/);
+});
+
+test("names: saving sends all names, shows the new name at once and keeps the draft in sync", async () => {
+  const p = renamePanel({ names: { "sensor.herd_leistung": "Herd" } });
+  await p._commitRename("sensor.wallbox_leistung", "  Wallbox  ");
+  assert.deepEqual(p._hass.calls, [
+    { type: "energyboard/update_config", config: { device_names: { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" } } },
+  ]);
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" });
+  assert.equal(p._editName, null);
+  assert.equal(p._isDirty(), false); // the settings form sees no unsaved change
+});
+
+test("names: an empty name or the original name resets the own name", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox", "sensor.herd_leistung": "Herd" } });
+  await p._commitRename("sensor.wallbox_leistung", "   ");
+  assert.deepEqual(p._hass.calls[0].config.device_names, { "sensor.herd_leistung": "Herd" });
+  p._editName = "sensor.herd_leistung";
+  await p._commitRename("sensor.herd_leistung", "Herd Leistung"); // typed the original again
+  assert.deepEqual(p._hass.calls[1].config.device_names, {});
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
+});
+
+test("names: nothing is sent when the name did not change, or when editing already ended", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  await p._commitRename("sensor.wallbox_leistung", "Wallbox");
+  assert.deepEqual(p._hass.calls, []);
+  assert.equal(p._editName, null);
+  await p._commitRename("sensor.wallbox_leistung", "Other"); // e.g. blur after Enter or Escape
+  assert.deepEqual(p._hass.calls, []);
+});
+
+test("names: names are cut at 80 characters", async () => {
+  const p = renamePanel();
+  await p._commitRename("sensor.wallbox_leistung", "x".repeat(120));
+  assert.equal(p._hass.calls[0].config.device_names["sensor.wallbox_leistung"].length, 80);
+});
+
+test("names: a failed save takes the new name back", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" }, fail: true });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await p._commitRename("sensor.wallbox_leistung", "Neu");
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.deepEqual(p._draft.device_names, { "sensor.wallbox_leistung": "Wallbox" });
+});
+
+test("names: cancelling does not save", () => {
+  const p = renamePanel();
+  p._endRename();
+  assert.equal(p._editName, null);
+  assert.deepEqual(p._hass.calls, []);
+});
+
+test("names: only an admin can start editing", () => {
+  const p = renamePanel({ admin: false });
+  p._editName = null;
+  p._startRename("sensor.wallbox_leistung");
+  assert.equal(p._editName, null);
+});
+
+test("names: own names also appear in the tooltips of areas and labels", () => {
+  const a = areaPanel();
+  a._config = { ...a._cfg, device_names: { "sensor.media_leistung": "Fernseher" } };
+  assert.match(a._renderAreas(2000), /Fernseher 124 W/);
+  const l = labelPanel();
+  l._config = { ...l._cfg, device_names: { "sensor.klimaanlage_leistung": "Split Büro" } };
+  assert.match(l._renderLabels(2000), /Split Büro 900 W/);
+});
+
+test("names: the names survive the settings form (normalize keeps them)", () => {
+  const p = new Panel();
+  assert.deepEqual(p._normalize({ device_names: { "sensor.a": "A" } }).device_names, { "sensor.a": "A" });
+  assert.deepEqual(p._normalize({}).device_names, {});
+});
+
+// Fake page content with expanded lists (`.devlist`), each belonging to a card with a title.
+function fakeContent(lists) {
+  const make = (title, top = 0) => ({
+    scrollTop: top,
+    closest: () => ({ querySelector: () => ({ textContent: title }) }),
+  });
+  const content = {
+    els: lists.map(([title, top]) => make(title, top)),
+    next: [],
+    querySelectorAll: () => content.els,
+  };
+  Object.defineProperty(content, "innerHTML", {
+    set(html) {
+      content.html = html;
+      content.els = content.next.map((title) => make(title, 0)); // new elements start at the top
+    },
+  });
+  return content;
+}
+
+test("live updates: an expanded list keeps its scroll position when the page is redrawn", () => {
+  const p = new Panel();
+  const content = fakeContent([["Devices", 300], ["Areas", 60]]);
+  content.next = ["Devices", "Areas"];
+  p._swapMarkup(content, "<new/>");
+  assert.equal(content.html, "<new/>");
+  assert.deepEqual(content.els.map((e) => e.scrollTop), [300, 60]);
+});
+
+test("live updates: scroll positions stay with their own list when lists come and go", () => {
+  const p = new Panel();
+  const content = fakeContent([["Areas", 60]]);
+  content.next = ["Devices", "Areas"]; // the device list was expanded as well
+  p._swapMarkup(content, "<new/>");
+  assert.deepEqual(content.els.map((e) => e.scrollTop), [0, 60]);
+  const later = fakeContent([["Devices", 200], ["Areas", 60]]);
+  later.next = ["Areas"]; // the device list was folded
+  p._swapMarkup(later, "<new/>");
+  assert.deepEqual(later.els.map((e) => e.scrollTop), [60]);
+});
+
+test("live updates: redrawing works without any expanded list", () => {
+  const p = new Panel();
+  const content = fakeContent([]);
+  content.next = [];
+  p._swapMarkup(content, "<plain/>");
+  assert.equal(content.html, "<plain/>");
 });

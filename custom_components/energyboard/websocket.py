@@ -14,11 +14,13 @@ from homeassistant.helpers import label_registry as lr
 
 from .const import (
     BOOL_KEYS,
+    CONF_DEVICE_NAMES,
     CONF_HOUSE_POWER,
     DOMAIN,
     LABEL_ID_REGEX,
     LABEL_KEYS,
     LIST_KEYS,
+    NAME_MAX_LEN,
     PATTERN_REGEX,
     TEXT_KEYS,
 )
@@ -39,6 +41,9 @@ _CONFIG_SCHEMA = vol.Schema(
         **{
             vol.Optional(key): [vol.All(cv.string, vol.Match(LABEL_ID_REGEX))]
             for key in LABEL_KEYS
+        },
+        vol.Optional(CONF_DEVICE_NAMES): {
+            cv.entity_id: vol.All(cv.string, vol.Length(max=NAME_MAX_LEN))
         },
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }

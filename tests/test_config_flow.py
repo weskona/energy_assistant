@@ -190,3 +190,21 @@ async def test_devices_step_rejects_invalid_exclude_patterns(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"device_exclude_patterns": "invalid_pattern"}
+
+
+async def test_options_flow_keeps_the_display_names(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"grid_import": "sensor.import"},
+        options={"device_names": {"sensor.wallbox_leistung": "Wallbox"}},
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    # the form is prefilled in the UI, so the stored sensor comes back with the submit
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"grid_import": "sensor.import"}
+    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["device_names"] == {"sensor.wallbox_leistung": "Wallbox"}
