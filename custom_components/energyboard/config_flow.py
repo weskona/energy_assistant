@@ -16,7 +16,11 @@ from .const import (
     CONF_BATTERY_DISCHARGE,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
+    CONF_GRID_POWER,
+    CONF_BATTERY_POWER,
     CONF_HOUSE_POWER,
+    CONF_INVERT_BATTERY,
+    CONF_INVERT_GRID,
     CONF_SOLAR_POWER,
     DOMAIN,
 )
@@ -37,9 +41,17 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
 
     return vol.Schema(
         {
+            optional(CONF_GRID_POWER): _MULTI,
+            vol.Optional(
+                CONF_INVERT_GRID, default=bool(defaults.get(CONF_INVERT_GRID))
+            ): bool,
             optional(CONF_GRID_IMPORT): _MULTI,
             optional(CONF_GRID_EXPORT): _MULTI,
             optional(CONF_SOLAR_POWER): _MULTI,
+            optional(CONF_BATTERY_POWER): _MULTI,
+            vol.Optional(
+                CONF_INVERT_BATTERY, default=bool(defaults.get(CONF_INVERT_BATTERY))
+            ): bool,
             optional(CONF_BATTERY_DISCHARGE): _MULTI,
             optional(CONF_BATTERY_CHARGE): _MULTI,
             optional(CONF_HOUSE_POWER): _SINGLE,
@@ -48,8 +60,12 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
 
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
-    """Hausverbrauch direkt oder Netzbezug zur Berechnung ist nötig."""
-    if not user_input.get(CONF_HOUSE_POWER) and not user_input.get(CONF_GRID_IMPORT):
+    """Hausverbrauch direkt oder Netzsensor zur Berechnung ist nötig."""
+    if not (
+        user_input.get(CONF_HOUSE_POWER)
+        or user_input.get(CONF_GRID_IMPORT)
+        or user_input.get(CONF_GRID_POWER)
+    ):
         return {"base": "no_source"}
     return {}
 

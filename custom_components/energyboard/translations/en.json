@@ -4,11 +4,15 @@
     "step": {
       "user": {
         "title": "Energyboard",
-        "description": "Pick power sensors that report positive values (W or kW). Multiple sensors per category are summed. House consumption = solar + grid import + from storage − grid export − to storage.",
+        "description": "Pick power sensors (W or kW). Multiple per category are summed. Separate sensors report positive values, combined sensors are signed (with invert switch). You can mix both. House consumption = solar + grid import + from storage − grid export − to storage.",
         "data": {
-          "grid_import": "Grid import (one or more sensors)",
+          "grid_power": "Grid combined (import +, export −)",
+          "invert_grid": "Invert grid sign",
+          "grid_import": "Grid import separate (optional, multiple allowed)",
           "grid_export": "Grid export (optional, multiple allowed)",
           "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_power": "Storage combined (discharge +, charge −)",
+          "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "house_power": "House consumption directly (optional, otherwise calculated)"
@@ -16,7 +20,7 @@
       }
     },
     "error": {
-      "no_source": "Please provide grid import or house consumption."
+      "no_source": "Please provide grid import, grid combined or house consumption."
     },
     "abort": {
       "single_instance_allowed": "Energyboard is already set up."
@@ -26,11 +30,15 @@
     "step": {
       "init": {
         "title": "Energyboard",
-        "description": "Pick power sensors that report positive values (W or kW). Multiple sensors per category are summed. House consumption = solar + grid import + from storage − grid export − to storage.",
+        "description": "Pick power sensors (W or kW). Multiple per category are summed. Separate sensors report positive values, combined sensors are signed (with invert switch). You can mix both. House consumption = solar + grid import + from storage − grid export − to storage.",
         "data": {
-          "grid_import": "Grid import (one or more sensors)",
+          "grid_power": "Grid combined (import +, export −)",
+          "invert_grid": "Invert grid sign",
+          "grid_import": "Grid import separate (optional, multiple allowed)",
           "grid_export": "Grid export (optional, multiple allowed)",
           "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_power": "Storage combined (discharge +, charge −)",
+          "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "house_power": "House consumption directly (optional, otherwise calculated)"
@@ -38,7 +46,7 @@
       }
     },
     "error": {
-      "no_source": "Please provide grid import or house consumption."
+      "no_source": "Please provide grid import, grid combined or house consumption."
     }
   }
 }

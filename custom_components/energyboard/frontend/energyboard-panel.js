@@ -87,18 +87,40 @@ class EnergyboardPanel extends HTMLElement {
     return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
   }
 
+  /** Summe mit Vorzeichen-Umkehr (für Kombisensoren). */
+  _signed(ids, invert) {
+    const v = this._sum(ids);
+    return v == null ? null : invert ? -v : v;
+  }
+
+  /** Getrennte und kombinierte Sensoren zu sechs positiven Größen zusammenführen. */
+  _split({ solar, gridIn, gridOut, discharge, charge, grid, battery }) {
+    const add = (a, b) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
+    const pos = (v) => (v == null ? null : Math.max(0, v));
+    const neg = (v) => (v == null ? null : Math.max(0, -v));
+    return {
+      solar,
+      gridIn: add(gridIn, pos(grid)),
+      gridOut: add(gridOut, neg(grid)),
+      discharge: add(discharge, pos(battery)),
+      charge: add(charge, neg(battery)),
+    };
+  }
+
   /** Aktuelle Werte in W: house, solar, gridIn, gridOut, discharge, charge. */
   _current() {
     const c = this._cfg;
-    const solar = this._sum(c.solar_power);
-    const gridIn = this._sum(c.grid_import);
-    const gridOut = this._sum(c.grid_export);
-    const discharge = this._sum(c.battery_discharge);
-    const charge = this._sum(c.battery_charge);
-    const house = c.house_power
-      ? this._watts(c.house_power)
-      : this._calcHouse({ solar, gridIn, gridOut, discharge, charge });
-    return { house, solar, gridIn, gridOut, discharge, charge };
+    const parts = this._split({
+      solar: this._sum(c.solar_power),
+      gridIn: this._sum(c.grid_import),
+      gridOut: this._sum(c.grid_export),
+      discharge: this._sum(c.battery_discharge),
+      charge: this._sum(c.battery_charge),
+      grid: this._signed(c.grid_power, c.invert_grid),
+      battery: this._signed(c.battery_power, c.invert_battery),
+    });
+    const house = c.house_power ? this._watts(c.house_power) : this._calcHouse(parts);
+    return { house, ...parts };
   }
   _calcHouse({ solar, gridIn, gridOut, discharge, charge }) {
     if (gridIn == null) return null;
@@ -121,7 +143,8 @@ class EnergyboardPanel extends HTMLElement {
     if (!this._hass || this._loading || now - this._lastHistory < 5 * 60 * 1000) return;
     const c = this._cfg;
     const ids = [c.house_power, ...(c.solar_power || []), ...(c.grid_import || []), ...(c.grid_export || []),
-      ...(c.battery_discharge || []), ...(c.battery_charge || [])].filter(Boolean);
+      ...(c.battery_discharge || []), ...(c.battery_charge || []),
+      ...(c.grid_power || []), ...(c.battery_power || [])].filter(Boolean);
     if (!ids.length) return;
     this._loading = true;
     try {
@@ -171,24 +194,25 @@ class EnergyboardPanel extends HTMLElement {
       return out;
     };
     // Mehrere Sensoren je Kategorie addieren (null, wenn zu dem Zeitpunkt kein Wert vorliegt).
-    const group = (ids) => {
+    const group = (ids, invert = false) => {
       const list = (ids || []).map(sample).filter(Boolean);
       if (!list.length) return null;
       return Array.from({ length: n + 1 }, (_, k) => {
         const v = list.map((l) => l[k]).filter((x) => x != null);
-        return v.length ? v.reduce((a, b) => a + b, 0) : null;
+        return v.length ? (invert ? -1 : 1) * v.reduce((a, b) => a + b, 0) : null;
       });
     };
     const house = c.house_power ? sample(c.house_power) : null;
     const g = {
       solar: group(c.solar_power), gridIn: group(c.grid_import), gridOut: group(c.grid_export),
       discharge: group(c.battery_discharge), charge: group(c.battery_charge),
+      grid: group(c.grid_power, c.invert_grid), battery: group(c.battery_power, c.invert_battery),
     };
     const pts = [];
     for (let k = 0; k <= n; k++) {
       const v = house
         ? house[k]
-        : this._calcHouse(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null])));
+        : this._calcHouse(this._split(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null]))));
       pts.push({ t: t0 + k * step, v });
     }
     return pts;
@@ -230,7 +254,7 @@ class EnergyboardPanel extends HTMLElement {
 
   _renderHouse() {
     const cur = this._current();
-    if (!this._cfg.house_power && !(this._cfg.grid_import || []).length) {
+    if (!this._cfg.house_power && !(this._cfg.grid_import || []).length && !(this._cfg.grid_power || []).length) {
       return `<div class="eb-card"><div class="empty">Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energyboard auswählen.</div></div>`;
     }
     const [val, unit] = fmtPower(cur.house);

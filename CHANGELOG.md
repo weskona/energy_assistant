@@ -13,7 +13,7 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/d
 - GitHub-Workflows für CI (Hassfest, HACS, Ruff, Pytest), Changelog-Check und Release sowie Dependabot-Konfiguration.
 - Design-Grundlage im dunklen Kartenstil: CSS-Tokens (`custom_components/energyboard/frontend/energyboard-tokens.css`), Doku (`docs/DESIGN.md`) und Vorschau (`docs/design-preview.html`).
 - Schrift Outfit (SIL OFL 1.1) lokal mitgeliefert unter `custom_components/energyboard/frontend/fonts/`.
-- Integration `energyboard` mit Konfigurationsdialog (getrennte Sensoren für Netzbezug, Einspeisung, PV, vom/zum Speicher, jeweils mehrere möglich) und Seitenleisten-Panel.
+- Integration `energyboard` mit Konfigurationsdialog (getrennte Sensoren für Netzbezug, Einspeisung, PV, vom/zum Speicher, jeweils mehrere möglich) sowie Kombisensoren mit Vorzeichen für Netz und Speicher (mit Umkehr-Schalter) und Seitenleisten-Panel.
 - Tab „Haus“: aktuelle Hausleistung, Herkunft (PV/Batterie/Netz), Kacheln und 24-Stunden-Verlauf.
 - `README.md` mit Installation und Konfiguration, `hacs.json`.
 

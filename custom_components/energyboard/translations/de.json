@@ -4,11 +4,15 @@
     "step": {
       "user": {
         "title": "Energyboard",
-        "description": "Wähle Leistungssensoren, die positive Werte liefern (W oder kW). Mehrere Sensoren je Kategorie werden addiert. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
+        "description": "Wähle Leistungssensoren (W oder kW). Je Kategorie sind mehrere möglich, sie werden addiert. Getrennte Sensoren liefern positive Werte, Kombisensoren haben ein Vorzeichen (Schalter zum Umkehren). Beides lässt sich mischen. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
         "data": {
-          "grid_import": "Netzbezug (ein oder mehrere Sensoren)",
+          "grid_power": "Netz kombiniert (Bezug +, Einspeisung −)",
+          "invert_grid": "Vorzeichen Netz umkehren",
+          "grid_import": "Netzbezug einzeln (optional, mehrere möglich)",
           "grid_export": "Einspeisung (optional, mehrere möglich)",
           "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
+          "battery_power": "Speicher kombiniert (Entladen +, Laden −)",
+          "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
@@ -16,7 +20,7 @@
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
     },
     "abort": {
       "single_instance_allowed": "Energyboard ist bereits eingerichtet."
@@ -26,11 +30,15 @@
     "step": {
       "init": {
         "title": "Energyboard",
-        "description": "Wähle Leistungssensoren, die positive Werte liefern (W oder kW). Mehrere Sensoren je Kategorie werden addiert. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
+        "description": "Wähle Leistungssensoren (W oder kW). Je Kategorie sind mehrere möglich, sie werden addiert. Getrennte Sensoren liefern positive Werte, Kombisensoren haben ein Vorzeichen (Schalter zum Umkehren). Beides lässt sich mischen. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
         "data": {
-          "grid_import": "Netzbezug (ein oder mehrere Sensoren)",
+          "grid_power": "Netz kombiniert (Bezug +, Einspeisung −)",
+          "invert_grid": "Vorzeichen Netz umkehren",
+          "grid_import": "Netzbezug einzeln (optional, mehrere möglich)",
           "grid_export": "Einspeisung (optional, mehrere möglich)",
           "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
+          "battery_power": "Speicher kombiniert (Entladen +, Laden −)",
+          "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
@@ -38,7 +46,7 @@
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
     }
   }
 }
