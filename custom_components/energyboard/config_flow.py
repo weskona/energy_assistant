@@ -25,16 +25,18 @@ from .const import (
     CONF_HOUSE_POWER,
     CONF_INVERT_BATTERY,
     CONF_INVERT_GRID,
+    CONF_LABEL_IDS,
     CONF_SOLAR_POWER,
     DOMAIN,
     TEXT_KEYS,
 )
-from .settings import clean_patterns, has_source, valid_patterns
+from .settings import clean_ids, clean_patterns, has_source, valid_patterns
 
 _SINGLE = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power")
 )
 _PATTERNS = selector.TextSelector(selector.TextSelectorConfig(multiple=True))
+_LABELS = selector.LabelSelector(selector.LabelSelectorConfig(multiple=True))
 _MULTI = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power", multiple=True)
 )
@@ -85,6 +87,7 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(defaults, CONF_DEVICE_EXCLUDE_PATTERNS): _PATTERNS,
             _optional(defaults, CONF_DEVICE_EXCLUDE): _MULTI,
             _optional(defaults, CONF_DEVICE_POWER): _MULTI,
+            _optional(defaults, CONF_LABEL_IDS): _LABELS,
         }
     )
 
@@ -93,7 +96,7 @@ def _clean_devices(
     user_input: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """Normalize the patterns and check that they only use allowed characters."""
-    cleaned = {**user_input}
+    cleaned = {**user_input, CONF_LABEL_IDS: clean_ids(user_input.get(CONF_LABEL_IDS))}
     errors: dict[str, str] = {}
     for key in TEXT_KEYS:
         cleaned[key] = clean_patterns(user_input.get(key))

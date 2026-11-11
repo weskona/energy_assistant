@@ -8,11 +8,16 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import label_registry as lr
 
 from .const import (
     BOOL_KEYS,
     CONF_HOUSE_POWER,
     DOMAIN,
+    LABEL_ID_REGEX,
+    LABEL_KEYS,
     LIST_KEYS,
     PATTERN_REGEX,
     TEXT_KEYS,
@@ -31,6 +36,10 @@ _CONFIG_SCHEMA = vol.Schema(
             for key in TEXT_KEYS
         },
         **{vol.Optional(key): cv.boolean for key in BOOL_KEYS},
+        **{
+            vol.Optional(key): [vol.All(cv.string, vol.Match(LABEL_ID_REGEX))]
+            for key in LABEL_KEYS
+        },
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }
 )
@@ -41,6 +50,7 @@ def async_register(hass: HomeAssistant) -> None:
     """Register the commands."""
     websocket_api.async_register_command(hass, ws_get_config)
     websocket_api.async_register_command(hass, ws_update_config)
+    websocket_api.async_register_command(hass, ws_labels)
 
 
 def _entry(hass: HomeAssistant):
@@ -59,6 +69,38 @@ def ws_get_config(
         connection.send_error(msg["id"], "not_found", "Energyboard is not set up")
         return
     connection.send_result(msg["id"], normalize({**entry.data, **entry.options}))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "energyboard/labels"})
+@callback
+def ws_labels(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the labels of Home Assistant and which sensors carry them.
+
+    A sensor carries the labels of its entity and of its device. Available to every
+    user (the labels are only names and ids), unlike the admin-only registry commands.
+    """
+    labels = [
+        {
+            "label_id": label.label_id,
+            "name": label.name,
+            "icon": label.icon,
+            "color": label.color,
+        }
+        for label in lr.async_get(hass).async_list_labels()
+    ]
+    devices = dr.async_get(hass)
+    entities: dict[str, list[str]] = {}
+    for entry in er.async_get(hass).entities.values():
+        if entry.domain != "sensor":
+            continue
+        ids = set(entry.labels)
+        if entry.device_id and (device := devices.async_get(entry.device_id)):
+            ids |= set(device.labels)
+        if ids:
+            entities[entry.entity_id] = sorted(ids)
+    connection.send_result(msg["id"], {"labels": labels, "entities": entities})
 
 
 @websocket_api.require_admin

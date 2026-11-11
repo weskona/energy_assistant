@@ -67,6 +67,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "device_exclude_patterns",
         "device_exclude",
         "device_power",
+        "label_ids",
     ]
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(
@@ -76,6 +77,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
                 "device_exclude_patterns": [" Alpha_ESS_* ", "alpha_ess_*"],
                 "device_exclude": ["sensor.skip_power"],
                 "device_power": ["sensor.oven", "sensor.fridge"],
+                "label_ids": ["klima", " klima ", "licht"],
             },
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -91,6 +93,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "device_exclude_patterns": ["alpha_ess_*"],
         "device_exclude": ["sensor.skip_power"],
         "device_power": ["sensor.oven", "sensor.fridge"],
+        "label_ids": ["klima", "licht"],
     }
 
 

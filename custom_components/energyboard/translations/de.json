@@ -32,7 +32,8 @@
           "device_patterns": "Namensmuster (z. B. *_leistung)",
           "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
-          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)",
+          "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
         }
       }
     },
@@ -76,7 +77,8 @@
           "device_patterns": "Namensmuster (z. B. *_leistung)",
           "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
-          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)",
+          "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
         }
       }
     },

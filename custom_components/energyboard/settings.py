@@ -11,6 +11,7 @@ from .const import (
     CONF_GRID_POWER,
     CONF_HOUSE_POWER,
     CONFIG_KEYS,
+    LABEL_KEYS,
     LIST_KEYS,
     PATTERN_REGEX,
     SINGLE_KEYS,
@@ -35,6 +36,16 @@ def clean_patterns(value: str | list[str] | None) -> list[str]:
     return seen
 
 
+def clean_ids(value: str | list[str] | None) -> list[str]:
+    """Strip ids, drop empty ones and duplicates (keeps the order)."""
+    seen: list[str] = []
+    for item in as_list(value):
+        label_id = str(item).strip()
+        if label_id and label_id not in seen:
+            seen.append(label_id)
+    return seen
+
+
 def valid_patterns(patterns: list[str]) -> bool:
     """Patterns may only contain entity id characters, * and ?."""
     return all(re.fullmatch(PATTERN_REGEX[1:-1], p) for p in patterns)
@@ -45,6 +56,8 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
     return {
         key: clean_patterns(data.get(key))
         if key in TEXT_KEYS
+        else clean_ids(data.get(key))
+        if key in LABEL_KEYS
         else as_list(data.get(key))
         if key in LIST_KEYS
         else bool(data.get(key))
@@ -72,7 +85,7 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             items = as_list(value)
             if items:
                 stored[key] = items[0]
-        elif key in LIST_KEYS:
+        elif key in LIST_KEYS or key in LABEL_KEYS:
             stored[key] = as_list(value)
         elif key in BOOL_KEYS:
             stored[key] = bool(value)

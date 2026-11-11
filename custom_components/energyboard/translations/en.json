@@ -32,7 +32,8 @@
           "device_patterns": "Name patterns (e.g. *_power)",
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",
           "device_exclude": "Excluded sensors (never added by a pattern)",
-          "device_power": "Additional device sensors (optional)"
+          "device_power": "Additional device sensors (optional)",
+          "label_ids": "Labels (their power sensors are summed up per label)"
         }
       }
     },
@@ -76,7 +77,8 @@
           "device_patterns": "Name patterns (e.g. *_power)",
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",
           "device_exclude": "Excluded sensors (never added by a pattern)",
-          "device_power": "Additional device sensors (optional)"
+          "device_power": "Additional device sensors (optional)",
+          "label_ids": "Labels (their power sensors are summed up per label)"
         }
       }
     },

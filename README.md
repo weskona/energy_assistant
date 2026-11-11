@@ -8,7 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
-| **Settings** | Change all sensors directly in the panel (see below) |
+| **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the House tab. |
 
 ## Installation
 
@@ -59,10 +59,30 @@ Separate and combined sensors can be mixed.
   (searches names and entity ids) and **Exclude shown** / **Include shown**, which only act on the shown sensors.
 - **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
   Sensors picked here always stay in the list, even if they are on the exclude list or match an exclude pattern.
-- The House tab lists devices in their own full-width row with several columns. It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
-  as "Other (not measured)".
+- The House tab lists the devices one below the other in their own full-width row, strongest first. Next to each value
+  the share of the house power is shown, and the bar has the same length (without a known house power the strongest
+  device fills the bar). It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as
+  idle and are only counted. If a house power is known, the remainder is shown as "Other (not measured)".
 
-In the panel's **Settings** tab the field shows live which sensors a pattern matches.
+In the panel's **Settings** tab the field shows live which sensors a pattern matches. Long match lists can be
+narrowed with filter buttons: **Activity** (all / active, at least 5 W right now / inactive, below 5 W or no value) and
+**Selection** (all / included / excluded), combinable with the text filter. **Exclude shown** and **Include shown** act on
+what the filters show, e.g. one click excludes all inactive sensors.
+
+**Labels:** in the Settings tab you pick labels from the list of labels that exist in Home Assistant (checkboxes, with
+the number of power sensors each label has). The **Labels** card on the House tab then shows one row per selected label
+with the summed power of all its power sensors, plus share of the house power, bar, folding and idle count. A sensor
+carries the labels of its entity and of its device. Unlike the devices **no name pattern is needed**, the label decides.
+The exclusions still apply: sensors of the energy balance (grid, solar, storage, house), the exclude list and the exclude
+patterns. A sensor with several selected labels counts in each of them. The labels are read over the `energyboard/labels`
+WebSocket command, available to every user.
+
+**Areas:** below the house card the panel also shows an **Areas** card. It uses exactly the sensors of the device list
+(same patterns, exclude patterns, exclude list and additional sensors) and sums their power per Home Assistant area.
+The area is taken from the entity, or from its device if the entity has none. Sensors without an area are collected in
+**No area**, shown last. Like the devices, areas show the value, the share of the house power and a bar, fold after the
+8 strongest and count idle areas (< 5 W). There is nothing extra to configure. The card is hidden as long as none of the
+sensors belongs to an area.
 
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.
