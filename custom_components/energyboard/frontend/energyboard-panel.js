@@ -56,6 +56,7 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .chip button:hover{color:var(--eb-red)}
 .set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
 .set input[type=text]:focus{outline:none;border-color:var(--eb-green)}
+.hint{color:var(--eb-muted);font-size:12.5px;margin-top:6px}
 .ferr{color:var(--eb-orange);font-size:12.5px;margin-top:4px}
 .bar2{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:var(--eb-gap)}
 .btn{border:0;border-radius:12px;padding:10px 18px;font:600 14px var(--eb-font);cursor:pointer;background:var(--eb-green);color:#06281d}
@@ -121,7 +122,12 @@ const STRINGS = {
     f_battery_discharge: "From storage (discharging)",
     f_battery_charge: "To storage (charging)",
     f_battery_grid_charge: "Storage charged from grid",
-    f_device_power: "Device power sensors",
+    f_device_power: "Additional device sensors (optional)",
+    f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
+    addPattern: "e.g. *_power",
+    invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
+    matches: "{n} matching: {names}",
+    noMatches: "No power sensor matches yet",
   },
   de: {
     house: "Haus",
@@ -175,7 +181,12 @@ const STRINGS = {
     f_battery_discharge: "Vom Speicher (Entladen)",
     f_battery_charge: "Zum Speicher (Laden)",
     f_battery_grid_charge: "Speicher aus dem Netz geladen",
-    f_device_power: "Leistungssensoren der Geräte",
+    f_device_power: "Zusätzliche Geräte-Sensoren (optional)",
+    f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
+    addPattern: "z. B. *_leistung",
+    invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
+    matches: "{n} passend: {names}",
+    noMatches: "Noch kein Leistungssensor passt",
   },
 };
 
@@ -186,9 +197,22 @@ const esc = (t) =>
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
-  { title: "sectionDevices", fields: [["device_power", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_power", "multi"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns"];
+// Sensors that are part of the energy balance and therefore never listed as devices.
+const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
+const PATTERN_RE = /^[a-z0-9_.*?]+$/;
+
+/**
+ * Does an entity id match a name pattern? "*" matches any text, "?" one character.
+ * Without a dot the pattern is compared with the part after "sensor.", e.g. "*_power".
+ */
+const matchesPattern = (entityId, pattern) => {
+  const target = pattern.includes(".") ? entityId : entityId.slice(entityId.indexOf(".") + 1);
+  const re = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+  return new RegExp(`^${re}$`, "i").test(target);
+};
 const BOOL_KEYS = ["invert_grid", "invert_battery"];
 
 const fmtPower = (w) => {
@@ -326,7 +350,15 @@ class EnergyboardPanel extends HTMLElement {
     } else if (t.dataset?.add) {
       const id = t.value.trim();
       if (!id) return;
-      if (this._hass?.states?.[id]) {
+      if (t.dataset.mode === "text") {
+        const pattern = id.toLowerCase();
+        if (PATTERN_RE.test(pattern)) {
+          this._draftAdd(t.dataset.add, pattern, "text");
+          this._fieldError = {};
+        } else {
+          this._fieldError = { [t.dataset.add]: this._t("invalidPattern") };
+        }
+      } else if (this._hass?.states?.[id]) {
         this._draftAdd(t.dataset.add, id, t.dataset.mode);
         this._fieldError = {};
       } else {
@@ -361,10 +393,18 @@ class EnergyboardPanel extends HTMLElement {
       const chips = this._draftList(key)
         .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
         .join("");
+      let hint = "";
+      if (kind === "text") {
+        const found = this._discoverDevices(this._draft.device_patterns, this._draft);
+        const names = found.slice(0, 8).map(nameOf).join(", ") + (found.length > 8 ? " …" : "");
+        if (this._draft.device_patterns.length) {
+          hint = `<div class="hint">${esc(found.length ? this._t("matches", { n: found.length, names }) : this._t("noMatches"))}</div>`;
+        }
+      }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" list="eb-sensors" placeholder="${esc(this._t("addSensor"))}" autocomplete="off">`}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? "addPattern" : "addSensor"))}" autocomplete="off">`}${hint}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec"><div class="eb-title">${this._t(sec.title)}</div>${sec.fields.map(field).join("")}</div>`,
@@ -446,7 +486,9 @@ class EnergyboardPanel extends HTMLElement {
   }
   /** Individual devices with their current power in W, highest first. */
   _devices() {
-    return (this._cfg.device_power || [])
+    const explicit = this._cfg.device_power || [];
+    const ids = [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
+    return ids
       .map((id) => ({
         id,
         name: this._hass?.states?.[id]?.attributes?.friendly_name || id,
@@ -454,6 +496,20 @@ class EnergyboardPanel extends HTMLElement {
       }))
       .filter((d) => d.w != null)
       .sort((a, b) => b.w - a.w);
+  }
+
+  /**
+   * Power sensors whose name matches one of the patterns. Only "sensor." entities with
+   * device_class power count, and sensors of the energy balance are left out.
+   */
+  _discoverDevices(patterns = [], cfg = this._cfg) {
+    if (!patterns?.length) return [];
+    const system = new Set(SYSTEM_KEYS.flatMap((k) => (Array.isArray(cfg[k]) ? cfg[k] : cfg[k] ? [cfg[k]] : [])));
+    return Object.entries(this._hass?.states || {})
+      .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
+      .map(([id]) => id)
+      .filter((id) => !system.has(id) && patterns.some((p) => matchesPattern(id, p)))
+      .sort();
   }
 
   _calcHouse({ solar, gridIn, gridOut, discharge, charge }) {
@@ -655,7 +711,7 @@ class EnergyboardPanel extends HTMLElement {
 
   /** Card with the power of individual devices. Empty string if none are configured. */
   _renderDevices(house) {
-    if (!(this._cfg.device_power || []).length) return "";
+    if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
     const IDLE_W = 5;
     const all = this._devices();
     const active = all.filter((d) => d.w >= IDLE_W);
@@ -665,7 +721,6 @@ class EnergyboardPanel extends HTMLElement {
     const rows = other != null ? [...active, { name: this._t("otherDevices"), w: other, other: true }] : active;
     rows.sort((a, b) => (a.other ? 1 : b.other ? -1 : b.w - a.w));
     const scale = Math.max(1, house ?? 0, ...rows.map((d) => d.w));
-    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     const [tv, tu] = fmtPower(sum);
     const list = rows
       .map((d) => {

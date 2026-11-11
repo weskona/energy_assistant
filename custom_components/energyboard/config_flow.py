@@ -15,6 +15,7 @@ from .const import (
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_POWER,
+    CONF_DEVICE_PATTERNS,
     CONF_DEVICE_POWER,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
@@ -25,11 +26,12 @@ from .const import (
     CONF_SOLAR_POWER,
     DOMAIN,
 )
-from .settings import has_source
+from .settings import clean_patterns, has_source, valid_patterns
 
 _SINGLE = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power")
 )
+_PATTERNS = selector.TextSelector(selector.TextSelectorConfig(multiple=True))
 _MULTI = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power", multiple=True)
 )
@@ -74,7 +76,25 @@ def _storage_schema(defaults: dict[str, Any]) -> vol.Schema:
 
 def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Step 3: individual devices."""
-    return vol.Schema({_optional(defaults, CONF_DEVICE_POWER): _MULTI})
+    return vol.Schema(
+        {
+            _optional(defaults, CONF_DEVICE_PATTERNS): _PATTERNS,
+            _optional(defaults, CONF_DEVICE_POWER): _MULTI,
+        }
+    )
+
+
+def _clean_devices(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Normalize the device patterns and check that they only use allowed characters."""
+    cleaned = {
+        **user_input,
+        CONF_DEVICE_PATTERNS: clean_patterns(user_input.get(CONF_DEVICE_PATTERNS)),
+    }
+    if not valid_patterns(cleaned[CONF_DEVICE_PATTERNS]):
+        return cleaned, {CONF_DEVICE_PATTERNS: "invalid_pattern"}
+    return cleaned, {}
 
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
@@ -120,12 +140,17 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_devices(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(
-                title="Energyboard", data={**self._data, **user_input}
-            )
+            user_input, errors = _clean_devices(user_input)
+            if not errors:
+                return self.async_create_entry(
+                    title="Energyboard", data={**self._data, **user_input}
+                )
         return self.async_show_form(
-            step_id="devices", data_schema=_devices_schema(self._data)
+            step_id="devices",
+            data_schema=_devices_schema(user_input or self._data),
+            errors=errors,
         )
 
     @staticmethod
@@ -172,8 +197,13 @@ class EnergyboardOptionsFlow(OptionsFlow):
     async def async_step_devices(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data={**self._current, **user_input})
+            user_input, errors = _clean_devices(user_input)
+            if not errors:
+                return self.async_create_entry(data={**self._current, **user_input})
         return self.async_show_form(
-            step_id="devices", data_schema=_devices_schema(self._current)
+            step_id="devices",
+            data_schema=_devices_schema(user_input or self._current),
+            errors=errors,
         )

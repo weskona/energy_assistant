@@ -2,9 +2,11 @@
 
 from custom_components.energyboard.settings import (
     as_list,
+    clean_patterns,
     has_source,
     normalize,
     to_storage,
+    valid_patterns,
 )
 
 
@@ -58,3 +60,24 @@ def test_storage_round_trips_through_normalize() -> None:
         {"grid_import": "sensor.gi", "solar_power": ["a", "b"], "invert_battery": True}
     )
     assert normalize(to_storage(settings)) == settings
+
+
+def test_clean_patterns() -> None:
+    assert clean_patterns(None) == []
+    assert clean_patterns(" *_Leistung ") == ["*_leistung"]
+    assert clean_patterns(["*_a", "", "  ", "*_A", "b*"]) == ["*_a", "b*"]
+
+
+def test_valid_patterns() -> None:
+    assert valid_patterns(["*_leistung", "sensor.k??_power", "x"])
+    assert valid_patterns([])
+    assert not valid_patterns(["bad pattern"])
+    assert not valid_patterns(["a/b"])
+    assert not valid_patterns(["ä*"])
+
+
+def test_normalize_cleans_patterns() -> None:
+    assert normalize({"device_patterns": [" *_Leistung "]})["device_patterns"] == [
+        "*_leistung"
+    ]
+    assert normalize({})["device_patterns"] == []

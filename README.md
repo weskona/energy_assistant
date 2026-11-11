@@ -42,9 +42,19 @@ Separate and combined sensors can be mixed.
 | Grid combined | Import | Export | yes |
 | Storage combined | Discharge | Charge | yes |
 
-**Devices** (step 3): any number of power sensors of individual devices (heat pump, wallbox, dishwasher, …).
-The House tab lists them by current power with a bar. Devices below 5 W count as idle and are only counted.
-If a house power is known, the remainder is shown as "Other (not measured)".
+**Devices** (step 3): the House tab lists the power of individual devices with a bar, highest first.
+
+- **Name patterns:** enter patterns with `*` as wildcard, e.g. `*_power` (or `*_leistung` for German entity names).
+  Every power sensor whose name matches is listed, so new devices appear automatically.
+  `?` matches one character. A pattern without a dot is compared with the part after `sensor.`,
+  a pattern with a dot (`sensor.kitchen_*`) with the full entity id. Upper and lower case do not matter.
+- **Only power entities:** only `sensor` entities with `device_class: power` are considered.
+  Sensors that are part of the energy balance (grid, solar, storage, house) are never listed as devices.
+- **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
+- Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
+  as "Other (not measured)".
+
+In the panel's **Settings** tab the field shows live which sensors a pattern matches.
 
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.

@@ -12,7 +12,9 @@ CONF_SOLAR_POWER = "solar_power"  # solar production, one or more sensors
 CONF_BATTERY_DISCHARGE = "battery_discharge"  # from storage, one or more
 CONF_BATTERY_CHARGE = "battery_charge"  # to storage, one or more
 CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # part of the above from grid
-CONF_DEVICE_POWER = "device_power"  # individual devices, one or more sensors
+CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
+# Name patterns like "*_leistung": every power sensor that matches is listed as a device.
+CONF_DEVICE_PATTERNS = "device_patterns"
 
 # Combined signed sensors (one or more each, summed)
 CONF_GRID_POWER = "grid_power"  # grid: import positive, export negative
@@ -30,8 +32,14 @@ LIST_KEYS = (
     CONF_BATTERY_CHARGE,
     CONF_BATTERY_GRID_CHARGE,
     CONF_DEVICE_POWER,
+    CONF_DEVICE_PATTERNS,
 )
+# List keys that hold text patterns instead of entity ids.
+TEXT_KEYS = (CONF_DEVICE_PATTERNS,)
 # Keys that hold exactly one entity in storage (the panel always sees lists).
 SINGLE_KEYS = (CONF_GRID_IMPORT, CONF_GRID_EXPORT, CONF_BATTERY_GRID_CHARGE)
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
 CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *BOOL_KEYS)
+
+# Allowed characters in a device pattern: entity id characters plus * and ?.
+PATTERN_REGEX = r"^[a-z0-9_.*?]+$"

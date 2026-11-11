@@ -240,3 +240,86 @@ test("settings: only power sensors are offered and names are escaped", () => {
   assert.doesNotMatch(html, /<b>/);
   assert.match(html, /&lt;b&gt;/);
 });
+
+const power = (name = "x") => ({ state: "10", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+
+function discoverPanel(config, states) {
+  const p = new Panel();
+  p._config = config;
+  p._hass = { states };
+  return p;
+}
+
+test("patterns: *_leistung finds every power sensor ending in _leistung", () => {
+  const p = discoverPanel(
+    { device_patterns: ["*_leistung"] },
+    {
+      "sensor.backofen_leistung": power(),
+      "sensor.mikrowelle_leistung": power(),
+      "sensor.leistung_total": power(), // does not end in _leistung
+      "sensor.tv_verbrauch": power(),
+    },
+  );
+  assert.deepEqual(p._discoverDevices(["*_leistung"]), ["sensor.backofen_leistung", "sensor.mikrowelle_leistung"]);
+});
+
+test("patterns: only sensor entities with device_class power count", () => {
+  const states = {
+    "sensor.a_leistung": power(),
+    "sensor.b_leistung": { state: "1", attributes: { device_class: "temperature" } },
+    "sensor.c_leistung": { state: "1", attributes: {} },
+    "switch.d_leistung": power(),
+  };
+  assert.deepEqual(discoverPanel({}, states)._discoverDevices(["*_leistung"]), ["sensor.a_leistung"]);
+});
+
+test("patterns: sensors of the energy balance are never listed as devices", () => {
+  const cfg = { solar_power: ["sensor.pv_leistung"], grid_import: ["sensor.netz_leistung"], house_power: "sensor.haus_leistung" };
+  const states = {
+    "sensor.pv_leistung": power(),
+    "sensor.netz_leistung": power(),
+    "sensor.haus_leistung": power(),
+    "sensor.herd_leistung": power(),
+  };
+  assert.deepEqual(discoverPanel(cfg, states)._discoverDevices(["*_leistung"], cfg), ["sensor.herd_leistung"]);
+});
+
+test("patterns: wildcard rules, full ids, case and regex characters", () => {
+  const states = { "sensor.k1_power": power(), "sensor.k22_power": power(), "sensor.kitchen_power": power(), "sensor.a+b_power": power() };
+  const p = discoverPanel({}, states);
+  assert.deepEqual(p._discoverDevices(["k?_power"]), ["sensor.k1_power"]);
+  assert.deepEqual(p._discoverDevices(["sensor.k*"]), ["sensor.k1_power", "sensor.k22_power", "sensor.kitchen_power"]);
+  assert.deepEqual(p._discoverDevices(["KITCHEN*"]), ["sensor.kitchen_power"]);
+  assert.deepEqual(p._discoverDevices(["a+b*"]), ["sensor.a+b_power"]);
+  assert.deepEqual(p._discoverDevices(["a.b*"]), []); // "." is a literal dot, not a wildcard
+  assert.deepEqual(p._discoverDevices([]), []);
+});
+
+test("patterns: devices combine patterns and explicit sensors without duplicates", () => {
+  const p = discoverPanel(
+    { device_patterns: ["*_leistung"], device_power: ["sensor.herd_leistung", "sensor.kuehlschrank_power"] },
+    {
+      "sensor.herd_leistung": { state: "2000", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Herd" } },
+      "sensor.ofen_leistung": { state: "800", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Ofen" } },
+      "sensor.kuehlschrank_power": { state: "90", attributes: { friendly_name: "Kühlschrank" } },
+    },
+  );
+  assert.deepEqual(p._devices().map((d) => d.name), ["Herd", "Ofen", "Kühlschrank"]);
+});
+
+test("patterns: the device card shows up with only patterns configured", () => {
+  const p = discoverPanel({ device_patterns: ["*_leistung"] }, { "sensor.a_leistung": { state: "300", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "A" } } });
+  assert.match(p._renderDevices(500), /A/);
+});
+
+test("settings: patterns are validated, lowercased and previewed", () => {
+  const states = { "sensor.herd_leistung": power("Herd") };
+  const p = settingsPanel({ grid_import: ["sensor.g"] }, { states });
+  p._edited = () => {}; // no shadow DOM in this test
+  p._onChange({ target: { dataset: { add: "device_patterns", mode: "text" }, value: " *_Leistung " } });
+  assert.deepEqual(p._draft.device_patterns, ["*_leistung"]);
+  p._onChange({ target: { dataset: { add: "device_patterns", mode: "text" }, value: "bad pattern" } });
+  assert.deepEqual(p._draft.device_patterns, ["*_leistung"]);
+  assert.match(p._fieldError.device_patterns, /Only letters/);
+  assert.match(p._renderSettings(), /1 matching: Herd/);
+});

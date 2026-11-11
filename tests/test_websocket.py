@@ -104,3 +104,32 @@ async def test_update_config_is_admin_only(
     assert not msg["success"]
     assert msg["error"]["code"] == "unauthorized"
     assert entry.options == {}
+
+
+async def test_update_config_stores_cleaned_patterns(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"device_patterns": ["*_Leistung", "sensor.k*"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["device_patterns"] == ["*_leistung", "sensor.k*"]
+    assert entry.options["device_patterns"] == ["*_leistung", "sensor.k*"]
+
+
+async def test_update_config_rejects_invalid_patterns(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "energyboard/update_config", "config": {"device_patterns": ["a b"]}}
+    )
+    msg = await client.receive_json()
+    assert not msg["success"]
+    assert msg["error"]["code"] == "invalid_format"
+    assert entry.options == {}

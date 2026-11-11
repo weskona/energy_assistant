@@ -62,10 +62,14 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         },
     )
     assert result["step_id"] == "devices"
-    assert list(result["data_schema"].schema) == ["device_power"]
+    assert list(result["data_schema"].schema) == ["device_patterns", "device_power"]
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"device_power": ["sensor.oven", "sensor.fridge"]}
+            result["flow_id"],
+            {
+                "device_patterns": [" *_Power ", "*_power", "sensor.x_*"],
+                "device_power": ["sensor.oven", "sensor.fridge"],
+            },
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Energyboard"
@@ -76,6 +80,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_charge": ["sensor.bat_in"],
         "battery_grid_charge": "sensor.bat_grid",
         "invert_battery": False,
+        "device_patterns": ["*_power", "sensor.x_*"],
         "device_power": ["sensor.oven", "sensor.fridge"],
     }
 
@@ -144,3 +149,17 @@ async def test_options_flow_requires_a_source(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})
     assert result["errors"] == {"base": "no_source"}
+
+
+async def test_devices_step_rejects_invalid_patterns(hass: HomeAssistant) -> None:
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"house_power": "sensor.house"}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "devices"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_patterns": ["*_power", "bad pattern!"]}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"device_patterns": "invalid_pattern"}

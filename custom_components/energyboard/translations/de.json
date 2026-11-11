@@ -27,14 +27,16 @@
       },
       "devices": {
         "title": "Geräte",
-        "description": "Optional: Leistungssensoren einzelner Geräte, die im Haus-Tab angezeigt werden. Beliebig viele wählbar.",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
         "data": {
-          "device_power": "Leistungssensoren der Geräte (optional)"
+          "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben.",
+      "invalid_pattern": "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?."
     },
     "abort": {
       "single_instance_allowed": "Energyboard ist bereits eingerichtet."
@@ -67,14 +69,16 @@
       },
       "devices": {
         "title": "Geräte",
-        "description": "Optional: Leistungssensoren einzelner Geräte, die im Haus-Tab angezeigt werden. Beliebig viele wählbar.",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
         "data": {
-          "device_power": "Leistungssensoren der Geräte (optional)"
+          "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben.",
+      "invalid_pattern": "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?."
     }
   }
 }

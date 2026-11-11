@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .const import (
@@ -11,7 +12,9 @@ from .const import (
     CONF_HOUSE_POWER,
     CONFIG_KEYS,
     LIST_KEYS,
+    PATTERN_REGEX,
     SINGLE_KEYS,
+    TEXT_KEYS,
 )
 
 
@@ -22,10 +25,27 @@ def as_list(value: str | list[str] | None) -> list[str]:
     return [value] if isinstance(value, str) else list(value)
 
 
+def clean_patterns(value: str | list[str] | None) -> list[str]:
+    """Strip and lowercase patterns, drop empty ones and duplicates."""
+    seen: list[str] = []
+    for item in as_list(value):
+        pattern = str(item).strip().lower()
+        if pattern and pattern not in seen:
+            seen.append(pattern)
+    return seen
+
+
+def valid_patterns(patterns: list[str]) -> bool:
+    """Patterns may only contain entity id characters, * and ?."""
+    return all(re.fullmatch(PATTERN_REGEX[1:-1], p) for p in patterns)
+
+
 def normalize(data: dict[str, Any]) -> dict[str, Any]:
     """Settings as the panel sees them: lists, booleans and an optional house sensor."""
     return {
-        key: as_list(data.get(key))
+        key: clean_patterns(data.get(key))
+        if key in TEXT_KEYS
+        else as_list(data.get(key))
         if key in LIST_KEYS
         else bool(data.get(key))
         if key in BOOL_KEYS

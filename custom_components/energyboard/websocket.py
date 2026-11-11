@@ -9,12 +9,27 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 
-from .const import BOOL_KEYS, CONF_HOUSE_POWER, DOMAIN, LIST_KEYS
+from .const import (
+    BOOL_KEYS,
+    CONF_HOUSE_POWER,
+    DOMAIN,
+    LIST_KEYS,
+    PATTERN_REGEX,
+    TEXT_KEYS,
+)
 from .settings import has_source, normalize, to_storage
 
 _CONFIG_SCHEMA = vol.Schema(
     {
-        **{vol.Optional(key): cv.entity_ids for key in LIST_KEYS},
+        **{
+            vol.Optional(key): cv.entity_ids
+            for key in LIST_KEYS
+            if key not in TEXT_KEYS
+        },
+        **{
+            vol.Optional(key): [vol.All(cv.string, vol.Lower, vol.Match(PATTERN_REGEX))]
+            for key in TEXT_KEYS
+        },
         **{vol.Optional(key): cv.boolean for key in BOOL_KEYS},
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }

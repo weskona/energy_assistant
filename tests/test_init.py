@@ -27,6 +27,7 @@ async def test_setup_registers_panel_with_normalized_config(
             "battery_grid_charge": "sensor.bgc",
             "house_power": "sensor.house",
             "device_power": ["sensor.oven", "sensor.fridge"],
+            "device_patterns": ["*_power"],
         },
     )
     entry.add_to_hass(hass)
@@ -51,6 +52,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "battery_charge": [],
         "battery_grid_charge": ["sensor.bgc"],
         "device_power": ["sensor.oven", "sensor.fridge"],
+        "device_patterns": ["*_power"],
         "invert_grid": True,
         "invert_battery": False,
     }
