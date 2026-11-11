@@ -1159,3 +1159,52 @@ test("names: the names survive the settings form (normalize keeps them)", () => 
   assert.deepEqual(p._normalize({ device_names: { "sensor.a": "A" } }).device_names, { "sensor.a": "A" });
   assert.deepEqual(p._normalize({}).device_names, {});
 });
+
+// Fake page content with expanded lists (`.devlist`), each belonging to a card with a title.
+function fakeContent(lists) {
+  const make = (title, top = 0) => ({
+    scrollTop: top,
+    closest: () => ({ querySelector: () => ({ textContent: title }) }),
+  });
+  const content = {
+    els: lists.map(([title, top]) => make(title, top)),
+    next: [],
+    querySelectorAll: () => content.els,
+  };
+  Object.defineProperty(content, "innerHTML", {
+    set(html) {
+      content.html = html;
+      content.els = content.next.map((title) => make(title, 0)); // new elements start at the top
+    },
+  });
+  return content;
+}
+
+test("live updates: an expanded list keeps its scroll position when the page is redrawn", () => {
+  const p = new Panel();
+  const content = fakeContent([["Devices", 300], ["Areas", 60]]);
+  content.next = ["Devices", "Areas"];
+  p._swapMarkup(content, "<new/>");
+  assert.equal(content.html, "<new/>");
+  assert.deepEqual(content.els.map((e) => e.scrollTop), [300, 60]);
+});
+
+test("live updates: scroll positions stay with their own list when lists come and go", () => {
+  const p = new Panel();
+  const content = fakeContent([["Areas", 60]]);
+  content.next = ["Devices", "Areas"]; // the device list was expanded as well
+  p._swapMarkup(content, "<new/>");
+  assert.deepEqual(content.els.map((e) => e.scrollTop), [0, 60]);
+  const later = fakeContent([["Devices", 200], ["Areas", 60]]);
+  later.next = ["Areas"]; // the device list was folded
+  p._swapMarkup(later, "<new/>");
+  assert.deepEqual(later.els.map((e) => e.scrollTop), [60]);
+});
+
+test("live updates: redrawing works without any expanded list", () => {
+  const p = new Panel();
+  const content = fakeContent([]);
+  content.next = [];
+  p._swapMarkup(content, "<plain/>");
+  assert.equal(content.html, "<plain/>");
+});

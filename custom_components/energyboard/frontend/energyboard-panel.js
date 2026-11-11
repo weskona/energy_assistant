@@ -475,7 +475,7 @@ class EnergyboardPanel extends HTMLElement {
     this._editName = id;
     const content = this.shadowRoot.getElementById("content");
     this._html = this._renderHouse();
-    content.innerHTML = this._html;
+    this._swapMarkup(content, this._html);
     const input = content.querySelector("input[data-rename-input]");
     input?.focus();
     input?.select();
@@ -1348,7 +1348,22 @@ class EnergyboardPanel extends HTMLElement {
     const html = this._renderHouse();
     if (html !== this._html) {
       this._html = html;
-      content.innerHTML = html;
+      this._swapMarkup(content, html);
+    }
+  }
+
+  /**
+   * Replace the markup of the page. Home Assistant sends new values all the time, so this happens
+   * often. The scroll position of the expanded lists is kept, otherwise they jump back to the top.
+   */
+  _swapMarkup(content, html) {
+    // Keyed by the title of the card, so the positions stay with their list when lists come and go.
+    const key = (el) => el.closest(".eb-card")?.querySelector(".eb-title")?.textContent;
+    const tops = new Map([...content.querySelectorAll(".devlist")].map((el) => [key(el), el.scrollTop]));
+    content.innerHTML = html;
+    for (const el of content.querySelectorAll(".devlist")) {
+      const top = tops.get(key(el));
+      if (top) el.scrollTop = top;
     }
   }
 }

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Ticking a label in a long list no longer throws the list back to its start.
+- An expanded list on the Power tab (devices, areas, labels) no longer jumps back to its start while you scroll it. Every new value from Home Assistant redraws the page, the scroll position is now kept.
 - The icons in front of the names are no longer cut off (name and icon share a flex row).
 - The style rule for the history chart only applies to the chart and no longer shifts other icons.
 
