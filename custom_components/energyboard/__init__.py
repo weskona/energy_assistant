@@ -10,7 +10,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONFIG_KEYS, DOMAIN, PANEL_URL_PATH, STATIC_URL
+from .const import CONFIG_KEYS, DOMAIN, LIST_KEYS, PANEL_URL_PATH, STATIC_URL
 
 _FRONTEND_DIR = Path(__file__).parent / "frontend"
 
@@ -29,7 +29,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         data["static_registered"] = True
 
-    config = {key: {**entry.data, **entry.options}.get(key) for key in CONFIG_KEYS}
+    merged = {**entry.data, **entry.options}
+    config = {
+        key: (merged.get(key) or []) if key in LIST_KEYS else merged.get(key)
+        for key in CONFIG_KEYS
+    }
 
     await panel_custom.async_register_panel(
         hass,

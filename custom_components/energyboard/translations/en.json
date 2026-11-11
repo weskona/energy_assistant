@@ -3,20 +3,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up Energyboard",
-        "description": "Pick your power sensors. Either the house consumption directly, or at least grid power so consumption is calculated (PV + grid + battery).",
+        "title": "Energyboard",
+        "description": "Pick power sensors that report positive values (W or kW). Multiple sensors per category are summed. House consumption = solar + grid import + from storage − grid export − to storage.",
         "data": {
-          "house_power": "House consumption (optional)",
-          "grid_power": "Grid power (import positive)",
-          "solar_power": "Solar power (optional)",
-          "battery_power": "Battery power (discharge positive, optional)",
-          "invert_grid": "Invert grid sign",
-          "invert_battery": "Invert battery sign"
+          "grid_import": "Grid import (one or more sensors)",
+          "grid_export": "Grid export (optional, multiple allowed)",
+          "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_discharge": "From storage / discharging (optional, multiple allowed)",
+          "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "house_power": "House consumption directly (optional, otherwise calculated)"
         }
       }
     },
     "error": {
-      "no_source": "Please provide house consumption or grid power."
+      "no_source": "Please provide grid import or house consumption."
     },
     "abort": {
       "single_instance_allowed": "Energyboard is already set up."
@@ -25,19 +25,20 @@
   "options": {
     "step": {
       "init": {
-        "title": "Energyboard sensors",
+        "title": "Energyboard",
+        "description": "Pick power sensors that report positive values (W or kW). Multiple sensors per category are summed. House consumption = solar + grid import + from storage − grid export − to storage.",
         "data": {
-          "house_power": "House consumption (optional)",
-          "grid_power": "Grid power (import positive)",
-          "solar_power": "Solar power (optional)",
-          "battery_power": "Battery power (discharge positive, optional)",
-          "invert_grid": "Invert grid sign",
-          "invert_battery": "Invert battery sign"
+          "grid_import": "Grid import (one or more sensors)",
+          "grid_export": "Grid export (optional, multiple allowed)",
+          "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_discharge": "From storage / discharging (optional, multiple allowed)",
+          "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "house_power": "House consumption directly (optional, otherwise calculated)"
         }
       }
     },
     "error": {
-      "no_source": "Please provide house consumption or grid power."
+      "no_source": "Please provide grid import or house consumption."
     }
   }
 }

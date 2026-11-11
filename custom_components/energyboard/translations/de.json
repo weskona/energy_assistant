@@ -3,20 +3,20 @@
   "config": {
     "step": {
       "user": {
-        "title": "Energyboard einrichten",
-        "description": "Wähle die Leistungssensoren. Entweder den Hausverbrauch direkt oder mindestens die Netzleistung, dann wird der Verbrauch berechnet (PV + Netz + Batterie).",
+        "title": "Energyboard",
+        "description": "Wähle Leistungssensoren, die positive Werte liefern (W oder kW). Mehrere Sensoren je Kategorie werden addiert. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
         "data": {
-          "house_power": "Hausverbrauch (optional)",
-          "grid_power": "Netzleistung (Bezug positiv)",
-          "solar_power": "PV-Leistung (optional)",
-          "battery_power": "Batterieleistung (Entladen positiv, optional)",
-          "invert_grid": "Netzvorzeichen umkehren",
-          "invert_battery": "Batterievorzeichen umkehren"
+          "grid_import": "Netzbezug (ein oder mehrere Sensoren)",
+          "grid_export": "Einspeisung (optional, mehrere möglich)",
+          "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
+          "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
+          "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
+          "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
         }
       }
     },
     "error": {
-      "no_source": "Bitte Hausverbrauch oder Netzleistung angeben."
+      "no_source": "Bitte Netzbezug oder Hausverbrauch angeben."
     },
     "abort": {
       "single_instance_allowed": "Energyboard ist bereits eingerichtet."
@@ -25,19 +25,20 @@
   "options": {
     "step": {
       "init": {
-        "title": "Energyboard-Sensoren",
+        "title": "Energyboard",
+        "description": "Wähle Leistungssensoren, die positive Werte liefern (W oder kW). Mehrere Sensoren je Kategorie werden addiert. Hausverbrauch = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher.",
         "data": {
-          "house_power": "Hausverbrauch (optional)",
-          "grid_power": "Netzleistung (Bezug positiv)",
-          "solar_power": "PV-Leistung (optional)",
-          "battery_power": "Batterieleistung (Entladen positiv, optional)",
-          "invert_grid": "Netzvorzeichen umkehren",
-          "invert_battery": "Batterievorzeichen umkehren"
+          "grid_import": "Netzbezug (ein oder mehrere Sensoren)",
+          "grid_export": "Einspeisung (optional, mehrere möglich)",
+          "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
+          "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
+          "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
+          "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
         }
       }
     },
     "error": {
-      "no_source": "Bitte Hausverbrauch oder Netzleistung angeben."
+      "no_source": "Bitte Netzbezug oder Hausverbrauch angeben."
     }
   }
 }

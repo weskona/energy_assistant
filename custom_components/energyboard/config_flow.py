@@ -12,45 +12,44 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_BATTERY_POWER,
-    CONF_GRID_POWER,
+    CONF_BATTERY_CHARGE,
+    CONF_BATTERY_DISCHARGE,
+    CONF_GRID_EXPORT,
+    CONF_GRID_IMPORT,
     CONF_HOUSE_POWER,
-    CONF_INVERT_BATTERY,
-    CONF_INVERT_GRID,
     CONF_SOLAR_POWER,
     DOMAIN,
 )
 
-_POWER_SENSOR = selector.EntitySelector(
+_SINGLE = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power")
+)
+_MULTI = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="power", multiple=True)
 )
 
 
 def _schema(defaults: dict[str, Any]) -> vol.Schema:
     def optional(key: str) -> vol.Optional:
-        if defaults.get(key) is not None:
+        if defaults.get(key):
             return vol.Optional(key, description={"suggested_value": defaults[key]})
         return vol.Optional(key)
 
     return vol.Schema(
         {
-            optional(CONF_HOUSE_POWER): _POWER_SENSOR,
-            optional(CONF_GRID_POWER): _POWER_SENSOR,
-            optional(CONF_SOLAR_POWER): _POWER_SENSOR,
-            optional(CONF_BATTERY_POWER): _POWER_SENSOR,
-            vol.Optional(
-                CONF_INVERT_GRID, default=defaults.get(CONF_INVERT_GRID, False)
-            ): bool,
-            vol.Optional(
-                CONF_INVERT_BATTERY, default=defaults.get(CONF_INVERT_BATTERY, False)
-            ): bool,
+            optional(CONF_GRID_IMPORT): _MULTI,
+            optional(CONF_GRID_EXPORT): _MULTI,
+            optional(CONF_SOLAR_POWER): _MULTI,
+            optional(CONF_BATTERY_DISCHARGE): _MULTI,
+            optional(CONF_BATTERY_CHARGE): _MULTI,
+            optional(CONF_HOUSE_POWER): _SINGLE,
         }
     )
 
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
-    """Hausverbrauch direkt oder Netzleistung zur Berechnung ist nötig."""
-    if not user_input.get(CONF_HOUSE_POWER) and not user_input.get(CONF_GRID_POWER):
+    """Hausverbrauch direkt oder Netzbezug zur Berechnung ist nötig."""
+    if not user_input.get(CONF_HOUSE_POWER) and not user_input.get(CONF_GRID_IMPORT):
         return {"base": "no_source"}
     return {}
 

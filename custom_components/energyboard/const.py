@@ -4,18 +4,19 @@ DOMAIN = "energyboard"
 PANEL_URL_PATH = "energyboard"
 STATIC_URL = "/energyboard_static"
 
-CONF_HOUSE_POWER = "house_power"
-CONF_SOLAR_POWER = "solar_power"
-CONF_GRID_POWER = "grid_power"
-CONF_BATTERY_POWER = "battery_power"
-CONF_INVERT_GRID = "invert_grid"
-CONF_INVERT_BATTERY = "invert_battery"
+# Alle Leistungssensoren liefern positive Werte (W oder kW).
+CONF_HOUSE_POWER = "house_power"  # optional, ein Sensor
+CONF_GRID_IMPORT = "grid_import"  # Netzbezug, ein oder mehrere Sensoren
+CONF_GRID_EXPORT = "grid_export"  # Einspeisung, ein oder mehrere Sensoren
+CONF_SOLAR_POWER = "solar_power"  # PV-Erzeugung, ein oder mehrere Sensoren
+CONF_BATTERY_DISCHARGE = "battery_discharge"  # vom Speicher, ein oder mehrere
+CONF_BATTERY_CHARGE = "battery_charge"  # zum Speicher, ein oder mehrere
 
-CONFIG_KEYS = (
-    CONF_HOUSE_POWER,
+LIST_KEYS = (
+    CONF_GRID_IMPORT,
+    CONF_GRID_EXPORT,
     CONF_SOLAR_POWER,
-    CONF_GRID_POWER,
-    CONF_BATTERY_POWER,
-    CONF_INVERT_GRID,
-    CONF_INVERT_BATTERY,
+    CONF_BATTERY_DISCHARGE,
+    CONF_BATTERY_CHARGE,
 )
+CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS)
