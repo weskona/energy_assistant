@@ -15,6 +15,7 @@ from .const import (
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_POWER,
+    CONF_DEVICE_POWER,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
@@ -70,6 +71,11 @@ def _storage_schema(defaults: dict[str, Any]) -> vol.Schema:
     )
 
 
+def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
+    """Step 3: individual devices."""
+    return vol.Schema({_optional(defaults, CONF_DEVICE_POWER): _MULTI})
+
+
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
     """Require house consumption or a grid sensor to calculate it."""
     if not (
@@ -82,7 +88,7 @@ def _validate(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Setup in two steps: grid/house, then solar/storage."""
+    """Setup in three steps: grid/house, solar/storage, devices."""
 
     VERSION = 1
 
@@ -108,11 +114,21 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_devices()
+        return self.async_show_form(
+            step_id="storage", data_schema=_storage_schema(self._data)
+        )
+
+    async def async_step_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is not None:
             return self.async_create_entry(
                 title="Energyboard", data={**self._data, **user_input}
             )
         return self.async_show_form(
-            step_id="storage", data_schema=_storage_schema(self._data)
+            step_id="devices", data_schema=_devices_schema(self._data)
         )
 
     @staticmethod
@@ -122,7 +138,7 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class EnergyboardOptionsFlow(OptionsFlow):
-    """Change sensors later, also in two steps."""
+    """Change sensors later, also in three steps."""
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -150,7 +166,17 @@ class EnergyboardOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            return self.async_create_entry(data={**self._current, **user_input})
+            self._data.update(user_input)
+            return await self.async_step_devices()
         return self.async_show_form(
             step_id="storage", data_schema=_storage_schema(self._current)
+        )
+
+    async def async_step_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data={**self._current, **user_input})
+        return self.async_show_form(
+            step_id="devices", data_schema=_devices_schema(self._current)
         )

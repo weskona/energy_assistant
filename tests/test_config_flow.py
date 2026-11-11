@@ -53,14 +53,19 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_charge",
         "battery_grid_charge",
     ]
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "solar_power": ["sensor.pv_1", "sensor.pv_2"],
+            "battery_charge": ["sensor.bat_in"],
+            "battery_grid_charge": "sensor.bat_grid",
+        },
+    )
+    assert result["step_id"] == "devices"
+    assert list(result["data_schema"].schema) == ["device_power"]
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"],
-            {
-                "solar_power": ["sensor.pv_1", "sensor.pv_2"],
-                "battery_charge": ["sensor.bat_in"],
-                "battery_grid_charge": "sensor.bat_grid",
-            },
+            result["flow_id"], {"device_power": ["sensor.oven", "sensor.fridge"]}
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Energyboard"
@@ -71,6 +76,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_charge": ["sensor.bat_in"],
         "battery_grid_charge": "sensor.bat_grid",
         "invert_battery": False,
+        "device_power": ["sensor.oven", "sensor.fridge"],
     }
 
 
@@ -79,6 +85,7 @@ async def test_flow_with_separate_import_only(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"grid_import": "sensor.import"}
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -121,9 +128,14 @@ async def test_options_flow_prefills_and_saves(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"solar_power": ["sensor.pv", "sensor.pv_2"]}
     )
+    assert result["step_id"] == "devices"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"device_power": ["sensor.oven"]}
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["grid_import"] == "sensor.import2"
     assert result["data"]["solar_power"] == ["sensor.pv", "sensor.pv_2"]
+    assert result["data"]["device_power"] == ["sensor.oven"]
 
 
 async def test_options_flow_requires_a_source(hass: HomeAssistant) -> None:

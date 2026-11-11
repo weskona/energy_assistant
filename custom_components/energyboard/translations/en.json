@@ -24,6 +24,13 @@
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
         }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Optional: power sensors of individual devices, shown on the House tab. Select as many as you like.",
+        "data": {
+          "device_power": "Device power sensors (optional)"
+        }
       }
     },
     "error": {
@@ -56,6 +63,13 @@
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
+        }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Optional: power sensors of individual devices, shown on the House tab. Select as many as you like.",
+        "data": {
+          "device_power": "Device power sensors (optional)"
         }
       }
     },

@@ -133,3 +133,37 @@ test("UI strings: English by default, German for German Home Assistant", () => {
   p._hass = { language: "fr" };
   assert.equal(p._t("gridImport"), "Grid import");
 });
+
+const dev = (name, w) => ({ state: String(w), attributes: { unit_of_measurement: "W", friendly_name: name } });
+
+test("devices are sorted by power, use friendly names and skip unavailable ones", () => {
+  const p = panel(
+    { device_power: ["a", "b", "c", "d"] },
+    { a: dev("Fridge", 90), b: dev("Oven", 2500), c: { state: "unavailable", attributes: {} }, d: dev("TV", 120) },
+  );
+  assert.deepEqual(p._devices().map((d) => [d.name, d.w]), [["Oven", 2500], ["TV", 120], ["Fridge", 90]]);
+});
+
+test("device card: unmeasured rest, idle devices and no card without devices", () => {
+  const p = panel(
+    { device_power: ["a", "b", "c"] },
+    { a: dev("Heat pump", 800), b: dev("Fridge", 100), c: dev("TV", 2) },
+  );
+  const html = p._renderDevices(1500);
+  assert.match(html, /Heat pump/);
+  assert.match(html, /Other \(not measured\)/);
+  assert.match(html, /1 idle/);
+  assert.doesNotMatch(html, /TV/);
+  assert.equal(panel({}, {})._renderDevices(1000), "");
+});
+
+test("device card without unmeasured rest when devices explain the house", () => {
+  const p = panel({ device_power: ["a"] }, { a: dev("Heat pump", 1000) });
+  assert.doesNotMatch(p._renderDevices(1000), /not measured/);
+  assert.doesNotMatch(p._renderDevices(null), /not measured/);
+});
+
+test("device names are HTML-escaped", () => {
+  const p = panel({ device_power: ["a"] }, { a: dev('<img src=x onerror="x">', 100) });
+  assert.doesNotMatch(p._renderDevices(200), /<img/);
+});

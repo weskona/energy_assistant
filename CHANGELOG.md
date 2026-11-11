@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Devices card on the **House** tab: power of individual devices, sorted by current power, with the unmeasured remainder of the house and a count of idle devices.
+- Optional third setup step "Devices" (config flow and options flow) to select the device power sensors, with German translation.
+
 ## [0.1.0] - 2026-11-11
 
 ### Added

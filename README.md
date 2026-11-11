@@ -7,7 +7,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 | Tab | Content |
 |-----|---------|
-| **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours |
+| **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
 
 ## Installation
 
@@ -17,7 +17,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 ## Configuration
 
-Setup runs in two steps: **1. Grid and house**, **2. Solar and storage** (optional).
+Setup runs in three steps: **1. Grid and house**, **2. Solar and storage** (optional), **3. Devices** (optional).
 
 All sensors are power sensors (`device_class: power`, W or kW).
 Several sensors can be selected per category where noted, they are added up.
@@ -40,6 +40,10 @@ Separate and combined sensors can be mixed.
 |----------|----------|----------|---------------|
 | Grid combined | Import | Export | yes |
 | Storage combined | Discharge | Charge | yes |
+
+**Devices** (step 3): any number of power sensors of individual devices (heat pump, wallbox, dishwasher, …).
+The House tab lists them by current power with a bar. Devices below 5 W count as idle and are only counted.
+If a house power is known, the remainder is shown as "Other (not measured)".
 
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.

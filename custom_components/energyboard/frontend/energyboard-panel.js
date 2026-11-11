@@ -36,6 +36,15 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .axis{fill:var(--eb-dim);font-size:11px}
 .empty{padding:40px 0;text-align:center;color:var(--eb-muted)}
 .state{color:var(--eb-green)}
+.dev{margin-top:14px}
+.dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .val{font-weight:700;white-space:nowrap}
+.dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
+.dev .track{height:6px;border-radius:3px;background:var(--eb-line);margin:6px 0 12px;overflow:hidden}
+.dev .fill{height:100%;border-radius:3px;background:var(--eb-green);transition:width .6s}
+.dev .fill.other{background:var(--eb-dim)}
+.note{font-size:12.5px;color:var(--eb-muted)}
 .warn{color:var(--eb-orange)}
 `;
 
@@ -63,6 +72,10 @@ const STRINGS = {
     storage: "Storage",
     grid: "Grid",
     legendSolarDirect: "Solar used directly",
+    devices: "Devices",
+    otherDevices: "Other (not measured)",
+    idleDevices: "{n} idle",
+    share: "{pct} % of house",
   },
   de: {
     house: "Haus",
@@ -86,6 +99,10 @@ const STRINGS = {
     storage: "Speicher",
     grid: "Netz",
     legendSolarDirect: "PV direkt verbraucht",
+    devices: "Geräte",
+    otherDevices: "Sonstiges (nicht gemessen)",
+    idleDevices: "{n} inaktiv",
+    share: "{pct} % vom Haus",
   },
 };
 
@@ -181,6 +198,18 @@ class EnergyboardPanel extends HTMLElement {
     const house = c.house_power ? this._watts(c.house_power) : this._calcHouse(parts);
     return { house, direct: this._calcDirect(parts, house), ...parts };
   }
+  /** Individual devices with their current power in W, highest first. */
+  _devices() {
+    return (this._cfg.device_power || [])
+      .map((id) => ({
+        id,
+        name: this._hass?.states?.[id]?.attributes?.friendly_name || id,
+        w: this._watts(id),
+      }))
+      .filter((d) => d.w != null)
+      .sort((a, b) => b.w - a.w);
+  }
+
   _calcHouse({ solar, gridIn, gridOut, discharge, charge }) {
     if (gridIn == null) return null;
     return Math.max(0, (solar ?? 0) + gridIn + (discharge ?? 0) - (gridOut ?? 0) - (charge ?? 0));
@@ -350,6 +379,7 @@ class EnergyboardPanel extends HTMLElement {
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
+    const devices = this._renderDevices(cur.house);
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
       <div class="eb-card eb-card--glow">
@@ -372,7 +402,38 @@ class EnergyboardPanel extends HTMLElement {
       <div class="eb-card">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
-      </div></div>`;
+      </div>
+      ${devices}</div>`;
+  }
+
+  /** Card with the power of individual devices. Empty string if none are configured. */
+  _renderDevices(house) {
+    if (!(this._cfg.device_power || []).length) return "";
+    const IDLE_W = 5;
+    const all = this._devices();
+    const active = all.filter((d) => d.w >= IDLE_W);
+    const idle = all.length - active.length;
+    const sum = all.reduce((a, d) => a + d.w, 0);
+    const other = house != null && house - sum >= IDLE_W ? house - sum : null;
+    const rows = other != null ? [...active, { name: this._t("otherDevices"), w: other, other: true }] : active;
+    rows.sort((a, b) => (a.other ? 1 : b.other ? -1 : b.w - a.w));
+    const scale = Math.max(1, house ?? 0, ...rows.map((d) => d.w));
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    const [tv, tu] = fmtPower(sum);
+    const list = rows
+      .map((d) => {
+        const [v, u] = fmtPower(d.w);
+        const pct = house > 0 ? this._t("share", { pct: Math.round((d.w / house) * 100) }) : "";
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(pct)}">${esc(d.name)}</span>
+          <span class="val">${v}<small>${u}</small></span></div>
+          <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
+      })
+      .join("");
+    return `<div class="eb-card">
+      <div class="row"><span class="eb-title">${this._t("devices")}</span><span class="eb-label">${tv} ${tu}</span></div>
+      ${list || `<div class="empty">–</div>`}
+      ${idle > 0 ? `<div class="note">${this._t("idleDevices", { n: idle })}</div>` : ""}
+    </div>`;
   }
 
   _render() {

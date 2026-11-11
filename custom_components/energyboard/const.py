@@ -12,6 +12,7 @@ CONF_SOLAR_POWER = "solar_power"  # solar production, one or more sensors
 CONF_BATTERY_DISCHARGE = "battery_discharge"  # from storage, one or more
 CONF_BATTERY_CHARGE = "battery_charge"  # to storage, one or more
 CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # part of the above from grid
+CONF_DEVICE_POWER = "device_power"  # individual devices, one or more sensors
 
 # Combined signed sensors (one or more each, summed)
 CONF_GRID_POWER = "grid_power"  # grid: import positive, export negative
@@ -28,6 +29,7 @@ LIST_KEYS = (
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_CHARGE,
     CONF_BATTERY_GRID_CHARGE,
+    CONF_DEVICE_POWER,
 )
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
 CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *BOOL_KEYS)

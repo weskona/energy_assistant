@@ -24,6 +24,13 @@
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
         }
+      },
+      "devices": {
+        "title": "Geräte",
+        "description": "Optional: Leistungssensoren einzelner Geräte, die im Haus-Tab angezeigt werden. Beliebig viele wählbar.",
+        "data": {
+          "device_power": "Leistungssensoren der Geräte (optional)"
+        }
       }
     },
     "error": {
@@ -56,6 +63,13 @@
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
+        }
+      },
+      "devices": {
+        "title": "Geräte",
+        "description": "Optional: Leistungssensoren einzelner Geräte, die im Haus-Tab angezeigt werden. Beliebig viele wählbar.",
+        "data": {
+          "device_power": "Leistungssensoren der Geräte (optional)"
         }
       }
     },
