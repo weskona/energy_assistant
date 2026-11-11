@@ -120,20 +120,30 @@ class EnergyboardPanel extends HTMLElement {
       battery: this._signed(c.battery_power, c.invert_battery),
     });
     const house = c.house_power ? this._watts(c.house_power) : this._calcHouse(parts);
-    return { house, ...parts };
+    return { house, direct: this._calcDirect(parts, house), ...parts };
   }
   _calcHouse({ solar, gridIn, gridOut, discharge, charge }) {
     if (gridIn == null) return null;
     return Math.max(0, (solar ?? 0) + gridIn + (discharge ?? 0) - (gridOut ?? 0) - (charge ?? 0));
   }
 
+  /**
+   * Direkt verbrauchte PV-Leistung: Erzeugung minus Einspeisung minus Speicherladung,
+   * begrenzt auf [0, min(Erzeugung, Hausleistung)]. Annahme: Speicher wird aus PV geladen.
+   */
+  _calcDirect({ solar, gridOut, charge }, house) {
+    if (solar == null) return null;
+    const d = solar - (gridOut ?? 0) - (charge ?? 0);
+    return Math.max(0, Math.min(d, solar, house ?? solar));
+  }
+
   /** Herkunft des Verbrauchs in Anteilen (PV, Batterie, Netz). */
-  _mix({ house, gridIn, discharge }) {
+  _mix({ house, gridIn, discharge, direct }) {
     if (!house || house <= 0) return null;
     const g = Math.max(0, gridIn ?? 0);
     const b = Math.max(0, discharge ?? 0);
-    // PV-Anteil = was nach Netzbezug und Speicher übrig bleibt.
-    const s = Math.max(0, house - g - b);
+    // PV-Anteil = direkt verbrauchte PV, sonst was nach Netzbezug und Speicher übrig bleibt.
+    const s = direct != null ? direct : Math.max(0, house - g - b);
     const sum = g + b + s || 1;
     return { solar: s / sum, battery: b / sum, grid: g / sum };
   }
@@ -210,10 +220,9 @@ class EnergyboardPanel extends HTMLElement {
     };
     const pts = [];
     for (let k = 0; k <= n; k++) {
-      const v = house
-        ? house[k]
-        : this._calcHouse(this._split(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null]))));
-      pts.push({ t: t0 + k * step, v });
+      const parts = this._split(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null])));
+      const v = house ? house[k] : this._calcHouse(parts);
+      pts.push({ t: t0 + k * step, v, d: v == null ? null : this._calcDirect(parts, v) });
     }
     return pts;
   }
@@ -232,6 +241,16 @@ class EnergyboardPanel extends HTMLElement {
       d += `${pen ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`;
       pen = true;
     }
+    const dline = (key) => {
+      let out = "", on = false;
+      for (const p of points) {
+        if (p[key] == null) { on = false; continue; }
+        out += `${on ? "L" : "M"}${x(p.t).toFixed(1)},${y(p[key]).toFixed(1)}`;
+        on = true;
+      }
+      return out;
+    };
+    const hasDirect = points.some((p) => p.d != null);
     const lastX = x(valid[valid.length - 1].t), firstX = x(valid[0].t);
     const area = `${d}L${lastX.toFixed(1)},${y(0)}L${firstX.toFixed(1)},${y(0)}Z`;
     const grid = [0.5, 1].map((f) => {
@@ -249,7 +268,10 @@ class EnergyboardPanel extends HTMLElement {
         <stop offset="0" stop-color="#34d399" stop-opacity=".35"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/>
       </linearGradient></defs>
       ${grid}<path d="${area}" fill="url(#g)"/>
-      <path d="${d}" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round"/>${ticks}</svg>`;
+      <path d="${d}" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round"/>
+      ${hasDirect ? `<path d="${dline("d")}" fill="none" stroke="#ff9800" stroke-width="2" stroke-linejoin="round"/>` : ""}
+      ${ticks}</svg>
+      <div class="legend"><span><i style="background:var(--eb-green)"></i>Haus</span>${hasDirect ? `<span><i style="background:var(--eb-solar)"></i>PV direkt verbraucht</span>` : ""}</div>`;
   }
 
   _renderHouse() {
@@ -259,6 +281,7 @@ class EnergyboardPanel extends HTMLElement {
     }
     const [val, unit] = fmtPower(cur.house);
     const mix = this._mix(cur);
+    const sharePv = cur.direct != null && cur.solar > 0 ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${Math.round((cur.direct / cur.solar) * 100)} % der Erzeugung</div>` : "";
     const tile = (label, w, extra = "") => {
       if (w == null) return "";
       const [v, u] = fmtPower(Math.abs(w));
@@ -279,7 +302,7 @@ class EnergyboardPanel extends HTMLElement {
             ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>Speicher ${Math.round(mix.battery * 100)} %</span>` : ""}
             <span><i style="background:var(--eb-grid)"></i>Netz ${Math.round(mix.grid * 100)} %</span></div>` : ""}
         <div class="tiles">
-          ${tile("PV", cur.solar)}${tile("Netzbezug", cur.gridIn)}${tile("Einspeisung", cur.gridOut)}
+          ${tile("PV", cur.solar)}${tile("PV direkt verbraucht", cur.direct, sharePv)}${tile("Netzbezug", cur.gridIn)}${tile("Einspeisung", cur.gridOut)}
           ${tile("Vom Speicher", cur.discharge)}${tile("Zum Speicher", cur.charge)}
         </div>
       </div>

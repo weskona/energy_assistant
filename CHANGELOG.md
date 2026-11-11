@@ -15,6 +15,7 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/d
 - Schrift Outfit (SIL OFL 1.1) lokal mitgeliefert unter `custom_components/energyboard/frontend/fonts/`.
 - Integration `energyboard` mit Konfigurationsdialog (getrennte Sensoren für Netzbezug und Einspeisung (je einer) sowie PV und vom/zum Speicher (jeweils mehrere möglich)) sowie Kombisensoren mit Vorzeichen für Netz und Speicher (mit Umkehr-Schalter) und Seitenleisten-Panel.
 - Tab „Haus“: aktuelle Hausleistung, Herkunft (PV/Batterie/Netz), Kacheln und 24-Stunden-Verlauf.
+- Berechnung der direkt verbrauchten PV-Leistung (PV − Einspeisung − zum Speicher) als Kachel, im Herkunftsbalken und im Verlauf.
 - `README.md` mit Installation und Konfiguration, `hacs.json`.
 
 [Unreleased]: https://github.com/weskona/ha-energyboard/commits/main

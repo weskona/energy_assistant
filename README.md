@@ -6,7 +6,7 @@ Home-Assistant-Integration (HACS) mit eigenem Panel in der Seitenleiste. Dunkles
 
 | Tab | Inhalt |
 |-----|--------|
-| **Haus** | Aktuelle Leistung des Hauses, Herkunft (PV, Batterie, Netz), PV/Netz/Batterie als Kacheln, Verlauf der letzten 24 Stunden |
+| **Haus** | Aktuelle Leistung des Hauses, direkt verbrauchte PV-Leistung, Herkunft (PV, Speicher, Netz), Kacheln, Verlauf der letzten 24 Stunden |
 
 ## Installation
 
@@ -44,6 +44,13 @@ Pflicht ist Netzbezug, Netz kombiniert oder Hausverbrauch.
 Ohne Hausverbrauchssensor berechnet Energyboard:
 
 **Haus = PV + Netzbezug + vom Speicher − Einspeisung − zum Speicher**
+
+Die **direkt verbrauchte PV-Leistung** ergibt sich aus:
+
+**PV direkt = PV − Einspeisung − zum Speicher** (mindestens 0, höchstens PV und Hausleistung)
+
+Dabei wird angenommen, dass der Speicher aus PV geladen wird. Wird er aus dem Netz geladen, ist der Wert zu niedrig.
+Im Panel erscheint der Wert als Kachel mit Anteil an der Erzeugung, im Herkunftsbalken und als zweite Linie im Verlauf.
 
 Die Sensoren lassen sich später über *Konfigurieren* ändern.
 
