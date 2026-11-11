@@ -126,7 +126,10 @@ const STRINGS = {
     f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
-    matches: "{n} matching: {names}",
+    matches: "{n} matching. Use ⊘ to exclude a sensor.",
+    moreMatches: "+{n} more",
+    exclude: "Exclude from the device list",
+    f_device_exclude: "Excluded sensors (never added by a pattern)",
     noMatches: "No power sensor matches yet",
   },
   de: {
@@ -185,7 +188,10 @@ const STRINGS = {
     f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
-    matches: "{n} passend: {names}",
+    matches: "{n} passend. Mit ⊘ schließt du einen Sensor aus.",
+    moreMatches: "+{n} weitere",
+    exclude: "Aus der Geräteliste ausschließen",
+    f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
     noMatches: "Noch kein Leistungssensor passt",
   },
 };
@@ -197,9 +203,9 @@ const esc = (t) =>
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_power", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude", "multi"], ["device_power", "multi"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude"];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
@@ -330,8 +336,12 @@ class EnergyboardPanel extends HTMLElement {
 
   _onClick(e) {
     const rm = e.target.closest("[data-remove]");
+    const ex = e.target.closest("[data-exclude]");
     if (rm && this._isAdmin) {
       this._draftRemove(rm.dataset.remove, rm.dataset.id);
+      this._edited();
+    } else if (ex && this._isAdmin) {
+      this._draftAdd("device_exclude", ex.dataset.exclude, "multi");
       this._edited();
     } else if (e.target.closest("[data-save]") && this._isAdmin && !this._saveDisabled()) {
       this._save();
@@ -396,9 +406,15 @@ class EnergyboardPanel extends HTMLElement {
       let hint = "";
       if (kind === "text") {
         const found = this._discoverDevices(this._draft.device_patterns, this._draft);
-        const names = found.slice(0, 8).map(nameOf).join(", ") + (found.length > 8 ? " …" : "");
         if (this._draft.device_patterns.length) {
-          hint = `<div class="hint">${esc(found.length ? this._t("matches", { n: found.length, names }) : this._t("noMatches"))}</div>`;
+          const shown = found.slice(0, 20);
+          const chipsHtml = shown
+            .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-exclude="${esc(id)}" aria-label="${esc(this._t("exclude"))}" title="${esc(this._t("exclude"))}">⊘</button>`}</span>`)
+            .join("");
+          const more = found.length > shown.length ? `<span class="hint">${esc(this._t("moreMatches", { n: found.length - shown.length }))}</span>` : "";
+          hint = found.length
+            ? `<div class="hint">${esc(this._t("matches", { n: found.length }))}</div><div class="chips">${chipsHtml}${more}</div>`
+            : `<div class="hint">${esc(this._t("noMatches"))}</div>`;
         }
       }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
@@ -500,15 +516,18 @@ class EnergyboardPanel extends HTMLElement {
 
   /**
    * Power sensors whose name matches one of the patterns. Only "sensor." entities with
-   * device_class power count, and sensors of the energy balance are left out.
+   * device_class power count. Sensors of the energy balance and excluded sensors are left out.
    */
   _discoverDevices(patterns = [], cfg = this._cfg) {
     if (!patterns?.length) return [];
-    const system = new Set(SYSTEM_KEYS.flatMap((k) => (Array.isArray(cfg[k]) ? cfg[k] : cfg[k] ? [cfg[k]] : [])));
+    const skip = new Set([
+      ...SYSTEM_KEYS.flatMap((k) => (Array.isArray(cfg[k]) ? cfg[k] : cfg[k] ? [cfg[k]] : [])),
+      ...(cfg.device_exclude || []),
+    ]);
     return Object.entries(this._hass?.states || {})
       .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
       .map(([id]) => id)
-      .filter((id) => !system.has(id) && patterns.some((p) => matchesPattern(id, p)))
+      .filter((id) => !skip.has(id) && patterns.some((p) => matchesPattern(id, p)))
       .sort();
   }
 

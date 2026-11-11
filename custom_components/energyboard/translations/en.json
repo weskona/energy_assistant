@@ -30,6 +30,7 @@
         "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors.",
         "data": {
           "device_patterns": "Name patterns (e.g. *_power)",
+          "device_exclude": "Excluded sensors (never added by a pattern)",
           "device_power": "Additional device sensors (optional)"
         }
       }
@@ -72,6 +73,7 @@
         "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors.",
         "data": {
           "device_patterns": "Name patterns (e.g. *_power)",
+          "device_exclude": "Excluded sensors (never added by a pattern)",
           "device_power": "Additional device sensors (optional)"
         }
       }

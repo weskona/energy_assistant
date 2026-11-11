@@ -15,6 +15,7 @@ from .const import (
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_POWER,
+    CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_POWER,
     CONF_GRID_EXPORT,
@@ -79,6 +80,7 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             _optional(defaults, CONF_DEVICE_PATTERNS): _PATTERNS,
+            _optional(defaults, CONF_DEVICE_EXCLUDE): _MULTI,
             _optional(defaults, CONF_DEVICE_POWER): _MULTI,
         }
     )

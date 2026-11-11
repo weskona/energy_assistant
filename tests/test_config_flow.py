@@ -62,12 +62,17 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         },
     )
     assert result["step_id"] == "devices"
-    assert list(result["data_schema"].schema) == ["device_patterns", "device_power"]
+    assert list(result["data_schema"].schema) == [
+        "device_patterns",
+        "device_exclude",
+        "device_power",
+    ]
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {
                 "device_patterns": [" *_Power ", "*_power", "sensor.x_*"],
+                "device_exclude": ["sensor.skip_power"],
                 "device_power": ["sensor.oven", "sensor.fridge"],
             },
         )
@@ -81,6 +86,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_grid_charge": "sensor.bat_grid",
         "invert_battery": False,
         "device_patterns": ["*_power", "sensor.x_*"],
+        "device_exclude": ["sensor.skip_power"],
         "device_power": ["sensor.oven", "sensor.fridge"],
     }
 

@@ -30,6 +30,7 @@
         "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
         "data": {
           "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }
       }
@@ -72,6 +73,7 @@
         "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
         "data": {
           "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }
       }

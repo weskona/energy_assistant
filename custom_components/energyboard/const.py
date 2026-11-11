@@ -15,6 +15,8 @@ CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # part of the above from grid
 CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
 # Name patterns like "*_leistung": every power sensor that matches is listed as a device.
 CONF_DEVICE_PATTERNS = "device_patterns"
+# Sensors that a pattern must not add to the device list.
+CONF_DEVICE_EXCLUDE = "device_exclude"
 
 # Combined signed sensors (one or more each, summed)
 CONF_GRID_POWER = "grid_power"  # grid: import positive, export negative
@@ -33,6 +35,7 @@ LIST_KEYS = (
     CONF_BATTERY_GRID_CHARGE,
     CONF_DEVICE_POWER,
     CONF_DEVICE_PATTERNS,
+    CONF_DEVICE_EXCLUDE,
 )
 # List keys that hold text patterns instead of entity ids.
 TEXT_KEYS = (CONF_DEVICE_PATTERNS,)

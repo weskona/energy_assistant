@@ -321,5 +321,47 @@ test("settings: patterns are validated, lowercased and previewed", () => {
   p._onChange({ target: { dataset: { add: "device_patterns", mode: "text" }, value: "bad pattern" } });
   assert.deepEqual(p._draft.device_patterns, ["*_leistung"]);
   assert.match(p._fieldError.device_patterns, /Only letters/);
-  assert.match(p._renderSettings(), /1 matching: Herd/);
+  const html = p._renderSettings();
+  assert.match(html, /1 matching/);
+  assert.match(html, /Herd/);
+});
+
+test("exclude: excluded sensors are not added by a pattern", () => {
+  const states = { "sensor.a_leistung": power("A"), "sensor.b_leistung": power("B"), "sensor.c_leistung": power("C") };
+  const cfg = { device_patterns: ["*_leistung"], device_exclude: ["sensor.b_leistung"] };
+  const p = discoverPanel(cfg, states);
+  assert.deepEqual(p._discoverDevices(cfg.device_patterns, cfg), ["sensor.a_leistung", "sensor.c_leistung"]);
+  assert.deepEqual(p._devices().map((d) => d.name), ["A", "C"].sort());
+});
+
+test("exclude: sensors picked explicitly stay in the list even if excluded", () => {
+  const states = { "sensor.a_leistung": power("A"), "sensor.b_leistung": power("B") };
+  const p = discoverPanel(
+    { device_patterns: ["*_leistung"], device_exclude: ["sensor.a_leistung", "sensor.b_leistung"], device_power: ["sensor.b_leistung"] },
+    states,
+  );
+  assert.deepEqual(p._devices().map((d) => d.name), ["B"]);
+});
+
+test("exclude: clicking the exclude button of a match puts it on the exclude list", () => {
+  const states = { "sensor.a_leistung": power("A"), "sensor.b_leistung": power("B") };
+  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"] }, { states });
+  p._edited = () => {}; // no shadow DOM in this test
+  const target = (sel, data) => ({ closest: (s) => (s === sel ? { dataset: data } : null) });
+  p._onClick({ target: target("[data-exclude]", { exclude: "sensor.b_leistung" }) });
+  p._onClick({ target: target("[data-exclude]", { exclude: "sensor.b_leistung" }) }); // no duplicate
+  assert.deepEqual(p._draft.device_exclude, ["sensor.b_leistung"]);
+  assert.deepEqual(p._discoverDevices(p._draft.device_patterns, p._draft), ["sensor.a_leistung"]);
+  const html = p._renderSettings();
+  assert.match(html, /1 matching/);
+  assert.match(html, /data-exclude="sensor.a_leistung"/);
+  assert.doesNotMatch(html, /data-exclude="sensor.b_leistung"/);
+});
+
+test("exclude: administrators only", () => {
+  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"] }, { admin: false, states: { "sensor.a_leistung": power("A") } });
+  p._edited = () => {};
+  p._onClick({ target: { closest: (s) => (s === "[data-exclude]" ? { dataset: { exclude: "sensor.a_leistung" } } : null) } });
+  assert.deepEqual(p._draft.device_exclude, []);
+  assert.doesNotMatch(p._renderSettings(), /data-exclude/);
 });
