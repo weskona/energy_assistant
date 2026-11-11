@@ -45,16 +45,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Prüfen, ob Tests und Abhängigkeiten vorhanden sind
-        id: check
-        run: |
-          if [ -d tests ] && [ -f requirements_test.txt ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Keine Tests oder requirements_test.txt gefunden, übersprungen."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.check.outputs.run == 'true'
-        run: |
-          pip install -r requirements_test.txt
-          pytest
+      - run: pip install -r requirements_test.txt
+      - run: pytest
+
+  panel-tests:
+    name: Panel-Logik (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
