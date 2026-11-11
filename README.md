@@ -65,7 +65,8 @@ Separate and combined sensors can be mixed.
   Sensors picked here always stay in the list, even if they are on the exclude list or match an exclude pattern.
 - The Power tab lists the devices one below the other in their own full-width row, strongest first. Next to each value
   the share of the house power is shown, and the bar has the same length (without a known house power the strongest
-  device fills the bar). It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as
+  device fills the bar). The three lists show the same number of rows before they fold: as many as the shortest list has, at least 5 and at most
+  8. **Show all** unfolds the rest of a list. Devices below 5 W count as
   idle and are only counted. If a house power is known, the remainder is shown as "Other (not measured)".
 
 In the panel's **Settings** tab the field shows live which sensors a pattern matches. Long match lists can be
@@ -91,8 +92,8 @@ WebSocket command, available to every user.
 **Areas:** below the house card the panel also shows an **Areas** card. It uses exactly the sensors of the device list
 (same patterns, exclude patterns, exclude list and additional sensors) and sums their power per Home Assistant area.
 The area is taken from the entity, or from its device if the entity has none. Sensors without an area are collected in
-**No area**, shown last. Like the devices, areas show the value, the share of the house power and a bar, fold after the
-8 strongest and count idle areas (< 5 W). There is nothing extra to configure. The card is hidden as long as none of the
+**No area**, shown last. Like the devices, areas show the value, the share of the house power and a bar, fold like the
+devices and count idle areas (< 5 W). There is nothing extra to configure. The card is hidden as long as none of the
 sensors belongs to an area.
 
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".

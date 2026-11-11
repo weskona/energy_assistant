@@ -314,6 +314,9 @@ const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "b
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // Power below this counts as idle and is only counted, not listed.
 const IDLE_W = 5;
+// Rows the lists show before they fold. They follow the shortest list, but within these bounds.
+const MAX_ROWS = 8;
+const MIN_ROWS = 5;
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
 
@@ -1089,9 +1092,10 @@ class EnergyboardPanel extends HTMLElement {
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
-    const areas = this._renderAreas(cur.house);
-    const labels = this._renderLabels(cur.house);
-    const devices = this._renderDevices(cur.house);
+    const limit = this._collapsedLimit();
+    const areas = this._renderAreas(cur.house, limit);
+    const labels = this._renderLabels(cur.house, limit);
+    const devices = this._renderDevices(cur.house, limit);
     // Devices, areas and labels share one row, in this order. Missing cards leave more room for the others.
     const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
@@ -1121,7 +1125,25 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
-  _renderDevices(house) {
+  /**
+   * Rows the lists show before they fold: as many as the shortest list has, so devices, areas and
+   * labels end at about the same height. At least MIN_ROWS and at most MAX_ROWS. The rest can be
+   * unfolded per list.
+   */
+  _collapsedLimit() {
+    const counts = [];
+    if ((this._cfg.device_power || []).length || (this._cfg.device_patterns || []).length) {
+      counts.push(this._devices().filter((d) => d.w >= IDLE_W).length);
+    }
+    const areas = this._areas();
+    if (areas.some((g) => !g.none)) counts.push(areas.filter((g) => g.w >= IDLE_W).length);
+    const labels = this._labelGroups();
+    if (labels.length) counts.push(labels.filter((g) => g.w >= IDLE_W).length);
+    const smallest = counts.length ? Math.min(...counts) : MAX_ROWS;
+    return Math.max(MIN_ROWS, Math.min(MAX_ROWS, smallest));
+  }
+
+  _renderDevices(house, limit = MAX_ROWS) {
     if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
     const all = this._devices();
     // Admins can rename the sensors right in the list (pencil next to the name).
@@ -1130,7 +1152,7 @@ class EnergyboardPanel extends HTMLElement {
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
     return this._listCard({
       title: this._t("devices"), rows: active, idle: all.length - active.length, sum, other, house,
-      expanded: this._devExpanded, toggle: "data-devtoggle",
+      expanded: this._devExpanded, toggle: "data-devtoggle", limit,
     });
   }
 
@@ -1178,7 +1200,7 @@ class EnergyboardPanel extends HTMLElement {
     }));
   }
 
-  _renderAreas(house) {
+  _renderAreas(house, limit = MAX_ROWS) {
     const all = this._areas();
     // Without any area assignment there is nothing to group, the device list says it all.
     if (!all.some((g) => !g.none)) return "";
@@ -1186,7 +1208,7 @@ class EnergyboardPanel extends HTMLElement {
     const sum = all.reduce((a, g) => a + g.w, 0);
     return this._listCard({
       title: this._t("areas"), rows: active, idle: all.length - active.length, sum, other: null, house,
-      expanded: this._areaExpanded, toggle: "data-areatoggle",
+      expanded: this._areaExpanded, toggle: "data-areatoggle", limit,
     });
   }
 
@@ -1226,24 +1248,23 @@ class EnergyboardPanel extends HTMLElement {
       });
   }
 
-  _renderLabels(house) {
+  _renderLabels(house, limit = MAX_ROWS) {
     const all = this._labelGroups();
     if (!all.length) return "";
     const active = all.filter((g) => g.w >= IDLE_W);
     const sum = all.reduce((a, g) => a + g.w, 0);
     return this._listCard({
       title: this._t("labels"), rows: active, idle: all.length - active.length, sum, other: null, house,
-      expanded: this._labelExpanded, toggle: "data-labeltoggle",
+      expanded: this._labelExpanded, toggle: "data-labeltoggle", limit,
     });
   }
 
   /** Card with a ranked list of rows with value, share of the house power and a bar. */
-  _listCard({ title, rows, idle, sum, other, house, expanded, toggle }) {
+  _listCard({ title, rows, idle, sum, other, house, expanded, toggle, limit = MAX_ROWS }) {
     // Strongest first (rows without a group such as "No area" go last). Only the top ones show by default.
-    const LIMIT = 8;
     const active = [...rows].sort((a, b) => (a.none ? 1 : b.none ? -1 : b.w - a.w));
-    const folded = active.length > LIMIT;
-    const shown = folded && !expanded ? active.slice(0, LIMIT) : active;
+    const folded = active.length > limit;
+    const shown = folded && !expanded ? active.slice(0, limit) : active;
     const list = other ? [...shown, other] : shown;
     const scale = Math.max(1, house ?? 0, ...list.map((d) => d.w));
     const [tv, tu] = fmtPower(sum);

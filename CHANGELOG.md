@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-11
+
+### Changed
+
+- The devices, areas and labels lists show the same number of rows before they fold: as many as the shortest list has (at least 5, at most 8; idle rows do not count). Each list can still be unfolded on its own with "Show all". Before, every list showed up to 8 rows.
+
 ## [0.4.0] - 2026-11-11
 
 ### Added
@@ -108,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2

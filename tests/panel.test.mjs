@@ -1208,3 +1208,81 @@ test("live updates: redrawing works without any expanded list", () => {
   p._swapMarkup(content, "<plain/>");
   assert.equal(content.html, "<plain/>");
 });
+
+// Panel with `devices` active power sensors, spread over `areas` areas, and `labels` selected labels
+// that each carry one sensor. `idle` of the devices are below 5 W.
+function limitPanel({ devices, areas = 0, labels = 0, idle = 0 }) {
+  const states = { "sensor.netz_leistung": { state: "9000", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Netz" } } };
+  const entities = {};
+  const labelEntities = {};
+  for (let i = 0; i < devices; i++) {
+    const id = `sensor.d${i}_leistung`;
+    states[id] = { state: String(i < idle ? 2 : 100 + i), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: `D${i}` } };
+    if (areas) entities[id] = { area_id: `a${i % areas}` };
+    if (i < labels) labelEntities[id] = [`l${i}`];
+  }
+  const cfg = {
+    grid_import: ["sensor.netz_leistung"],
+    device_patterns: ["*_leistung"],
+    label_ids: Array.from({ length: labels }, (_, i) => `l${i}`),
+  };
+  const p = discoverPanel(cfg, states);
+  p._hass.entities = entities;
+  p._hass.devices = {};
+  p._hass.areas = Object.fromEntries(Array.from({ length: areas }, (_, i) => [`a${i}`, { name: `Area ${i}` }]));
+  p._labelData = {
+    labels: Array.from({ length: labels }, (_, i) => ({ label_id: `l${i}`, name: `Label ${i}`, color: null })),
+    entities: labelEntities,
+  };
+  p._ready = true;
+  return p;
+}
+
+test("fold limit: follows the shortest list (here the labels)", () => {
+  assert.equal(limitPanel({ devices: 13, areas: 9, labels: 6 })._collapsedLimit(), 6);
+  assert.equal(limitPanel({ devices: 13, areas: 7, labels: 12 })._collapsedLimit(), 7);
+});
+
+test("fold limit: at least 5 and at most 8 rows", () => {
+  assert.equal(limitPanel({ devices: 13, areas: 9, labels: 2 })._collapsedLimit(), 5);
+  assert.equal(limitPanel({ devices: 20, areas: 12, labels: 10 })._collapsedLimit(), 8);
+});
+
+test("fold limit: only the cards that exist count, idle rows are not counted", () => {
+  assert.equal(limitPanel({ devices: 7 })._collapsedLimit(), 7); // no areas, no labels
+  assert.equal(limitPanel({ devices: 10, idle: 4 })._collapsedLimit(), 6); // 6 active devices
+  assert.equal(limitPanel({ devices: 0 })._collapsedLimit(), 5);
+  const none = new Panel();
+  none._config = {};
+  none._hass = { states: {} };
+  assert.equal(none._collapsedLimit(), 8); // nothing configured
+});
+
+test("fold limit: the page shows that many rows per list and unfolds the rest per list", () => {
+  const p = limitPanel({ devices: 13, areas: 9, labels: 6 });
+  let html = p._renderHouse();
+  const card = (title) => {
+    const start = html.indexOf(`<span class="eb-title">${title}</span>`);
+    const end = html.indexOf('<div class="eb-card', start + 10);
+    return html.slice(start, end > 0 ? end : undefined);
+  };
+  const rows = (title) => (card(title).match(/class="dev"/g) || []).length;
+  assert.equal(rows("Devices"), 7); // 6 devices + the unmeasured rest
+  assert.equal(rows("Areas"), 6);
+  assert.equal(rows("Labels"), 6);
+  assert.match(html, /Show all 13/); // devices fold
+  assert.match(html, /Show all 9/); // areas fold
+  assert.equal((html.match(/data-labeltoggle/g) || []).length, 0); // labels have exactly 6, nothing to fold
+  p._devExpanded = true;
+  html = p._renderHouse();
+  assert.equal(rows("Devices"), 14); // all 13 + the rest
+  assert.equal(rows("Areas"), 6); // the others stay folded
+});
+
+test("fold limit: the cards still unfold fully with a custom limit", () => {
+  const p = limitPanel({ devices: 13, areas: 9, labels: 6 });
+  p._areaExpanded = true;
+  const html = p._renderAreas(null, 6);
+  assert.equal((html.match(/class="dev"/g) || []).length, 9);
+  assert.match(html, /Show less/);
+});
