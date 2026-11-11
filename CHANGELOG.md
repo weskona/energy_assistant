@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.1] - 2026-11-11
+## [0.5.0] - 2026-11-11
+
+### Added
+
+- Areas can be chosen in the Settings tab like the labels: a checkbox list of the areas of Home Assistant that have power sensors (plus already selected ones), with the number of sensors and their power, and filters for activity, selection and text. The choice is stored as `area_ids`, also available in the config flow and options flow. **Nothing selected** keeps showing all areas (plus "No area"), **with a selection** only the selected areas are shown.
 
 ### Changed
 
-- The devices, areas and labels lists show the same number of rows before they fold: as many as the shortest list has (at least 5, at most 8; idle rows do not count). Each list can still be unfolded on its own with "Show all". Before, every list showed up to 8 rows.
+- The Areas card now sums up **all power sensors in an area** (like the labels, no name pattern needed) instead of only the sensors of the device list. The sensors of the energy balance, the exclude list and the exclude patterns still apply. The rows count "power sensors" instead of "devices".
+- The devices, areas and labels lists show the same number of rows before they fold: as many as the shortest list has (at least 5, at most 8; idle rows do not count). Each list can still be unfolded on its own with "Show all".
 
 ## [0.4.0] - 2026-11-11
 
@@ -114,8 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.4.1...HEAD
-[0.4.1]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...v0.4.1
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2

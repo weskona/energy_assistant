@@ -89,12 +89,17 @@ The exclusions still apply: sensors of the energy balance (grid, solar, storage,
 patterns. A sensor with several selected labels counts in each of them. The labels are read over the `energyboard/labels`
 WebSocket command, available to every user.
 
-**Areas:** below the house card the panel also shows an **Areas** card. It uses exactly the sensors of the device list
-(same patterns, exclude patterns, exclude list and additional sensors) and sums their power per Home Assistant area.
-The area is taken from the entity, or from its device if the entity has none. Sensors without an area are collected in
-**No area**, shown last. Like the devices, areas show the value, the share of the house power and a bar, fold like the
-devices and count idle areas (< 5 W). There is nothing extra to configure. The card is hidden as long as none of the
-sensors belongs to an area.
+**Areas:** the **Areas** card sums up the power of the power sensors per Home Assistant area. The area is taken from the
+entity, or from its device if the entity has none. Like for the labels **no name pattern is needed**, every power sensor
+in the area counts. The sensors of the energy balance (grid, solar, storage, house), the exclude list and the exclude
+patterns still apply. Areas show the value, the share of the house power and a bar, fold like the other lists and count
+idle areas (< 5 W).
+
+In the Settings tab you choose the areas the same way as the labels: a checkbox list of the areas of Home Assistant that
+have power sensors (plus areas you already selected), with the number of sensors and their power, and the same filters
+(activity, selection, text). **Nothing selected** shows all areas that have power sensors, plus a row **No area** for
+sensors without an area (shown last). **With a selection** only the selected areas are shown, in the order of the list,
+without the **No area** row. The card is hidden while no sensor belongs to an area.
 
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.

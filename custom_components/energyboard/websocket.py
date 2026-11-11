@@ -17,8 +17,8 @@ from .const import (
     CONF_DEVICE_NAMES,
     CONF_HOUSE_POWER,
     DOMAIN,
-    LABEL_ID_REGEX,
-    LABEL_KEYS,
+    ID_KEYS,
+    ID_REGEX,
     LIST_KEYS,
     NAME_MAX_LEN,
     PATTERN_REGEX,
@@ -39,8 +39,8 @@ _CONFIG_SCHEMA = vol.Schema(
         },
         **{vol.Optional(key): cv.boolean for key in BOOL_KEYS},
         **{
-            vol.Optional(key): [vol.All(cv.string, vol.Match(LABEL_ID_REGEX))]
-            for key in LABEL_KEYS
+            vol.Optional(key): [vol.All(cv.string, vol.Match(ID_REGEX))]
+            for key in ID_KEYS
         },
         vol.Optional(CONF_DEVICE_NAMES): {
             cv.entity_id: vol.All(cv.string, vol.Length(max=NAME_MAX_LEN))
