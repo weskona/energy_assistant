@@ -45,8 +45,8 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_INVERT_GRID, default=bool(defaults.get(CONF_INVERT_GRID))
             ): bool,
-            optional(CONF_GRID_IMPORT): _MULTI,
-            optional(CONF_GRID_EXPORT): _MULTI,
+            optional(CONF_GRID_IMPORT): _SINGLE,
+            optional(CONF_GRID_EXPORT): _SINGLE,
             optional(CONF_SOLAR_POWER): _MULTI,
             optional(CONF_BATTERY_POWER): _MULTI,
             vol.Optional(

@@ -15,6 +15,13 @@ from .const import BOOL_KEYS, CONFIG_KEYS, DOMAIN, LIST_KEYS, PANEL_URL_PATH, ST
 _FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
+def _as_list(value: str | list[str] | None) -> list[str]:
+    """Einzelne Entität oder Liste einheitlich als Liste für das Panel."""
+    if not value:
+        return []
+    return [value] if isinstance(value, str) else list(value)
+
+
 def _version() -> str:
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
     return manifest["version"]
@@ -31,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     merged = {**entry.data, **entry.options}
     config = {
-        key: (merged.get(key) or [])
+        key: _as_list(merged.get(key))
         if key in LIST_KEYS
         else bool(merged.get(key))
         if key in BOOL_KEYS

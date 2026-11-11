@@ -8,8 +8,8 @@
         "data": {
           "grid_power": "Netz kombiniert (Bezug +, Einspeisung −)",
           "invert_grid": "Vorzeichen Netz umkehren",
-          "grid_import": "Netzbezug einzeln (optional, mehrere möglich)",
-          "grid_export": "Einspeisung (optional, mehrere möglich)",
+          "grid_import": "Netzbezug einzeln (optional)",
+          "grid_export": "Einspeisung einzeln (optional)",
           "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
           "battery_power": "Speicher kombiniert (Entladen +, Laden −)",
           "invert_battery": "Vorzeichen Speicher umkehren",
@@ -34,8 +34,8 @@
         "data": {
           "grid_power": "Netz kombiniert (Bezug +, Einspeisung −)",
           "invert_grid": "Vorzeichen Netz umkehren",
-          "grid_import": "Netzbezug einzeln (optional, mehrere möglich)",
-          "grid_export": "Einspeisung (optional, mehrere möglich)",
+          "grid_import": "Netzbezug einzeln (optional)",
+          "grid_export": "Einspeisung einzeln (optional)",
           "solar_power": "PV-Erzeugung (optional, mehrere möglich)",
           "battery_power": "Speicher kombiniert (Entladen +, Laden −)",
           "invert_battery": "Vorzeichen Speicher umkehren",

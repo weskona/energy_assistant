@@ -24,8 +24,8 @@ Getrennte und kombinierte Sensoren lassen sich mischen.
 
 | Kategorie | Mehrere | Bedeutung |
 |-----------|---------|-----------|
-| Netzbezug | ja | Leistung aus dem Netz |
-| Einspeisung | ja | Leistung ins Netz |
+| Netzbezug | nein | Leistung aus dem Netz |
+| Einspeisung | nein | Leistung ins Netz |
 | PV-Erzeugung | ja | z. B. ein Sensor je Wechselrichter oder Dachfläche |
 | Vom Speicher | ja | Entladeleistung der Batterien |
 | Zum Speicher | ja | Ladeleistung der Batterien |
@@ -34,7 +34,7 @@ Getrennte und kombinierte Sensoren lassen sich mischen.
 
 | Kategorie | Positiv | Negativ | Umkehr-Schalter |
 |-----------|---------|---------|-----------------|
-| Netz kombiniert | Bezug | Einspeisung | ja |
+| Netz kombiniert | Bezug | Einspeisung | nein |
 | Speicher kombiniert | Entladen | Laden | ja |
 
 Zählt dein Sensor andersherum (z. B. Laden positiv), schalte „Vorzeichen umkehren“ ein.

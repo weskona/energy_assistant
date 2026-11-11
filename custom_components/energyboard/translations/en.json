@@ -8,8 +8,8 @@
         "data": {
           "grid_power": "Grid combined (import +, export −)",
           "invert_grid": "Invert grid sign",
-          "grid_import": "Grid import separate (optional, multiple allowed)",
-          "grid_export": "Grid export (optional, multiple allowed)",
+          "grid_import": "Grid import separate (optional)",
+          "grid_export": "Grid export separate (optional)",
           "solar_power": "Solar production (optional, multiple allowed)",
           "battery_power": "Storage combined (discharge +, charge −)",
           "invert_battery": "Invert storage sign",
@@ -34,8 +34,8 @@
         "data": {
           "grid_power": "Grid combined (import +, export −)",
           "invert_grid": "Invert grid sign",
-          "grid_import": "Grid import separate (optional, multiple allowed)",
-          "grid_export": "Grid export (optional, multiple allowed)",
+          "grid_import": "Grid import separate (optional)",
+          "grid_export": "Grid export separate (optional)",
           "solar_power": "Solar production (optional, multiple allowed)",
           "battery_power": "Storage combined (discharge +, charge −)",
           "invert_battery": "Invert storage sign",
