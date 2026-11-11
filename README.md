@@ -104,3 +104,7 @@ npm test
 Every merge to `main` that contains a new `version` in `custom_components/energyboard/manifest.json`
 creates the tag `v<version>` and a GitHub release. The release notes come from the matching
 `## [<version>]` section of `CHANGELOG.md`, which therefore must exist before merging.
+
+## License
+
+[MIT](LICENSE). The bundled font Outfit is licensed under the SIL Open Font License 1.1, see `custom_components/energyboard/frontend/fonts/OFL-Outfit.txt`.
