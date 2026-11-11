@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energyboard import _as_list
 from custom_components.energyboard.const import DOMAIN
 
 
@@ -69,11 +68,3 @@ async def test_options_override_data(hass: HomeAssistant, mock_panel) -> None:
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     assert register.await_args.kwargs["config"]["grid_import"] == ["sensor.new"]
-
-
-def test_as_list() -> None:
-    assert _as_list(None) == []
-    assert _as_list("") == []
-    assert _as_list([]) == []
-    assert _as_list("sensor.a") == ["sensor.a"]
-    assert _as_list(["sensor.a", "sensor.b"]) == ["sensor.a", "sensor.b"]

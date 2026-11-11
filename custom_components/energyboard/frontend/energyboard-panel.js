@@ -44,6 +44,25 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .dev .track{height:6px;border-radius:3px;background:var(--eb-line);margin:6px 0 12px;overflow:hidden}
 .dev .fill{height:100%;border-radius:3px;background:var(--eb-green);transition:width .6s}
 .dev .fill.other{background:var(--eb-dim)}
+.tab{white-space:nowrap}
+.set .sec{margin-bottom:var(--eb-gap)}
+.fld{margin-top:16px}
+.fld>label,.sw{display:block;font-size:12.5px;color:var(--eb-muted);margin-bottom:6px}
+.sw{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--eb-text);font-size:14px;cursor:pointer}
+.sw input{accent-color:var(--eb-green);width:18px;height:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;max-width:100%}
+.chip button{border:0;background:none;color:var(--eb-muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
+.chip button:hover{color:var(--eb-red)}
+.set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
+.set input[type=text]:focus{outline:none;border-color:var(--eb-green)}
+.ferr{color:var(--eb-orange);font-size:12.5px;margin-top:4px}
+.bar2{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:var(--eb-gap)}
+.btn{border:0;border-radius:12px;padding:10px 18px;font:600 14px var(--eb-font);cursor:pointer;background:var(--eb-green);color:#06281d}
+.btn.ghost{background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border)}
+.btn[disabled]{opacity:.4;cursor:default}
+.msg{font-size:13px;color:var(--eb-green)}
+.msg.err{color:var(--eb-red)}
 .note{font-size:12.5px;color:var(--eb-muted)}
 .warn{color:var(--eb-orange)}
 `;
@@ -76,6 +95,33 @@ const STRINGS = {
     otherDevices: "Other (not measured)",
     idleDevices: "{n} idle",
     share: "{pct} % of house",
+    settings: "Settings",
+    save: "Save",
+    discard: "Discard",
+    saved: "Saved",
+    saving: "Saving …",
+    saveFailed: "Could not save: {error}",
+    adminOnly: "Only administrators can change the settings.",
+    noSource: "Grid import, grid combined or house consumption is required.",
+    addSensor: "Add sensor …",
+    unknownSensor: "Unknown sensor: {id}",
+    remove: "Remove",
+    loading: "Loading …",
+    sectionGrid: "Grid and house",
+    sectionSolar: "Solar and storage",
+    sectionDevices: "Devices",
+    f_grid_power: "Grid combined (import +, export −)",
+    f_invert_grid: "Invert grid sign",
+    f_grid_import: "Grid import separate",
+    f_grid_export: "Grid export separate",
+    f_house_power: "House consumption directly (optional)",
+    f_solar_power: "Solar production",
+    f_battery_power: "Storage combined (discharge +, charge −)",
+    f_invert_battery: "Invert storage sign",
+    f_battery_discharge: "From storage (discharging)",
+    f_battery_charge: "To storage (charging)",
+    f_battery_grid_charge: "Storage charged from grid",
+    f_device_power: "Device power sensors",
   },
   de: {
     house: "Haus",
@@ -103,8 +149,47 @@ const STRINGS = {
     otherDevices: "Sonstiges (nicht gemessen)",
     idleDevices: "{n} inaktiv",
     share: "{pct} % vom Haus",
+    settings: "Einstellungen",
+    save: "Speichern",
+    discard: "Verwerfen",
+    saved: "Gespeichert",
+    saving: "Speichert …",
+    saveFailed: "Speichern fehlgeschlagen: {error}",
+    adminOnly: "Nur Administratoren können die Einstellungen ändern.",
+    noSource: "Netzbezug, Netz kombiniert oder Hausverbrauch ist nötig.",
+    addSensor: "Sensor hinzufügen …",
+    unknownSensor: "Unbekannter Sensor: {id}",
+    remove: "Entfernen",
+    loading: "Lädt …",
+    sectionGrid: "Netz und Haus",
+    sectionSolar: "PV und Speicher",
+    sectionDevices: "Geräte",
+    f_grid_power: "Netz kombiniert (Bezug +, Einspeisung −)",
+    f_invert_grid: "Vorzeichen Netz umkehren",
+    f_grid_import: "Netzbezug einzeln",
+    f_grid_export: "Einspeisung einzeln",
+    f_house_power: "Hausverbrauch direkt (optional)",
+    f_solar_power: "PV-Erzeugung",
+    f_battery_power: "Speicher kombiniert (Entladen +, Laden −)",
+    f_invert_battery: "Vorzeichen Speicher umkehren",
+    f_battery_discharge: "Vom Speicher (Entladen)",
+    f_battery_charge: "Zum Speicher (Laden)",
+    f_battery_grid_charge: "Speicher aus dem Netz geladen",
+    f_device_power: "Leistungssensoren der Geräte",
   },
 };
+
+const esc = (t) =>
+  String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// Settings form: [key, kind]. "multi" = several sensors, "single" = one sensor.
+const SETTINGS_SECTIONS = [
+  { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
+  { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
+  { title: "sectionDevices", fields: [["device_power", "multi"]] },
+];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power"];
+const BOOL_KEYS = ["invert_grid", "invert_battery"];
 
 const fmtPower = (w) => {
   if (w == null || Number.isNaN(w)) return ["–", ""];
@@ -124,18 +209,179 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   set panel(p) {
-    this._config = (p && p.config) || {};
-    this._history = null;
-    this._lastHistory = 0;
+    // Initial copy from the panel registration, only a fallback until the live settings arrive.
+    this._fallback = (p && p.config) || {};
   }
   set narrow(n) { this._narrow = n; this._render(); }
   set hass(h) {
     this._hass = h;
+    this._loadConfig();
     this._render();
     this._maybeLoadHistory();
   }
 
-  get _cfg() { return this._config || {}; }
+  get _cfg() { return this._config || this._fallback || {}; }
+
+  get _isAdmin() { return this._hass?.user?.is_admin !== false; }
+
+  /** Load the live settings over the WebSocket API (once). */
+  async _loadConfig() {
+    if (this._ready || this._loadingCfg || !this._hass) return;
+    this._loadingCfg = true;
+    try {
+      this._config = await this._hass.callWS({ type: "energyboard/get_config" });
+    } catch (e) {
+      console.warn("Energyboard: could not load settings, using the registration copy", e);
+      this._config = this._fallback || {};
+    } finally {
+      this._draft = this._normalize(this._config);
+      this._ready = true;
+      this._loadingCfg = false;
+      this._settingsDirty = true;
+      this._render();
+      this._maybeLoadHistory();
+    }
+  }
+
+  /** Settings in the shape of the settings form: lists, booleans, house_power as string or null. */
+  _normalize(cfg = {}) {
+    const out = { house_power: cfg.house_power || null };
+    for (const k of LIST_KEYS) out[k] = Array.isArray(cfg[k]) ? [...cfg[k]] : cfg[k] ? [cfg[k]] : [];
+    for (const k of BOOL_KEYS) out[k] = !!cfg[k];
+    return out;
+  }
+
+  _draftList(key) {
+    const v = this._draft?.[key];
+    return key === "house_power" ? (v ? [v] : []) : v || [];
+  }
+
+  _draftAdd(key, id, mode) {
+    if (key === "house_power") this._draft.house_power = id;
+    else if (mode === "single") this._draft[key] = [id];
+    else if (!this._draft[key].includes(id)) this._draft[key] = [...this._draft[key], id];
+  }
+
+  _draftRemove(key, id) {
+    if (key === "house_power") this._draft.house_power = null;
+    else this._draft[key] = this._draft[key].filter((x) => x !== id);
+  }
+
+  _hasSource(d = this._draft) {
+    return !!(d?.house_power || d?.grid_import?.length || d?.grid_power?.length);
+  }
+
+  _isDirty() {
+    return JSON.stringify(this._draft) !== JSON.stringify(this._normalize(this._config));
+  }
+
+  /** Power sensors offered in the picker. */
+  _candidates() {
+    const states = this._hass?.states || {};
+    return Object.entries(states)
+      .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
+      .map(([id, st]) => ({ id, name: st.attributes.friendly_name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async _save() {
+    this._status = "saving";
+    this._settingsDirty = true;
+    this._render();
+    try {
+      this._config = await this._hass.callWS({ type: "energyboard/update_config", config: this._draft });
+      this._draft = this._normalize(this._config);
+      this._history = null;
+      this._lastHistory = 0;
+      this._status = "saved";
+      this._error = "";
+      this._maybeLoadHistory();
+    } catch (e) {
+      this._status = "error";
+      this._error = e?.code === "no_source" ? this._t("noSource") : e?.message || String(e);
+    }
+    this._settingsDirty = true;
+    this._render();
+  }
+
+  _onClick(e) {
+    const rm = e.target.closest("[data-remove]");
+    if (rm && this._isAdmin) {
+      this._draftRemove(rm.dataset.remove, rm.dataset.id);
+      this._edited();
+    } else if (e.target.closest("[data-save]") && this._isAdmin && !this._saveDisabled()) {
+      this._save();
+    } else if (e.target.closest("[data-discard]")) {
+      this._draft = this._normalize(this._config);
+      this._edited();
+    }
+  }
+
+  _onChange(e) {
+    const t = e.target;
+    if (!this._isAdmin) return;
+    if (t.dataset?.bool) {
+      this._draft[t.dataset.bool] = t.checked;
+      this._edited();
+    } else if (t.dataset?.add) {
+      const id = t.value.trim();
+      if (!id) return;
+      if (this._hass?.states?.[id]) {
+        this._draftAdd(t.dataset.add, id, t.dataset.mode);
+        this._fieldError = {};
+      } else {
+        this._fieldError = { [t.dataset.add]: this._t("unknownSensor", { id }) };
+      }
+      this._edited(t.dataset.add);
+    }
+  }
+
+  _edited(focusKey) {
+    this._status = "";
+    this._settingsDirty = true;
+    this._render();
+    if (focusKey) this.shadowRoot.querySelector(`input[data-add="${focusKey}"]`)?.focus();
+  }
+
+  _saveDisabled() {
+    return !this._isAdmin || this._status === "saving" || !this._isDirty() || !this._hasSource();
+  }
+
+  _renderSettings() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const ro = !this._isAdmin;
+    const states = this._hass?.states || {};
+    const nameOf = (id) => states[id]?.attributes?.friendly_name || id;
+    const options = this._candidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+    const field = ([key, kind]) => {
+      const label = this._t(`f_${key}`);
+      if (kind === "bool") {
+        return `<label class="sw"><input type="checkbox" data-bool="${key}" ${this._draft[key] ? "checked" : ""} ${ro ? "disabled" : ""}>${esc(label)}</label>`;
+      }
+      const chips = this._draftList(key)
+        .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
+        .join("");
+      const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
+      return `<div class="fld"><label>${esc(label)}</label>
+        ${chips ? `<div class="chips">${chips}</div>` : ""}
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" list="eb-sensors" placeholder="${esc(this._t("addSensor"))}" autocomplete="off">`}${err}</div>`;
+    };
+    const sections = SETTINGS_SECTIONS.map(
+      (sec) => `<div class="eb-card sec"><div class="eb-title">${this._t(sec.title)}</div>${sec.fields.map(field).join("")}</div>`,
+    ).join("");
+    const dirty = this._isDirty();
+    let msg = "";
+    if (ro) msg = `<span class="msg err">${this._t("adminOnly")}</span>`;
+    else if (!this._hasSource()) msg = `<span class="msg err">${this._t("noSource")}</span>`;
+    else if (this._status === "saving") msg = `<span class="msg">${this._t("saving")}</span>`;
+    else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
+    else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
+    return `<datalist id="eb-sensors">${options}</datalist>
+      <div class="set"><div class="grid">${sections}</div>
+      ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
+        <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
+        <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
+  }
 
   /** Translate a key using the Home Assistant UI language (de, otherwise en). */
   _t(key, vars = {}) {
@@ -241,7 +487,7 @@ class EnergyboardPanel extends HTMLElement {
 
   async _maybeLoadHistory() {
     const now = Date.now();
-    if (!this._hass || this._loading || now - this._lastHistory < 5 * 60 * 1000) return;
+    if (!this._hass || !this._ready || this._loading || now - this._lastHistory < 5 * 60 * 1000) return;
     const c = this._cfg;
     const ids = [c.house_power, ...(c.solar_power || []), ...(c.grid_import || []), ...(c.grid_export || []),
       ...(c.battery_discharge || []), ...(c.battery_charge || []),
@@ -367,6 +613,7 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   _renderHouse() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const cur = this._current();
     if (!this._cfg.house_power && !(this._cfg.grid_import || []).length && !(this._cfg.grid_power || []).length) {
       return `<div class="eb-card"><div class="empty">${this._t("notConfigured")}</div></div>`;
@@ -444,21 +691,47 @@ class EnergyboardPanel extends HTMLElement {
         <div class="wrap">
           <div class="top">
             <button class="menu" aria-label="Menu" hidden>☰</button>
-            <div class="tabs"><button class="tab active" data-tab="house">House</button></div>
+            <div class="tabs"><button class="tab active" data-tab="house">House</button><button class="tab" data-tab="settings">Settings</button></div>
           </div>
           <div id="content"></div></div>`;
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
         this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })));
+      const content = this.shadowRoot.getElementById("content");
+      content.addEventListener("click", (e) => this._onClick(e));
+      content.addEventListener("change", (e) => this._onChange(e));
+      this.shadowRoot.querySelector(".tabs").addEventListener("click", (e) => {
+        const tab = e.target.closest("[data-tab]")?.dataset.tab;
+        if (tab && tab !== this._tab) {
+          this._tab = tab;
+          this._html = null;
+          this._settingsDirty = true;
+          this._render();
+        }
+      });
       this._built = true;
     }
     this.shadowRoot.querySelector(".menu").hidden = !this._narrow;
     this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
-    this.shadowRoot.querySelector(".tab").textContent = this._t("house");
+    for (const tab of this.shadowRoot.querySelectorAll(".tab")) {
+      tab.textContent = this._t(tab.dataset.tab);
+      tab.classList.toggle("active", tab.dataset.tab === this._tab);
+    }
+    const content = this.shadowRoot.getElementById("content");
+    if (this._tab === "settings") {
+      // The settings form only redraws on its own edits, so typing is not interrupted
+      // by live state updates from Home Assistant.
+      if (this._settingsDirty) {
+        this._settingsDirty = false;
+        this._html = null;
+        content.innerHTML = this._renderSettings();
+      }
+      return;
+    }
     // Only redraw when the content changes (avoids flicker).
-    const html = this._tab === "house" ? this._renderHouse() : "";
+    const html = this._renderHouse();
     if (html !== this._html) {
       this._html = html;
-      this.shadowRoot.getElementById("content").innerHTML = html;
+      content.innerHTML = html;
     }
   }
 }

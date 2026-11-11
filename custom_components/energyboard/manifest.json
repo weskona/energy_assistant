@@ -1,9 +1,16 @@
 {
   "domain": "energyboard",
   "name": "Energyboard",
-  "codeowners": ["@weskona"],
+  "codeowners": [
+    "@weskona"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "panel_custom"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/weskona/ha-energyboard",
   "integration_type": "service",
   "iot_class": "calculated",

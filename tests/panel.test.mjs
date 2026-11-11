@@ -167,3 +167,76 @@ test("device names are HTML-escaped", () => {
   const p = panel({ device_power: ["a"] }, { a: dev('<img src=x onerror="x">', 100) });
   assert.doesNotMatch(p._renderDevices(200), /<img/);
 });
+
+function settingsPanel(config, { admin = true, states = {} } = {}) {
+  const p = new Panel();
+  p._config = config;
+  p._hass = { user: { is_admin: admin }, states };
+  p._draft = p._normalize(config);
+  p._ready = true;
+  return p;
+}
+
+test("settings: normalize turns strings into lists and fills defaults", () => {
+  const p = new Panel();
+  const n = p._normalize({ grid_import: "sensor.gi", house_power: "", invert_grid: 1 });
+  assert.deepEqual(n.grid_import, ["sensor.gi"]);
+  assert.deepEqual(n.solar_power, []);
+  assert.equal(n.house_power, null);
+  assert.equal(n.invert_grid, true);
+  assert.equal(n.invert_battery, false);
+});
+
+test("settings: add and remove sensors (multi, single and house sensor)", () => {
+  const p = settingsPanel({ grid_import: ["a"], solar_power: ["pv1"] });
+  p._draftAdd("solar_power", "pv2", "multi");
+  p._draftAdd("solar_power", "pv2", "multi");
+  assert.deepEqual(p._draft.solar_power, ["pv1", "pv2"]);
+  p._draftAdd("grid_import", "b", "single");
+  assert.deepEqual(p._draft.grid_import, ["b"]);
+  p._draftAdd("house_power", "h", "single");
+  assert.equal(p._draft.house_power, "h");
+  assert.deepEqual(p._draftList("house_power"), ["h"]);
+  p._draftRemove("house_power", "h");
+  assert.equal(p._draft.house_power, null);
+  p._draftRemove("solar_power", "pv1");
+  assert.deepEqual(p._draft.solar_power, ["pv2"]);
+});
+
+test("settings: dirty detection and save is blocked without a source", () => {
+  const p = settingsPanel({ grid_import: ["a"] });
+  assert.equal(p._isDirty(), false);
+  assert.equal(p._saveDisabled(), true); // nothing changed
+  p._draftAdd("device_power", "oven", "multi");
+  assert.equal(p._isDirty(), true);
+  assert.equal(p._saveDisabled(), false);
+  p._draftRemove("grid_import", "a");
+  assert.equal(p._hasSource(), false);
+  assert.equal(p._saveDisabled(), true);
+  p._draftAdd("grid_power", "g", "multi");
+  assert.equal(p._hasSource(), true);
+});
+
+test("settings: only administrators can save", () => {
+  const p = settingsPanel({ grid_import: ["a"] }, { admin: false });
+  p._draftAdd("device_power", "oven", "multi");
+  assert.equal(p._isAdmin, false);
+  assert.equal(p._saveDisabled(), true);
+  const html = p._renderSettings();
+  assert.doesNotMatch(html, /data-save/);
+  assert.doesNotMatch(html, /data-add=/);
+  assert.match(html, /Only administrators/);
+});
+
+test("settings: only power sensors are offered and names are escaped", () => {
+  const states = {
+    "sensor.p": { state: "1", attributes: { device_class: "power", friendly_name: '<b>"P"</b>' } },
+    "sensor.t": { state: "1", attributes: { device_class: "temperature" } },
+    "light.l": { state: "on", attributes: { device_class: "power" } },
+  };
+  const p = settingsPanel({ grid_import: ["sensor.p"] }, { states });
+  assert.deepEqual(p._candidates().map((c) => c.id), ["sensor.p"]);
+  const html = p._renderSettings();
+  assert.doesNotMatch(html, /<b>/);
+  assert.match(html, /&lt;b&gt;/);
+});

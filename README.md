@@ -8,6 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
+| **Settings** | Change all sensors directly in the panel (see below) |
 
 ## Installation
 
@@ -61,7 +62,18 @@ Without the optional "storage charged from grid" sensor the storage is assumed t
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile with its share of production, in the source bar and as a second line in the history.
 
-You can change the sensors later via *Configure*.
+### Changing the settings
+
+After the first setup in the config flow you can change everything in the panel itself:
+open the **Settings** tab, add sensors by typing or picking from the list of power sensors, remove them with the ×
+and press **Save**. The changes apply immediately, no restart or reload is needed.
+
+- Only administrators can save. Other users see the settings read-only.
+- Saving is blocked while neither grid import, grid combined nor house consumption is set.
+- The same settings are still available via *Configure* on the integration.
+
+The panel talks to the integration over two WebSocket commands, `energyboard/get_config` and
+`energyboard/update_config` (admin only), and stores the result in the options of the config entry.
 
 ## Development
 

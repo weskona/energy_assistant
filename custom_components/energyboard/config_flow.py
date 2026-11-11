@@ -25,6 +25,7 @@ from .const import (
     CONF_SOLAR_POWER,
     DOMAIN,
 )
+from .settings import has_source
 
 _SINGLE = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power")
@@ -78,11 +79,7 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
     """Require house consumption or a grid sensor to calculate it."""
-    if not (
-        user_input.get(CONF_HOUSE_POWER)
-        or user_input.get(CONF_GRID_IMPORT)
-        or user_input.get(CONF_GRID_POWER)
-    ):
+    if not has_source(user_input):
         return {"base": "no_source"}
     return {}
 

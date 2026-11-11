@@ -12,8 +12,14 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
-def skip_dependencies():
-    """The tests do not need frontend, http and panel_custom to be set up."""
+def skip_dependencies(request):
+    """The tests do not need frontend, http and panel_custom to be set up.
+
+    The WebSocket tests need a real http and websocket_api, so they keep the real setup.
+    """
+    if "hass_ws_client" in request.fixturenames:
+        yield
+        return
     with (
         patch("homeassistant.config_entries.async_process_deps_reqs", AsyncMock()),
         patch("homeassistant.setup.async_process_deps_reqs", AsyncMock()),
