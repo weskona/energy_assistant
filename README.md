@@ -16,6 +16,8 @@ Home-Assistant-Integration (HACS) mit eigenem Panel in der Seitenleiste. Dunkles
 
 ## Konfiguration
 
+Die Einrichtung läuft in zwei Schritten: **1. Netz und Haus**, **2. PV und Speicher** (optional).
+
 Alle Sensoren sind Leistungssensoren (`device_class: power`, W oder kW).
 Je Kategorie können ein oder mehrere Sensoren gewählt werden, sie werden addiert.
 Getrennte und kombinierte Sensoren lassen sich mischen.
