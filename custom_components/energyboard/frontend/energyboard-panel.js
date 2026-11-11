@@ -24,7 +24,7 @@ const STYLE = `
 .gear{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--eb-line);background:var(--eb-panel);color:var(--eb-muted);cursor:pointer;padding:0}
 .gear:hover{color:var(--eb-text)}
 .gear.active{background:rgba(255,255,255,.08);color:var(--eb-text);border-color:var(--eb-green)}
-.gear svg{width:20px;height:20px;margin:0}
+.gear svg{width:20px;height:20px}
 .tab{border:0;background:none;color:var(--eb-muted);font:600 14px var(--eb-font);padding:8px 16px;border-radius:10px;cursor:pointer}
 .tab.active{background:rgba(255,255,255,.08);color:var(--eb-text)}
 .grid{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
@@ -42,15 +42,17 @@ const STYLE = `
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .bar{margin-top:16px}
 .bar>div{transition:width .6s}
-svg{width:100%;height:auto;display:block;margin-top:12px}
+svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .axis{fill:var(--eb-dim);font-size:11px}
 .empty{padding:40px 0;text-align:center;color:var(--eb-muted)}
 .state{color:var(--eb-green)}
 .dev{margin-top:14px}
 .dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
-.dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dev .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px}
-.dev .cnt{color:var(--eb-dim);font-size:12px;margin-left:6px}
+.dev .name{display:flex;align-items:center;min-width:0}
+.nt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dev .ico,.mn .ico{--mdc-icon-size:18px;flex:none;margin-right:8px;color:var(--eb-muted)}
+.dev .dot,.mn .dot{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;margin-right:8px}
+.dev .cnt{color:var(--eb-dim);font-size:12px;margin-left:6px;flex:none;white-space:nowrap}
 .dev .val{font-weight:700;white-space:nowrap}
 .dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
 .dev .val small.pct{margin-left:10px;color:var(--eb-muted);display:inline-block;min-width:36px;text-align:right}
@@ -73,7 +75,7 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .mrow{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--eb-line);min-width:0}
 .mrow input{accent-color:var(--eb-green);flex:none}
 .mt{display:flex;flex-direction:column;min-width:0}
-.mn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mn{display:flex;align-items:center;min-width:0}
 .mi{color:var(--eb-dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mrow.ex .mn{color:var(--eb-dim);text-decoration:line-through}
 .segs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
@@ -162,6 +164,11 @@ const STRINGS = {
     filterAll: "All",
     filterGroupState: "Activity",
     filterGroupSel: "Selection",
+    filterSelected: "Selected",
+    filterUnselected: "Not selected",
+    filterLabels: "Filter labels …",
+    noLabelMatches: "No label matches the filters",
+    noPowerLabels: "No label has power sensors yet. Add a label to your power sensors under Settings → Areas, labels & zones.",
     filterActive: "Active",
     filterIdle: "Inactive",
     filterIncluded: "Included",
@@ -249,6 +256,11 @@ const STRINGS = {
     filterAll: "Alle",
     filterGroupState: "Aktivität",
     filterGroupSel: "Auswahl",
+    filterSelected: "Ausgewählt",
+    filterUnselected: "Nicht ausgewählt",
+    filterLabels: "Labels filtern …",
+    noLabelMatches: "Kein Label passt zu den Filtern",
+    noPowerLabels: "Noch kein Label hat Leistungssensoren. Versieh deine Leistungssensoren unter Einstellungen → Bereiche, Labels & Zonen mit einem Label.",
     filterActive: "Aktiv",
     filterIdle: "Inaktiv",
     filterIncluded: "Enthalten",
@@ -450,7 +462,13 @@ class EnergyboardPanel extends HTMLElement {
     const rm = e.target.closest("[data-remove]");
     const bulk = e.target.closest("[data-bulk]");
     const seg = e.target.closest("[data-seg]");
-    if (seg) {
+    const lseg = e.target.closest("[data-lseg]");
+    if (lseg) {
+      const [group, value] = lseg.dataset.lseg.split(":");
+      if (group === "state") this._lState = value;
+      else this._lSel = value;
+      this._edited();
+    } else if (seg) {
       // View filters of the match list. They also decide what the bulk buttons act on.
       const [group, value] = seg.dataset.seg.split(":");
       if (group === "state") this._fState = value;
@@ -523,6 +541,12 @@ class EnergyboardPanel extends HTMLElement {
 
   /** Typing in the filter box only redraws the match list, so the box keeps its focus. */
   _onInput(e) {
+    if (e.target.dataset?.lfilter !== undefined) {
+      this._lFilter = e.target.value.toLowerCase();
+      const list = this.shadowRoot.getElementById("llist");
+      if (list) list.innerHTML = this._renderLabelRows(!this._isAdmin);
+      return;
+    }
     if (e.target.dataset?.filter === undefined) return;
     this._filter = e.target.value.toLowerCase();
     const list = this.shadowRoot.getElementById("mlist");
@@ -532,11 +556,13 @@ class EnergyboardPanel extends HTMLElement {
   _edited(focusKey) {
     this._status = "";
     this._settingsDirty = true;
-    const scroll = this.shadowRoot.getElementById("mlist")?.scrollTop;
+    // The form is redrawn as a whole. Keep the scroll position of the long lists so ticking a
+    // checkbox does not throw the list back to its start.
+    const scrolls = ["mlist", "llist"].map((id) => [id, this.shadowRoot.getElementById(id)?.scrollTop]);
     this._render();
-    if (scroll) {
-      const list = this.shadowRoot.getElementById("mlist");
-      if (list) list.scrollTop = scroll;
+    for (const [id, top] of scrolls) {
+      const list = this.shadowRoot.getElementById(id);
+      if (top && list) list.scrollTop = top;
     }
     if (focusKey) this.shadowRoot.querySelector(`input[data-add="${focusKey}"]`)?.focus();
   }
@@ -597,21 +623,66 @@ class EnergyboardPanel extends HTMLElement {
       .join("");
   }
 
-  /** Checkbox list of the labels that exist in Home Assistant. */
-  _renderLabelPicker(ro) {
-    if (!this._labelData) return `<div class="hint">${esc(this._t("loading"))}</div>`;
-    const labels = this._labelData.labels;
-    if (!labels.length) return `<div class="hint">${esc(this._t("noLabelsDefined"))}</div>`;
+  /**
+   * Labels for the picker: only labels that have power sensors (plus already selected ones, so they
+   * can be unselected again), with the summed power of their sensors and the filters applied.
+   */
+  _labelPicker() {
     const selected = new Set(this._draft.label_ids);
-    const rows = labels
-      .map((l) => {
+    const all = (this._labelData?.labels || [])
+      .map((label) => {
         // Same count as the card: sensors of the energy balance and excluded sensors do not count.
-        const n = this._labelMembers(l.label_id, this._draft).length;
-        const dot = l.color && /^[a-z-]+$/.test(l.color) ? `<i class="dot" style="background:var(--${l.color}-color, var(--eb-green))"></i>` : "";
-        return `<label class="mrow"><input type="checkbox" data-label="${esc(l.label_id)}" ${selected.has(l.label_id) ? "checked" : ""} ${ro ? "disabled" : ""}><span class="mt"><span class="mn">${dot}${esc(l.name)}</span><span class="mi">${esc(this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }))}</span></span></label>`;
+        const members = this._labelMembers(label.label_id, this._draft);
+        const w = members.reduce((a, id) => a + (this._watts(id) || 0), 0);
+        return { label, n: members.length, w, selected: selected.has(label.label_id) };
+      })
+      .filter((x) => x.n > 0 || x.selected);
+    const count = (fn) => all.filter(fn).length;
+    const counts = {
+      all: all.length,
+      active: count((x) => x.w >= IDLE_W),
+      idle: count((x) => x.w < IDLE_W),
+      selected: count((x) => x.selected),
+      unselected: count((x) => !x.selected),
+    };
+    const q = (this._lFilter || "").trim();
+    const fState = this._lState || "all";
+    const fSel = this._lSel || "all";
+    const shown = all.filter((x) => {
+      if (fState === "active" && x.w < IDLE_W) return false;
+      if (fState === "idle" && x.w >= IDLE_W) return false;
+      if (fSel === "selected" && !x.selected) return false;
+      if (fSel === "unselected" && x.selected) return false;
+      return !q || `${x.label.name} ${x.label.label_id}`.toLowerCase().includes(q);
+    });
+    return { all, shown, counts };
+  }
+
+  _renderLabelRows(ro) {
+    const { shown } = this._labelPicker();
+    if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t("noLabelMatches"))}</div>`;
+    return shown
+      .map(({ label: l, n, w, selected }) => {
+        const dot = this._iconHtml(l.icon || "mdi:label", l.color);
+        const sub = this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }) + (w >= IDLE_W ? ` · ${fmtPower(w).join(" ")}` : "");
+        return `<label class="mrow"><input type="checkbox" data-label="${esc(l.label_id)}" ${selected ? "checked" : ""} ${ro ? "disabled" : ""}><span class="mt"><span class="mn">${dot}<span class="nt">${esc(l.name)}</span></span><span class="mi">${esc(sub)}</span></span></label>`;
       })
       .join("");
-    return `<div class="mlist">${rows}</div>`;
+  }
+
+  /** Checkbox list of the labels that exist in Home Assistant, with filters. */
+  _renderLabelPicker(ro) {
+    if (!this._labelData) return `<div class="hint">${esc(this._t("loading"))}</div>`;
+    if (!this._labelData.labels.length) return `<div class="hint">${esc(this._t("noLabelsDefined"))}</div>`;
+    const { all, counts } = this._labelPicker();
+    if (!all.length) return `<div class="hint">${esc(this._t("noPowerLabels"))}</div>`;
+    const seg = (group, value, key, tipKey) => {
+      const on = (group === "state" ? this._lState || "all" : this._lSel || "all") === value;
+      return `<button type="button" class="seg${on ? " on" : ""}" data-lseg="${group}:${value}"${tipKey ? ` title="${esc(this._t(tipKey))}"` : ""}>${esc(this._t(key))} <small>${counts[value]}</small></button>`;
+    };
+    return `<div class="mbar"><input type="text" data-lfilter value="${esc(this._lFilter || "")}" placeholder="${esc(this._t("filterLabels"))}" autocomplete="off" style="flex:1 1 160px;width:auto"></div>
+      <div class="segs"><span class="seglab">${esc(this._t("filterGroupState"))}</span>${seg("state", "all", "filterAll")}${seg("state", "active", "filterActive", "filterActiveTip")}${seg("state", "idle", "filterIdle", "filterIdleTip")}<span class="sep"></span><span class="seglab">${esc(this._t("filterGroupSel"))}</span>${seg("sel", "all", "filterAll")}${seg("sel", "selected", "filterSelected")}${seg("sel", "unselected", "filterUnselected")}</div>
+      <div class="mlist" id="llist">${this._renderLabelRows(ro)}</div>`;
   }
 
   _renderMatches(ro) {
@@ -922,7 +993,7 @@ class EnergyboardPanel extends HTMLElement {
       const label = new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       return `<text class="axis" x="${x(t)}" y="${H - 6}" text-anchor="${h === 0 ? "start" : h === 24 ? "end" : "middle"}">${label}</text>`;
     }).join("");
-    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${this._t("chartLabel")}">
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${this._t("chartLabel")}">
       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#34d399" stop-opacity=".35"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/>
       </linearGradient></defs>
@@ -989,11 +1060,25 @@ class EnergyboardPanel extends HTMLElement {
     });
   }
 
+  /**
+   * Home Assistant icon (mdi:...) in front of a name, tinted with the label color if there is one.
+   * Without the <ha-icon> element (or a valid icon) the colored dot is used, else nothing.
+   */
+  _iconHtml(icon, color) {
+    const safeColor = color && /^[a-z-]+$/.test(color) ? color : "";
+    if (icon && /^[a-z0-9-]+:[a-z0-9-]+$/i.test(icon) && globalThis.customElements?.get?.("ha-icon")) {
+      const tint = safeColor ? ` style="color:var(--${safeColor}-color, var(--eb-muted))"` : "";
+      return `<ha-icon class="ico" icon="${esc(icon)}"${tint}></ha-icon>`;
+    }
+    return safeColor ? `<i class="dot" style="background:var(--${safeColor}-color, var(--eb-green))"></i>` : "";
+  }
+
   /** Area of an entity: its own area, otherwise the area of its device. null if none. */
   _areaOf(entityId) {
     const ent = this._hass?.entities?.[entityId];
     const areaId = ent?.area_id || (ent?.device_id && this._hass?.devices?.[ent.device_id]?.area_id);
-    return areaId ? { id: areaId, name: this._hass?.areas?.[areaId]?.name || areaId } : null;
+    const area = areaId && this._hass?.areas?.[areaId];
+    return areaId ? { id: areaId, name: area?.name || areaId, icon: area?.icon || null } : null;
   }
 
   /** The same sensors as the device list, summed up per Home Assistant area. */
@@ -1002,7 +1087,11 @@ class EnergyboardPanel extends HTMLElement {
     for (const d of this._devices()) {
       const area = this._areaOf(d.id);
       const key = area ? area.id : "";
-      const g = groups.get(key) || { name: area ? area.name : this._t("noArea"), w: 0, n: 0, none: !area, tips: [] };
+      const g = groups.get(key) || {
+        name: area ? area.name : this._t("noArea"),
+        icon: area ? area.icon || "mdi:texture-box" : "mdi:help-circle-outline",
+        w: 0, n: 0, none: !area, tips: [],
+      };
       g.w += d.w;
       g.n += 1;
       g.tips.push(`${d.name} ${fmtPower(d.w).join(" ")}`);
@@ -1054,6 +1143,7 @@ class EnergyboardPanel extends HTMLElement {
         return {
           name: byId[id].name,
           color: byId[id].color,
+          icon: byId[id].icon || "mdi:label",
           w: members.reduce((a, m) => a + m.w, 0),
           n,
           sub: this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }),
@@ -1089,7 +1179,7 @@ class EnergyboardPanel extends HTMLElement {
         // Share of the house power, only known when the house power is known.
         const share = house > 0 ? Math.round((d.w / house) * 100) : null;
         const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || ""].filter(Boolean).join(" · ");
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${d.color && /^[a-z-]+$/.test(d.color) ? `<i class="dot" style="background:var(--${d.color}-color, var(--eb-green))"></i>` : ""}${esc(d.name)}${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${this._iconHtml(d.icon, d.color)}<span class="nt">${esc(d.name)}</span>${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
           <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })

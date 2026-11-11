@@ -7,7 +7,11 @@ globalThis.HTMLElement = class {
   attachShadow() { return {}; }
 };
 globalThis.document = { getElementById: () => ({}), createElement: () => ({}), head: { appendChild() {} } };
-globalThis.customElements = { define: (_n, cls) => { Panel = cls; } };
+// <ha-icon> exists in Home Assistant only. Tests switch it on with globalThis.haIcon = true.
+globalThis.customElements = {
+  define: (_n, cls) => { Panel = cls; },
+  get: (name) => (name === "ha-icon" && globalThis.haIcon ? class {} : undefined),
+};
 
 await import("../custom_components/energyboard/frontend/energyboard-panel.js");
 
@@ -812,10 +816,10 @@ test("labels: the settings list shows the existing labels with their sensor coun
   p._ready = true;
   const html = p._renderSettings();
   assert.match(html, /data-label="klima" checked/);
-  assert.match(html, /data-label="unbenutzt"\s+>/);
+  assert.doesNotMatch(html, /data-label="unbenutzt"/); // no power sensors, so it is not offered
   // same count as the card: klimaanlage, lüftung, split (the excluded and the grid sensor do not count)
-  assert.match(html, /Klima<\/span><span class="mi">3 power sensors/);
-  assert.match(html, /Unbenutzt<\/span><span class="mi">0 power sensors/);
+  assert.match(html, /Klima<\/span><\/span><span class="mi">3 power sensors · 1\.6 kW/);
+  assert.match(html, /Licht<\/span><\/span><span class="mi">1 power sensor · 15 W</);
 });
 
 test("labels: ticking a label in the settings selects it", () => {
@@ -855,4 +859,144 @@ test("labels: read-only for non-admins, hint when no labels exist, escaped names
   const html = evil._renderSettings();
   assert.doesNotMatch(html, /<img/);
   assert.doesNotMatch(html, /<script>/);
+});
+
+
+function pickerPanel(selected = []) {
+  const p = labelPanel({ label_ids: selected });
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._ready = true;
+  p._edited = () => {};
+  return p;
+}
+const lseg = (value) => ({ target: { closest: (s) => (s === "[data-lseg]" ? { dataset: { lseg: value } } : null) } });
+const names = (p) => p._labelPicker().shown.map((x) => x.label.name);
+
+test("label picker: only labels with power sensors are offered", () => {
+  const p = pickerPanel();
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+  assert.equal(p._labelPicker().counts.all, 2);
+});
+
+test("label picker: a selected label without power sensors stays so it can be unselected", () => {
+  const p = pickerPanel(["unbenutzt"]);
+  assert.deepEqual(names(p), ["Klima", "Licht", "Unbenutzt"]);
+  const html = p._renderSettings();
+  assert.match(html, /data-label="unbenutzt" checked/);
+  p._onChange({ target: { dataset: { label: "unbenutzt" }, checked: false } });
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+});
+
+test("label picker: hint when no label has power sensors", () => {
+  const p = pickerPanel();
+  p._labelData.entities = {};
+  assert.match(p._renderSettings(), /No label has power sensors yet/);
+});
+
+test("label picker: activity filter uses the summed power of the label", () => {
+  const p = pickerPanel();
+  p._hass.states["sensor.licht_flur_leistung"].state = "2"; // Licht drops below 5 W
+  assert.deepEqual(p._labelPicker().counts, { all: 2, active: 1, idle: 1, selected: 0, unselected: 2 });
+  p._onClick(lseg("state:active"));
+  assert.deepEqual(names(p), ["Klima"]);
+  p._onClick(lseg("state:idle"));
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("state:all"));
+  assert.deepEqual(names(p), ["Klima", "Licht"]);
+});
+
+test("label picker: selection filter and combination with the text filter", () => {
+  const p = pickerPanel(["klima"]);
+  p._onClick(lseg("sel:selected"));
+  assert.deepEqual(names(p), ["Klima"]);
+  p._onClick(lseg("sel:unselected"));
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("sel:all"));
+  p._lFilter = "lic";
+  assert.deepEqual(names(p), ["Licht"]);
+  p._onClick(lseg("state:idle"));
+  assert.deepEqual(names(p), []);
+  assert.match(p._renderLabelRows(false), /No label matches the filters/);
+});
+
+test("label picker: the filter also finds labels by their id", () => {
+  const p = pickerPanel();
+  p._labelData.labels[0].name = "Raumklima";
+  p._lFilter = "klima";
+  assert.deepEqual(names(p), ["Raumklima"]);
+});
+
+test("label picker: buttons show counts and mark the chosen filter, read-only for non-admins still filters", () => {
+  const p = pickerPanel(["klima"]);
+  p._onClick(lseg("sel:selected"));
+  const html = p._renderSettings();
+  assert.match(html, /class="seg on" data-lseg="sel:selected"[^>]*>Selected <small>1<\/small>/);
+  assert.match(html, /class="seg" data-lseg="sel:unselected"[^>]*>Not selected <small>1<\/small>/);
+  assert.match(html, /data-lfilter/);
+  assert.match(html, /id="llist"/);
+  p._hass.user = { is_admin: false };
+  p._onClick(lseg("sel:all"));
+  assert.equal(names(p).length, 2);
+});
+
+
+function withIcons(fn) {
+  globalThis.haIcon = true;
+  try {
+    fn();
+  } finally {
+    globalThis.haIcon = false;
+  }
+}
+
+test("icons: areas show their Home Assistant icon, with defaults for areas without one and for no area", () => {
+  withIcons(() => {
+    const p = areaPanel(undefined, {
+      areas: { kueche: { name: "Küche", icon: "mdi:silverware-fork-knife" }, wohnzimmer: { name: "Wohnzimmer" }, technik: { name: "Technik" }, keller: { name: "Keller" } },
+    });
+    const html = p._renderAreas(2000);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:silverware-fork-knife"><\/ha-icon><span class="nt">Küche/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:texture-box"><\/ha-icon><span class="nt">Wohnzimmer/); // no icon set
+    assert.match(html, /<ha-icon class="ico" icon="mdi:help-circle-outline"><\/ha-icon><span class="nt">No area/);
+  });
+});
+
+test("icons: labels show their icon tinted with the label color, default mdi:label", () => {
+  withIcons(() => {
+    const p = labelPanel();
+    p._labelData.labels[0].icon = "mdi:snowflake"; // Klima, color blue
+    const html = p._renderLabels(2000);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:snowflake" style="color:var\(--blue-color, var\(--eb-muted\)\)"><\/ha-icon><span class="nt">Klima/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:label"><\/ha-icon><span class="nt">Licht/); // no icon, no color
+  });
+});
+
+test("icons: the label picker uses the icons too", () => {
+  withIcons(() => {
+    const p = pickerPanel();
+    p._labelData.labels[0].icon = "mdi:snowflake";
+    const html = p._renderSettings();
+    assert.match(html, /<ha-icon class="ico" icon="mdi:snowflake"[^>]*><\/ha-icon><span class="nt">Klima/);
+    assert.match(html, /<ha-icon class="ico" icon="mdi:label"><\/ha-icon><span class="nt">Licht/);
+  });
+});
+
+test("icons: without the ha-icon element a colored label falls back to a dot, areas show nothing", () => {
+  const labels = labelPanel()._renderLabels(2000);
+  assert.doesNotMatch(labels, /ha-icon/);
+  assert.match(labels, /<i class="dot" style="background:var\(--blue-color/); // Klima
+  assert.doesNotMatch(areaPanel()._renderAreas(2000), /ha-icon|class="dot"/);
+});
+
+test("icons: invalid icon names and colors are not put into the page", () => {
+  withIcons(() => {
+    const p = labelPanel();
+    p._labelData.labels[0].icon = 'x" onmouseover="alert(1)';
+    p._labelData.labels[0].color = 'red;background:url(x)';
+    const html = p._renderLabels(2000);
+    assert.doesNotMatch(html, /onmouseover/);
+    assert.doesNotMatch(html, /url\(x\)/);
+    assert.match(html, /<span class="name"[^>]*><span class="nt">Klima/); // neither icon nor dot
+  });
 });
