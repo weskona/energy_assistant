@@ -50,12 +50,13 @@ Separate and combined sensors can be mixed.
   a pattern with a dot (`sensor.kitchen_*`) with the full entity id. Upper and lower case do not matter.
 - **Only power entities:** only `sensor` entities with `device_class: power` are considered.
   Sensors that are part of the energy balance (grid, solar, storage, house) are never listed as devices.
-- **Exclude list:** not every sensor that matches a pattern is wanted. In the Settings tab the matches are shown
-  as chips, a click on ⊘ puts a sensor on the **excluded sensors** list. It is then no longer added by any pattern.
-  Remove it from that list to bring it back.
+- **Exclude list:** not every sensor that matches a pattern is wanted. In the Settings tab all matches are listed
+  with a checkbox each. Untick a sensor to exclude it, tick it again to bring it back. Excluded sensors stay in the
+  list (struck through) and are collected in the **excluded sensors** field. With many matches use the filter box
+  (searches names and entity ids) and **Exclude shown** / **Include shown**, which only act on the shown sensors.
 - **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
   Sensors picked here always stay in the list, even if they are on the exclude list.
-- Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
+- The House tab shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
   as "Other (not measured)".
 
 In the panel's **Settings** tab the field shows live which sensors a pattern matches.

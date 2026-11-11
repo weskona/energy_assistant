@@ -343,25 +343,97 @@ test("exclude: sensors picked explicitly stay in the list even if excluded", () 
   assert.deepEqual(p._devices().map((d) => d.name), ["B"]);
 });
 
-test("exclude: clicking the exclude button of a match puts it on the exclude list", () => {
-  const states = { "sensor.a_leistung": power("A"), "sensor.b_leistung": power("B") };
-  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"] }, { states });
+function matchPanel(admin = true) {
+  const states = {
+    "sensor.herd_leistung": power("Herd"),
+    "sensor.ofen_leistung": power("Ofen"),
+    "sensor.licht_flur_leistung": power("Licht Flur"),
+    "sensor.licht_bad_leistung": power("Licht Bad"),
+  };
+  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"] }, { admin, states });
   p._edited = () => {}; // no shadow DOM in this test
-  const target = (sel, data) => ({ closest: (s) => (s === sel ? { dataset: data } : null) });
-  p._onClick({ target: target("[data-exclude]", { exclude: "sensor.b_leistung" }) });
-  p._onClick({ target: target("[data-exclude]", { exclude: "sensor.b_leistung" }) }); // no duplicate
-  assert.deepEqual(p._draft.device_exclude, ["sensor.b_leistung"]);
-  assert.deepEqual(p._discoverDevices(p._draft.device_patterns, p._draft), ["sensor.a_leistung"]);
-  const html = p._renderSettings();
-  assert.match(html, /1 matching/);
-  assert.match(html, /data-exclude="sensor.a_leistung"/);
-  assert.doesNotMatch(html, /data-exclude="sensor.b_leistung"/);
+  return p;
+}
+const checkbox = (id, checked) => ({ target: { dataset: { device: id }, checked } });
+const click = (sel, data = {}) => ({ target: { closest: (s) => (s === sel ? { dataset: data } : null) } });
+
+test("matches: unticking a match excludes it, ticking brings it back", () => {
+  const p = matchPanel();
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  p._onChange(checkbox("sensor.ofen_leistung", false)); // no duplicate
+  assert.deepEqual(p._draft.device_exclude, ["sensor.ofen_leistung"]);
+  assert.deepEqual(p._discoverDevices(p._draft.device_patterns, p._draft), ["sensor.herd_leistung", "sensor.licht_bad_leistung", "sensor.licht_flur_leistung"]);
+  p._onChange(checkbox("sensor.ofen_leistung", true));
+  assert.deepEqual(p._draft.device_exclude, []);
 });
 
-test("exclude: administrators only", () => {
-  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"] }, { admin: false, states: { "sensor.a_leistung": power("A") } });
-  p._edited = () => {};
-  p._onClick({ target: { closest: (s) => (s === "[data-exclude]" ? { dataset: { exclude: "sensor.a_leistung" } } : null) } });
+test("matches: excluded sensors stay in the list (unticked) so they can be re-included", () => {
+  const p = matchPanel();
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  const html = p._renderSettings();
+  assert.match(html, /4 matching, 1 excluded/);
+  const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
+  assert.doesNotMatch(box("sensor.ofen_leistung"), /checked/);
+  assert.match(box("sensor.herd_leistung"), /checked/);
+  assert.match(html, /mrow ex/);
+});
+
+test("matches: filter narrows the list and bulk actions only touch the shown sensors", () => {
+  const p = matchPanel();
+  p._filter = "licht";
+  assert.deepEqual(p._matchList().shown, ["sensor.licht_bad_leistung", "sensor.licht_flur_leistung"]);
+  p._onClick(click("[data-bulk]", { bulk: "exclude" }));
+  assert.deepEqual(p._draft.device_exclude.sort(), ["sensor.licht_bad_leistung", "sensor.licht_flur_leistung"]);
+  p._filter = "";
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  p._filter = "licht";
+  p._onClick(click("[data-bulk]", { bulk: "include" }));
+  assert.deepEqual(p._draft.device_exclude, ["sensor.ofen_leistung"]); // only the shown ones came back
+});
+
+test("matches: the filter also finds sensors by entity id", () => {
+  const p = matchPanel();
+  p._filter = "ofen_leis";
+  assert.deepEqual(p._matchList().shown, ["sensor.ofen_leistung"]);
+  p._filter = "nothing";
+  assert.deepEqual(p._matchList().shown, []);
+  assert.match(p._renderMatchRows(false), /No power sensor matches yet/);
+});
+
+test("matches: administrators only", () => {
+  const p = matchPanel(false);
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  p._onClick(click("[data-bulk]", { bulk: "exclude" }));
   assert.deepEqual(p._draft.device_exclude, []);
-  assert.doesNotMatch(p._renderSettings(), /data-exclude/);
+  const html = p._renderSettings();
+  assert.doesNotMatch(html, /data-bulk/);
+  assert.match(html, /disabled/);
+});
+
+test("device card: only the strongest devices show, the rest folds away", () => {
+  const states = {};
+  const ids = [];
+  for (let i = 1; i <= 12; i++) {
+    ids.push(`sensor.d${i}`);
+    states[`sensor.d${i}`] = { state: String(i * 100), attributes: { unit_of_measurement: "W", friendly_name: `Dev ${i}` } };
+  }
+  const p = discoverPanel({ device_power: ids }, states);
+  let html = p._renderDevices(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 8);
+  assert.match(html, /Dev 12/);
+  assert.doesNotMatch(html, /Dev 4</);
+  assert.match(html, /Show all 12/);
+  p._onClick(click("[data-devtoggle]"));
+  html = p._renderDevices(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 12);
+  assert.match(html, /Show less/);
+});
+
+test("device card: no toggle for a short list and the unmeasured rest is always shown", () => {
+  const states = {};
+  for (let i = 1; i <= 10; i++) states[`sensor.d${i}`] = { state: String(i * 100), attributes: { unit_of_measurement: "W", friendly_name: `Dev ${i}` } };
+  const p = discoverPanel({ device_power: Object.keys(states) }, states);
+  assert.match(p._renderDevices(9000), /Other \(not measured\)/); // folded list still shows the rest row
+  const short = discoverPanel({ device_power: ["sensor.d1", "sensor.d2"] }, states);
+  assert.doesNotMatch(short._renderDevices(null), /data-devtoggle/);
 });

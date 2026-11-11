@@ -56,6 +56,17 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .chip button:hover{color:var(--eb-red)}
 .set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
 .set input[type=text]:focus{outline:none;border-color:var(--eb-green)}
+.mlist{max-height:260px;overflow:auto;border:1px solid var(--eb-tile-border);border-radius:10px;margin-top:8px}
+.mrow{display:flex;align-items:center;gap:10px;padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--eb-line)}
+.mrow:last-child{border-bottom:0}
+.mrow input{accent-color:var(--eb-green);flex:none}
+.mn{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi{color:var(--eb-dim);font-size:11.5px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow.ex .mn{color:var(--eb-dim);text-decoration:line-through}
+.mbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.mbar .btn{padding:7px 12px;font-size:12.5px}
+.devlist{max-height:480px;overflow:auto}
+.linkbtn{border:0;background:none;color:var(--eb-green);font:600 13px var(--eb-font);cursor:pointer;padding:6px 0}
 .hint{color:var(--eb-muted);font-size:12.5px;margin-top:6px}
 .ferr{color:var(--eb-orange);font-size:12.5px;margin-top:4px}
 .bar2{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:var(--eb-gap)}
@@ -126,9 +137,12 @@ const STRINGS = {
     f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
-    matches: "{n} matching. Use ⊘ to exclude a sensor.",
-    moreMatches: "+{n} more",
-    exclude: "Exclude from the device list",
+    matchesCount: "{n} matching, {x} excluded. Untick a sensor to exclude it.",
+    filterMatches: "Filter matches …",
+    excludeShown: "Exclude shown",
+    includeShown: "Include shown",
+    showAll: "Show all {n}",
+    showLess: "Show less",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
     noMatches: "No power sensor matches yet",
   },
@@ -188,9 +202,12 @@ const STRINGS = {
     f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
-    matches: "{n} passend. Mit ⊘ schließt du einen Sensor aus.",
-    moreMatches: "+{n} weitere",
-    exclude: "Aus der Geräteliste ausschließen",
+    matchesCount: "{n} passend, {x} ausgeschlossen. Häkchen entfernen schließt einen Sensor aus.",
+    filterMatches: "Treffer filtern …",
+    excludeShown: "Gezeigte ausschließen",
+    includeShown: "Gezeigte zulassen",
+    showAll: "Alle {n} zeigen",
+    showLess: "Weniger zeigen",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
     noMatches: "Noch kein Leistungssensor passt",
   },
@@ -211,13 +228,21 @@ const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", 
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
 
 /**
- * Does an entity id match a name pattern? "*" matches any text, "?" one character.
+ * Name patterns: "*" matches any text, "?" one character.
  * Without a dot the pattern is compared with the part after "sensor.", e.g. "*_power".
  */
-const matchesPattern = (entityId, pattern) => {
-  const target = pattern.includes(".") ? entityId : entityId.slice(entityId.indexOf(".") + 1);
+const patternRegExp = (pattern) => {
   const re = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
-  return new RegExp(`^${re}$`, "i").test(target);
+  return { full: pattern.includes("."), re: new RegExp(`^${re}$`, "i") };
+};
+
+/** Compile patterns once and return a function that tests entity ids. */
+const compilePatterns = (patterns) => {
+  const list = patterns.map(patternRegExp);
+  return (entityId) => {
+    const short = entityId.slice(entityId.indexOf(".") + 1);
+    return list.some((p) => p.re.test(p.full ? entityId : short));
+  };
 };
 const BOOL_KEYS = ["invert_grid", "invert_battery"];
 
@@ -336,12 +361,18 @@ class EnergyboardPanel extends HTMLElement {
 
   _onClick(e) {
     const rm = e.target.closest("[data-remove]");
-    const ex = e.target.closest("[data-exclude]");
-    if (rm && this._isAdmin) {
+    const bulk = e.target.closest("[data-bulk]");
+    if (e.target.closest("[data-devtoggle]")) {
+      this._devExpanded = !this._devExpanded;
+      this._render();
+    } else if (rm && this._isAdmin) {
       this._draftRemove(rm.dataset.remove, rm.dataset.id);
       this._edited();
-    } else if (ex && this._isAdmin) {
-      this._draftAdd("device_exclude", ex.dataset.exclude, "multi");
+    } else if (bulk && this._isAdmin) {
+      // Applies to the sensors currently shown (respects the filter).
+      const ids = this._matchList().shown;
+      const rest = this._draft.device_exclude.filter((id) => !ids.includes(id));
+      this._draft.device_exclude = bulk.dataset.bulk === "exclude" ? [...rest, ...ids] : rest;
       this._edited();
     } else if (e.target.closest("[data-save]") && this._isAdmin && !this._saveDisabled()) {
       this._save();
@@ -354,7 +385,12 @@ class EnergyboardPanel extends HTMLElement {
   _onChange(e) {
     const t = e.target;
     if (!this._isAdmin) return;
-    if (t.dataset?.bool) {
+    if (t.dataset?.device) {
+      const id = t.dataset.device;
+      const rest = this._draft.device_exclude.filter((x) => x !== id);
+      this._draft.device_exclude = t.checked ? rest : [...rest, id];
+      this._edited();
+    } else if (t.dataset?.bool) {
       this._draft[t.dataset.bool] = t.checked;
       this._edited();
     } else if (t.dataset?.add) {
@@ -378,15 +414,66 @@ class EnergyboardPanel extends HTMLElement {
     }
   }
 
+  /** Typing in the filter box only redraws the match list, so the box keeps its focus. */
+  _onInput(e) {
+    if (e.target.dataset?.filter === undefined) return;
+    this._filter = e.target.value.toLowerCase();
+    const list = this.shadowRoot.getElementById("mlist");
+    if (list) list.innerHTML = this._renderMatchRows(!this._isAdmin);
+  }
+
   _edited(focusKey) {
     this._status = "";
     this._settingsDirty = true;
+    const scroll = this.shadowRoot.getElementById("mlist")?.scrollTop;
     this._render();
+    if (scroll) {
+      const list = this.shadowRoot.getElementById("mlist");
+      if (list) list.scrollTop = scroll;
+    }
     if (focusKey) this.shadowRoot.querySelector(`input[data-add="${focusKey}"]`)?.focus();
   }
 
   _saveDisabled() {
     return !this._isAdmin || this._status === "saving" || !this._isDirty() || !this._hasSource();
+  }
+
+  /** Sensors that match the patterns (also the excluded ones), filtered by the filter box. */
+  _matchList() {
+    const found = this._discoverDevices(this._draft.device_patterns, this._draft, { ignoreExclude: true });
+    const states = this._hass?.states || {};
+    const q = (this._filter || "").trim();
+    return {
+      found,
+      shown: q
+        ? found.filter((id) => `${states[id]?.attributes?.friendly_name || ""} ${id}`.toLowerCase().includes(q))
+        : found,
+    };
+  }
+
+  _renderMatchRows(ro) {
+    const { shown } = this._matchList();
+    const states = this._hass?.states || {};
+    const excluded = new Set(this._draft.device_exclude);
+    if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t("noMatches"))}</div>`;
+    return shown
+      .map((id) => {
+        const off = excluded.has(id);
+        const name = states[id]?.attributes?.friendly_name || id;
+        return `<label class="mrow${off ? " ex" : ""}" title="${esc(id)}"><input type="checkbox" data-device="${esc(id)}" ${off ? "" : "checked"} ${ro ? "disabled" : ""}><span class="mn">${esc(name)}</span><span class="mi">${esc(id)}</span></label>`;
+      })
+      .join("");
+  }
+
+  _renderMatches(ro) {
+    const { found } = this._matchList();
+    if (!found.length) return `<div class="hint">${esc(this._t("noMatches"))}</div>`;
+    const excluded = new Set(this._draft.device_exclude);
+    const x = found.filter((id) => excluded.has(id)).length;
+    return `<div class="hint" id="mcount">${esc(this._t("matchesCount", { n: found.length, x }))}</div>
+      <div class="mbar"><input type="text" data-filter value="${esc(this._filter || "")}" placeholder="${esc(this._t("filterMatches"))}" autocomplete="off" style="flex:1 1 160px;width:auto">
+      ${ro ? "" : `<button class="btn ghost" data-bulk="exclude">${esc(this._t("excludeShown"))}</button><button class="btn ghost" data-bulk="include">${esc(this._t("includeShown"))}</button>`}</div>
+      <div class="mlist" id="mlist">${this._renderMatchRows(ro)}</div>`;
   }
 
   _renderSettings() {
@@ -404,19 +491,7 @@ class EnergyboardPanel extends HTMLElement {
         .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
         .join("");
       let hint = "";
-      if (kind === "text") {
-        const found = this._discoverDevices(this._draft.device_patterns, this._draft);
-        if (this._draft.device_patterns.length) {
-          const shown = found.slice(0, 20);
-          const chipsHtml = shown
-            .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-exclude="${esc(id)}" aria-label="${esc(this._t("exclude"))}" title="${esc(this._t("exclude"))}">⊘</button>`}</span>`)
-            .join("");
-          const more = found.length > shown.length ? `<span class="hint">${esc(this._t("moreMatches", { n: found.length - shown.length }))}</span>` : "";
-          hint = found.length
-            ? `<div class="hint">${esc(this._t("matches", { n: found.length }))}</div><div class="chips">${chipsHtml}${more}</div>`
-            : `<div class="hint">${esc(this._t("noMatches"))}</div>`;
-        }
-      }
+      if (kind === "text" && this._draft.device_patterns.length) hint = this._renderMatches(ro);
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
@@ -518,16 +593,17 @@ class EnergyboardPanel extends HTMLElement {
    * Power sensors whose name matches one of the patterns. Only "sensor." entities with
    * device_class power count. Sensors of the energy balance and excluded sensors are left out.
    */
-  _discoverDevices(patterns = [], cfg = this._cfg) {
+  _discoverDevices(patterns = [], cfg = this._cfg, { ignoreExclude = false } = {}) {
     if (!patterns?.length) return [];
     const skip = new Set([
       ...SYSTEM_KEYS.flatMap((k) => (Array.isArray(cfg[k]) ? cfg[k] : cfg[k] ? [cfg[k]] : [])),
-      ...(cfg.device_exclude || []),
+      ...(ignoreExclude ? [] : cfg.device_exclude || []),
     ]);
+    const matches = compilePatterns(patterns);
     return Object.entries(this._hass?.states || {})
       .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
       .map(([id]) => id)
-      .filter((id) => !skip.has(id) && patterns.some((p) => matchesPattern(id, p)))
+      .filter((id) => !skip.has(id) && matches(id))
       .sort();
   }
 
@@ -737,8 +813,12 @@ class EnergyboardPanel extends HTMLElement {
     const idle = all.length - active.length;
     const sum = all.reduce((a, d) => a + d.w, 0);
     const other = house != null && house - sum >= IDLE_W ? house - sum : null;
-    const rows = other != null ? [...active, { name: this._t("otherDevices"), w: other, other: true }] : active;
-    rows.sort((a, b) => (a.other ? 1 : b.other ? -1 : b.w - a.w));
+    // Strongest devices first. By default only the top ones are shown, the rest folds away.
+    const LIMIT = 8;
+    active.sort((a, b) => b.w - a.w);
+    const folded = active.length > LIMIT;
+    const shown = folded && !this._devExpanded ? active.slice(0, LIMIT) : active;
+    const rows = other != null ? [...shown, { name: this._t("otherDevices"), w: other, other: true }] : shown;
     const scale = Math.max(1, house ?? 0, ...rows.map((d) => d.w));
     const [tv, tu] = fmtPower(sum);
     const list = rows
@@ -752,7 +832,8 @@ class EnergyboardPanel extends HTMLElement {
       .join("");
     return `<div class="eb-card">
       <div class="row"><span class="eb-title">${this._t("devices")}</span><span class="eb-label">${tv} ${tu}</span></div>
-      ${list || `<div class="empty">–</div>`}
+      <div class="${this._devExpanded ? "devlist" : ""}">${list || `<div class="empty">–</div>`}</div>
+      ${folded ? `<button class="linkbtn" data-devtoggle>${this._devExpanded ? this._t("showLess") : this._t("showAll", { n: active.length })}</button>` : ""}
       ${idle > 0 ? `<div class="note">${this._t("idleDevices", { n: idle })}</div>` : ""}
     </div>`;
   }
@@ -773,6 +854,7 @@ class EnergyboardPanel extends HTMLElement {
       const content = this.shadowRoot.getElementById("content");
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
+      content.addEventListener("input", (e) => this._onInput(e));
       this.shadowRoot.querySelector(".tabs").addEventListener("click", (e) => {
         const tab = e.target.closest("[data-tab]")?.dataset.tab;
         if (tab && tab !== this._tab) {
