@@ -10,5 +10,6 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/d
 ### Added
 
 - Initiales Projekt-Repository für ha-energyboard.
+- GitHub-Workflows für CI (Hassfest, HACS, Ruff, Pytest), Changelog-Check und Release sowie Dependabot-Konfiguration.
 
 [Unreleased]: https://github.com/weskona/ha-energyboard/commits/main

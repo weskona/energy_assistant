@@ -1,0 +1,23 @@
+name: Changelog-Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: CHANGELOG.md muss angepasst sein
+        run: |
+          if ! git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx 'CHANGELOG.md'; then
+            echo "::error file=CHANGELOG.md::Bitte CHANGELOG.md unter [Unreleased] ergänzen (oder Label 'skip-changelog' setzen)."
+            exit 1
+          fi

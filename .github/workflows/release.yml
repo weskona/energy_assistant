@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Changelog-Abschnitt extrahieren
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "::error::Kein Abschnitt '## [$version]' in CHANGELOG.md gefunden."
+            exit 1
+          fi
+
+      - name: Integration als ZIP packen (für HACS)
+        run: |
+          dir=$(ls -d custom_components/*/ | head -n 1)
+          [ -n "$dir" ] || { echo "::error::Kein Verzeichnis unter custom_components/"; exit 1; }
+          (cd "$dir" && zip -r "$GITHUB_WORKSPACE/energyboard.zip" .)
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: energyboard.zip
