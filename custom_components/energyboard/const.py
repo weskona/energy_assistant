@@ -45,10 +45,15 @@ TEXT_KEYS = (CONF_DEVICE_PATTERNS, CONF_DEVICE_EXCLUDE_PATTERNS)
 # Labels (ids from the Home Assistant label registry) whose power sensors are summed up.
 CONF_LABEL_IDS = "label_ids"
 LABEL_KEYS = (CONF_LABEL_IDS,)
+# Own display names for sensors in the lists: {entity_id: name}.
+CONF_DEVICE_NAMES = "device_names"
+DICT_KEYS = (CONF_DEVICE_NAMES,)
+# Longest allowed display name.
+NAME_MAX_LEN = 80
 # Keys that hold exactly one entity in storage (the panel always sees lists).
 SINGLE_KEYS = (CONF_GRID_IMPORT, CONF_GRID_EXPORT, CONF_BATTERY_GRID_CHARGE)
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
-CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *LABEL_KEYS, *BOOL_KEYS)
+CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *LABEL_KEYS, *DICT_KEYS, *BOOL_KEYS)
 
 # Allowed characters in a label id (a slug).
 LABEL_ID_REGEX = r"^[a-z0-9_]+$"

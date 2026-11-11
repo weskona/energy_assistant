@@ -27,7 +27,7 @@
       },
       "devices": {
         "title": "Devices",
-        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors. Exclude patterns and excluded sensors keep unwanted sensors out of the list.",
+        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the Power tab. You can also add single sensors. Exclude patterns and excluded sensors keep unwanted sensors out of the list.",
         "data": {
           "device_patterns": "Name patterns (e.g. *_power)",
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",
@@ -72,7 +72,7 @@
       },
       "devices": {
         "title": "Devices",
-        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors. Exclude patterns and excluded sensors keep unwanted sensors out of the list.",
+        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the Power tab. You can also add single sensors. Exclude patterns and excluded sensors keep unwanted sensors out of the list.",
         "data": {
           "device_patterns": "Name patterns (e.g. *_power)",
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",

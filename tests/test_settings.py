@@ -3,6 +3,7 @@
 from custom_components.energyboard.settings import (
     as_list,
     clean_ids,
+    clean_names,
     clean_patterns,
     has_source,
     normalize,
@@ -101,3 +102,27 @@ def test_label_ids_are_normalized_and_stored_as_a_list() -> None:
     assert settings["label_ids"] == ["klima", "licht"]
     assert normalize({})["label_ids"] == []
     assert to_storage(settings)["label_ids"] == ["klima", "licht"]
+
+
+def test_clean_names() -> None:
+    assert clean_names(None) == {}
+    assert clean_names("not a dict") == {}
+    assert clean_names({}) == {}
+    assert clean_names(
+        {
+            "sensor.a": " Wallbox ",
+            "sensor.b": "",
+            "sensor.c": "   ",
+            "sensor.d": None,
+            "sensor.e": 5,
+        }
+    ) == {"sensor.a": "Wallbox", "sensor.e": "5"}
+
+
+def test_device_names_are_normalized_and_stored() -> None:
+    settings = normalize({"device_names": {"sensor.a": " Wallbox ", "sensor.b": ""}})
+    assert settings["device_names"] == {"sensor.a": "Wallbox"}
+    assert normalize({})["device_names"] == {}
+    assert to_storage(settings)["device_names"] == {"sensor.a": "Wallbox"}
+    assert "device_names" not in to_storage(normalize({}))
+    assert normalize(to_storage(settings)) == settings

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
+### Added
+
+- Editable display names: administrators can rename the devices right in the list (pencil next to the name, Enter or leaving the field saves, Esc cancels, an empty name restores the original). The names are stored as `device_names`, accepted by `energyboard/update_config`, kept by the options flow and also used in the tooltips of the Areas and Labels cards. The tooltip of a renamed device shows the original name.
+- The Areas and Labels cards show the Home Assistant icon in front of the name (area or label icon, with defaults `mdi:texture-box`, `mdi:label` and `mdi:help-circle-outline` for "No area"; labels are tinted with their color). Without the `ha-icon` element the colored dot is used.
+- Filters for the label list in the Settings tab: activity (all / active / inactive), selection (all / selected / not selected) and a text filter, with counts.
+- Each label in the picker shows its number of power sensors and their current power.
+
+### Changed
+
+- The first tab is now called **Power** (German: **Leistung**) instead of House. The card inside is still titled House.
+- Devices, areas and labels are shown side by side in one row, in this order and with the same height. They stack on narrow screens.
+- The label picker only offers labels that have power sensors. Labels you already selected stay visible so you can unselect them.
+
+### Fixed
+
+- Ticking a label in a long list no longer throws the list back to its start.
+- The icons in front of the names are no longer cut off (name and icon share a flex row).
+- The style rule for the history chart only applies to the chart and no longer shifts other icons.
+
 ## [0.3.0] - 2026-11-11
 
 ### Added
@@ -86,7 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...v0.2.1

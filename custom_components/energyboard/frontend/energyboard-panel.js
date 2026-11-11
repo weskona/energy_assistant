@@ -30,6 +30,7 @@ const STYLE = `
 .grid{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
 .set .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .wide{grid-column:1/-1}
+.trio{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:var(--eb-gap);align-items:stretch}
 .sec .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:28px;align-items:start}
 .fld.span{grid-column:1/-1}
 @media (max-width:800px){.grid,.set .grid{grid-template-columns:minmax(0,1fr)}.wrap{padding:12px}}
@@ -52,6 +53,10 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .nt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .dev .ico,.mn .ico{--mdc-icon-size:18px;flex:none;margin-right:8px;color:var(--eb-muted)}
 .dev .dot,.mn .dot{display:inline-block;flex:none;width:9px;height:9px;border-radius:50%;margin-right:8px}
+.dev .edit{border:0;background:none;color:var(--eb-dim);cursor:pointer;padding:2px 6px;margin-left:4px;opacity:.55;flex:none;font-size:14px;line-height:1;--mdc-icon-size:16px}
+.dev:hover .edit,.dev .edit:focus-visible{opacity:1;color:var(--eb-text)}
+.dev .rename{flex:1 1 auto;min-width:0;max-width:420px;font:inherit;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-green);border-radius:8px;padding:3px 8px}
+.dev .rename:focus{outline:none}
 .dev .cnt{color:var(--eb-dim);font-size:12px;margin-left:6px;flex:none;white-space:nowrap}
 .dev .val{font-weight:700;white-space:nowrap}
 .dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
@@ -105,6 +110,9 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 const STRINGS = {
   en: {
     house: "House",
+    tabPower: "Power",
+    rename: "Rename",
+    originalName: "Original: {name}",
     live: "Live consumption",
     noData: "No data",
     history: "History",
@@ -197,6 +205,9 @@ const STRINGS = {
   },
   de: {
     house: "Haus",
+    tabPower: "Leistung",
+    rename: "Umbenennen",
+    originalName: "Original: {name}",
     live: "Verbrauch live",
     noData: "Keine Daten",
     history: "Verlauf",
@@ -401,6 +412,7 @@ class EnergyboardPanel extends HTMLElement {
     const out = { house_power: cfg.house_power || null };
     for (const k of LIST_KEYS) out[k] = Array.isArray(cfg[k]) ? [...cfg[k]] : cfg[k] ? [cfg[k]] : [];
     for (const k of BOOL_KEYS) out[k] = !!cfg[k];
+    out.device_names = { ...(cfg.device_names || {}) };
     return out;
   }
 
@@ -457,7 +469,60 @@ class EnergyboardPanel extends HTMLElement {
     this._render();
   }
 
+  /** Start renaming a sensor in the device list. The row turns into a text field. */
+  _startRename(id) {
+    if (!this._isAdmin) return;
+    this._editName = id;
+    const content = this.shadowRoot.getElementById("content");
+    this._html = this._renderHouse();
+    content.innerHTML = this._html;
+    const input = content.querySelector("input[data-rename-input]");
+    input?.focus();
+    input?.select();
+  }
+
+  _endRename() {
+    this._editName = null;
+    this._html = null;
+    this._render();
+  }
+
+  /** Save the new name. An empty name or the original name resets it. Admins only. */
+  async _commitRename(id, value) {
+    if (this._editName !== id) return; // already saved or cancelled (blur after Enter or Escape)
+    const before = { ...(this._cfg.device_names || {}) };
+    const names = { ...before };
+    const original = this._hass?.states?.[id]?.attributes?.friendly_name || id;
+    const name = String(value).trim().slice(0, 80);
+    if (!name || name === original) delete names[id];
+    else names[id] = name;
+    if (JSON.stringify(names) === JSON.stringify(before) || !this._isAdmin) {
+      this._endRename();
+      return;
+    }
+    // Show the new name at once, take it back if saving fails.
+    this._config = { ...this._cfg, device_names: names };
+    if (this._draft) this._draft.device_names = { ...names };
+    this._endRename();
+    try {
+      const res = await this._hass.callWS({ type: "energyboard/update_config", config: { device_names: names } });
+      this._config = res;
+      if (this._draft) this._draft.device_names = { ...(res.device_names || {}) };
+    } catch (e) {
+      console.warn("Energyboard: could not save the name", e);
+      this._config = { ...this._cfg, device_names: before };
+      if (this._draft) this._draft.device_names = { ...before };
+    }
+    this._html = null;
+    this._render();
+  }
+
   _onClick(e) {
+    const ren = e.target.closest("[data-rename]");
+    if (ren) {
+      this._startRename(ren.dataset.rename);
+      return;
+    }
     this._fieldError = {};
     const rm = e.target.closest("[data-remove]");
     const bulk = e.target.closest("[data-bulk]");
@@ -802,13 +867,19 @@ class EnergyboardPanel extends HTMLElement {
     return { house, direct: this._calcDirect(parts, house), ...parts };
   }
   /** Individual devices with their current power in W, highest first. */
+  /** Display name of a sensor in the lists: the own name if one is set, else the friendly name. */
+  _deviceName(id) {
+    return this._cfg.device_names?.[id] || this._hass?.states?.[id]?.attributes?.friendly_name || id;
+  }
+
   _devices() {
     const explicit = this._cfg.device_power || [];
     const ids = [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
     return ids
       .map((id) => ({
         id,
-        name: this._hass?.states?.[id]?.attributes?.friendly_name || id,
+        name: this._deviceName(id),
+        original: this._hass?.states?.[id]?.attributes?.friendly_name || id,
         w: this._watts(id),
       }))
       .filter((d) => d.w != null)
@@ -1021,6 +1092,8 @@ class EnergyboardPanel extends HTMLElement {
     const areas = this._renderAreas(cur.house);
     const labels = this._renderLabels(cur.house);
     const devices = this._renderDevices(cur.house);
+    // Devices, areas and labels share one row, in this order. Missing cards leave more room for the others.
+    const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
       <div class="eb-card eb-card--glow">
@@ -1044,14 +1117,15 @@ class EnergyboardPanel extends HTMLElement {
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${areas}${labels}${devices}</div>`;
+      ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
   _renderDevices(house) {
     if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
     const all = this._devices();
-    const active = all.filter((d) => d.w >= IDLE_W);
+    // Admins can rename the sensors right in the list (pencil next to the name).
+    const active = all.filter((d) => d.w >= IDLE_W).map((d) => ({ ...d, editable: this._isAdmin }));
     const sum = all.reduce((a, d) => a + d.w, 0);
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
     return this._listCard({
@@ -1136,7 +1210,7 @@ class EnergyboardPanel extends HTMLElement {
       .filter((id) => byId[id])
       .map((id) => {
         const members = this._labelMembers(id).map((sid) => ({
-          name: this._hass?.states?.[sid]?.attributes?.friendly_name || sid,
+          name: this._deviceName(sid),
           w: this._watts(sid),
         })).filter((m) => m.w != null);
         const n = members.length;
@@ -1178,13 +1252,19 @@ class EnergyboardPanel extends HTMLElement {
         const [v, u] = fmtPower(d.w);
         // Share of the house power, only known when the house power is known.
         const share = house > 0 ? Math.round((d.w / house) * 100) : null;
-        const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || ""].filter(Boolean).join(" · ");
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${this._iconHtml(d.icon, d.color)}<span class="nt">${esc(d.name)}</span>${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
+        const renamed = d.original && d.original !== d.name;
+        const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || "", renamed ? this._t("originalName", { name: d.original }) : ""].filter(Boolean).join(" · ");
+        const editing = d.id && d.editable && this._editName === d.id;
+        const pencil = globalThis.customElements?.get?.("ha-icon") ? `<ha-icon icon="mdi:pencil"></ha-icon>` : "✎";
+        const nameHtml = editing
+          ? `<input class="rename" type="text" data-rename-input="${esc(d.id)}" value="${esc(renamed ? d.name : "")}" placeholder="${esc(d.original)}" maxlength="80" aria-label="${esc(this._t("rename"))}">`
+          : `<span class="nt">${esc(d.name)}</span>${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}${d.id && d.editable ? `<button type="button" class="edit" data-rename="${esc(d.id)}" title="${esc(this._t("rename"))}" aria-label="${esc(this._t("rename"))}">${pencil}</button>` : ""}`;
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${this._iconHtml(d.icon, d.color)}${nameHtml}</span>
           <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card wide">
+    return `<div class="eb-card">
       <div class="row"><span class="eb-title">${title}</span><span class="eb-label">${tv} ${tu}</span></div>
       <div class="devgrid${expanded ? " devlist" : ""}">${html || `<div class="empty">–</div>`}</div>
       ${folded ? `<button class="linkbtn" ${toggle}>${expanded ? this._t("showLess") : this._t("showAll", { n: active.length })}</button>` : ""}
@@ -1200,7 +1280,7 @@ class EnergyboardPanel extends HTMLElement {
         <div class="wrap">
           <div class="top">
             <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
-            <div class="tabs"><button class="tab active" data-tab="house">House</button></div>
+            <div class="tabs"><button class="tab active" data-tab="house">Power</button></div>
             <div class="right"><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
           </div>
           <div id="content"></div></div>`;
@@ -1210,12 +1290,28 @@ class EnergyboardPanel extends HTMLElement {
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
+      content.addEventListener("keydown", (e) => {
+        const input = e.target.closest?.("[data-rename-input]");
+        if (!input) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this._commitRename(input.dataset.renameInput, input.value);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          this._endRename();
+        }
+      });
+      content.addEventListener("focusout", (e) => {
+        const input = e.target.closest?.("[data-rename-input]");
+        if (input) this._commitRename(input.dataset.renameInput, input.value);
+      });
       this.shadowRoot.querySelector(".top").addEventListener("click", (e) => {
         let tab = e.target.closest("[data-tab]")?.dataset.tab;
         // The gear toggles: a second click on it leads back to the house tab.
         if (tab === "settings" && this._tab === "settings") tab = "house";
         if (tab && tab !== this._tab) {
           this._tab = tab;
+          this._editName = null;
           this._html = null;
           this._settingsDirty = true;
           this._render();
@@ -1227,7 +1323,8 @@ class EnergyboardPanel extends HTMLElement {
     this.shadowRoot.querySelector(".menu").hidden = !this._narrow;
     this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
     for (const tab of this.shadowRoot.querySelectorAll(".tab")) {
-      tab.textContent = this._t(tab.dataset.tab);
+      // The first tab shows the power overview. Its card inside is still titled "House".
+      tab.textContent = this._t(tab.dataset.tab === "house" ? "tabPower" : tab.dataset.tab);
       tab.classList.toggle("active", tab.dataset.tab === this._tab);
     }
     const gear = this.shadowRoot.querySelector(".gear");
@@ -1245,6 +1342,8 @@ class EnergyboardPanel extends HTMLElement {
       }
       return;
     }
+    // While a name is being typed the page is not redrawn, live updates would wipe the text field.
+    if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
     const html = this._renderHouse();
     if (html !== this._html) {

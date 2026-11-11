@@ -7,8 +7,12 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 | Tab | Content |
 |-----|---------|
-| **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
-| **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the House tab. |
+| **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
+| **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the Power tab. |
+
+**Layout:** the first row shows the house card and the history. Below it **Devices**, **Areas** and **Labels** sit side by
+side in one row, in this order and with the same height (missing cards leave more room to the others). On narrow screens
+they stack. Areas and labels show their Home Assistant icon in front of the name (labels tinted with their color).
 
 ## Installation
 
@@ -42,7 +46,7 @@ Separate and combined sensors can be mixed.
 | Grid combined | Import | Export | yes |
 | Storage combined | Discharge | Charge | yes |
 
-**Devices** (step 3): the House tab lists the power of individual devices with a bar, highest first.
+**Devices** (step 3): the Power tab lists the power of individual devices with a bar, highest first.
 
 - **Name patterns:** enter patterns with `*` as wildcard, e.g. `*_power` (or `*_leistung` for German entity names).
   Every power sensor whose name matches is listed, so new devices appear automatically.
@@ -59,7 +63,7 @@ Separate and combined sensors can be mixed.
   (searches names and entity ids) and **Exclude shown** / **Include shown**, which only act on the shown sensors.
 - **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
   Sensors picked here always stay in the list, even if they are on the exclude list or match an exclude pattern.
-- The House tab lists the devices one below the other in their own full-width row, strongest first. Next to each value
+- The Power tab lists the devices one below the other in their own full-width row, strongest first. Next to each value
   the share of the house power is shown, and the bar has the same length (without a known house power the strongest
   device fills the bar). It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as
   idle and are only counted. If a house power is known, the remainder is shown as "Other (not measured)".
@@ -69,8 +73,15 @@ narrowed with filter buttons: **Activity** (all / active, at least 5 W right now
 **Selection** (all / included / excluded), combinable with the text filter. **Exclude shown** and **Include shown** act on
 what the filters show, e.g. one click excludes all inactive sensors.
 
-**Labels:** in the Settings tab you pick labels from the list of labels that exist in Home Assistant (checkboxes, with
-the number of power sensors each label has). The **Labels** card on the House tab then shows one row per selected label
+**Renaming:** administrators see a pencil next to the name of every device in the list. Click it, type a new name and
+press **Enter** (or leave the field) to save, **Esc** cancels, an empty name restores the original. The tooltip of a
+renamed device shows the original name. The names are stored in the settings (`device_names`) and also used in the
+tooltips of the Areas and Labels cards. Devices below 5 W are not listed and can be renamed once they are active.
+
+**Labels:** in the Settings tab you pick labels from the list of labels that exist in Home Assistant. Only labels that
+have power sensors are offered (plus labels you already selected, so you can unselect them). Each label shows how many
+power sensors it has and their current power. Filters (activity: all / active / inactive, selection: all / selected /
+not selected, plus a text filter) keep long lists manageable. The **Labels** card on the Power tab then shows one row per selected label
 with the summed power of all its power sensors, plus share of the house power, bar, folding and idle count. A sensor
 carries the labels of its entity and of its device. Unlike the devices **no name pattern is needed**, the label decides.
 The exclusions still apply: sensors of the energy balance (grid, solar, storage, house), the exclude list and the exclude

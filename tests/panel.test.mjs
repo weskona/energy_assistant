@@ -1000,3 +1000,162 @@ test("icons: invalid icon names and colors are not put into the page", () => {
     assert.match(html, /<span class="name"[^>]*><span class="nt">Klima/); // neither icon nor dot
   });
 });
+
+function renamePanel({ admin = true, names = {}, fail = false } = {}) {
+  const dev = (name, w) => ({ state: String(w), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+  const states = {
+    "sensor.wallbox_leistung": dev("Wallbox 3EM Leistung", 1400),
+    "sensor.herd_leistung": dev("Herd Leistung", 900),
+  };
+  const p = discoverPanel({ device_patterns: ["*_leistung"], device_names: names }, states);
+  p._hass.user = { is_admin: admin };
+  p._hass.calls = [];
+  p._hass.callWS = async (msg) => {
+    p._hass.calls.push(msg);
+    if (fail) throw new Error("boom");
+    // like the real backend: the complete settings come back
+    return { ...p._cfg, device_names: msg.config.device_names };
+  };
+  p._draft = p._normalize(p._cfg);
+  p._render = () => {}; // no shadow DOM in this test
+  p.shadowRoot = { getElementById: () => ({ querySelector: () => null }) };
+  p._editName = "sensor.wallbox_leistung";
+  return p;
+}
+
+test("names: an own name wins over the friendly name, which wins over the entity id", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
+  assert.equal(p._deviceName("sensor.unknown"), "sensor.unknown");
+});
+
+test("names: the device list shows own names, sorting stays by power, the original is kept", () => {
+  const p = renamePanel({ names: { "sensor.herd_leistung": "AAA first in the alphabet" } });
+  const [first, second] = p._devices();
+  assert.equal(first.name, "Wallbox 3EM Leistung"); // strongest first
+  assert.equal(second.name, "AAA first in the alphabet");
+  assert.equal(second.original, "Herd Leistung");
+});
+
+test("names: admins get a pencil on every device row but not on the unmeasured rest", () => {
+  const p = renamePanel();
+  p._editName = null;
+  const html = p._renderDevices(2500);
+  assert.equal((html.match(/data-rename="/g) || []).length, 2);
+  assert.match(html, /data-rename="sensor.wallbox_leistung"/);
+  assert.match(html, /Other \(not measured\)/);
+  assert.doesNotMatch(html.slice(html.indexOf("Other (not measured)")), /data-rename/);
+});
+
+test("names: no pencil and no editing for non-admins", async () => {
+  const p = renamePanel({ admin: false });
+  assert.doesNotMatch(p._renderDevices(2500), /data-rename|rename/);
+  await p._commitRename("sensor.wallbox_leistung", "Hacked");
+  assert.deepEqual(p._hass.calls, []);
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox 3EM Leistung");
+});
+
+test("names: the row in edit mode is a text field with the own name as value and the original as placeholder", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  const html = p._renderDevices(2500);
+  const input = html.match(/<input class="rename"[^>]*>/)[0];
+  assert.match(input, /data-rename-input="sensor.wallbox_leistung"/);
+  assert.match(input, /value="Wallbox"/);
+  assert.match(input, /placeholder="Wallbox 3EM Leistung"/);
+  assert.match(input, /maxlength="80"/);
+  assert.match(html, /data-rename="sensor.herd_leistung"/); // the other row stays a normal row
+  const plain = renamePanel();
+  assert.match(plain._renderDevices(2500).match(/<input class="rename"[^>]*>/)[0], /value=""/); // no own name yet
+});
+
+test("names: the tooltip names the original when a row was renamed", () => {
+  const html = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } })._renderDevices(2500);
+  assert.match(html, /title="[^"]*Original: Wallbox 3EM Leistung"/);
+});
+
+test("names: names and placeholders are HTML-escaped", () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": '<img src=x onerror="x">' } });
+  const html = p._renderDevices(2500);
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img/);
+});
+
+test("names: saving sends all names, shows the new name at once and keeps the draft in sync", async () => {
+  const p = renamePanel({ names: { "sensor.herd_leistung": "Herd" } });
+  await p._commitRename("sensor.wallbox_leistung", "  Wallbox  ");
+  assert.deepEqual(p._hass.calls, [
+    { type: "energyboard/update_config", config: { device_names: { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" } } },
+  ]);
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" });
+  assert.equal(p._editName, null);
+  assert.equal(p._isDirty(), false); // the settings form sees no unsaved change
+});
+
+test("names: an empty name or the original name resets the own name", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox", "sensor.herd_leistung": "Herd" } });
+  await p._commitRename("sensor.wallbox_leistung", "   ");
+  assert.deepEqual(p._hass.calls[0].config.device_names, { "sensor.herd_leistung": "Herd" });
+  p._editName = "sensor.herd_leistung";
+  await p._commitRename("sensor.herd_leistung", "Herd Leistung"); // typed the original again
+  assert.deepEqual(p._hass.calls[1].config.device_names, {});
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
+});
+
+test("names: nothing is sent when the name did not change, or when editing already ended", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
+  await p._commitRename("sensor.wallbox_leistung", "Wallbox");
+  assert.deepEqual(p._hass.calls, []);
+  assert.equal(p._editName, null);
+  await p._commitRename("sensor.wallbox_leistung", "Other"); // e.g. blur after Enter or Escape
+  assert.deepEqual(p._hass.calls, []);
+});
+
+test("names: names are cut at 80 characters", async () => {
+  const p = renamePanel();
+  await p._commitRename("sensor.wallbox_leistung", "x".repeat(120));
+  assert.equal(p._hass.calls[0].config.device_names["sensor.wallbox_leistung"].length, 80);
+});
+
+test("names: a failed save takes the new name back", async () => {
+  const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" }, fail: true });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await p._commitRename("sensor.wallbox_leistung", "Neu");
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
+  assert.deepEqual(p._draft.device_names, { "sensor.wallbox_leistung": "Wallbox" });
+});
+
+test("names: cancelling does not save", () => {
+  const p = renamePanel();
+  p._endRename();
+  assert.equal(p._editName, null);
+  assert.deepEqual(p._hass.calls, []);
+});
+
+test("names: only an admin can start editing", () => {
+  const p = renamePanel({ admin: false });
+  p._editName = null;
+  p._startRename("sensor.wallbox_leistung");
+  assert.equal(p._editName, null);
+});
+
+test("names: own names also appear in the tooltips of areas and labels", () => {
+  const a = areaPanel();
+  a._config = { ...a._cfg, device_names: { "sensor.media_leistung": "Fernseher" } };
+  assert.match(a._renderAreas(2000), /Fernseher 124 W/);
+  const l = labelPanel();
+  l._config = { ...l._cfg, device_names: { "sensor.klimaanlage_leistung": "Split Büro" } };
+  assert.match(l._renderLabels(2000), /Split Büro 900 W/);
+});
+
+test("names: the names survive the settings form (normalize keeps them)", () => {
+  const p = new Panel();
+  assert.deepEqual(p._normalize({ device_names: { "sensor.a": "A" } }).device_names, { "sensor.a": "A" });
+  assert.deepEqual(p._normalize({}).device_names, {});
+});
