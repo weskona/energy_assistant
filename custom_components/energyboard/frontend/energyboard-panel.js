@@ -361,12 +361,10 @@ const compilePatterns = (patterns) => {
 };
 const BOOL_KEYS = ["invert_grid", "invert_battery"];
 
+// Power is always shown in watts (also above 1000 W), whatever unit the sensors report.
 const fmtPower = (w) => {
   if (w == null || Number.isNaN(w)) return ["–", ""];
-  const a = Math.abs(w);
-  return a >= 1000
-    ? [(w / 1000).toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 }), "kW"]
-    : [Math.round(w).toLocaleString(), "W"];
+  return [Math.round(w).toLocaleString(), "W"];
 };
 
 class EnergyboardPanel extends HTMLElement {
@@ -1205,8 +1203,9 @@ class EnergyboardPanel extends HTMLElement {
     const active = all.filter((d) => d.w >= IDLE_W).map((d) => ({ ...d, editable: this._isAdmin }));
     const sum = all.reduce((a, d) => a + d.w, 0);
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
+    // The total in the header includes the unmeasured rest, so it equals the house power.
     return this._listCard({
-      title: this._t("devices"), rows: active, idle: all.length - active.length, sum, other, house,
+      title: this._t("devices"), rows: active, idle: all.length - active.length, sum: sum + (other ? other.w : 0), other, house,
       expanded: this._devExpanded, toggle: "data-devtoggle", limit,
     });
   }
@@ -1281,8 +1280,12 @@ class EnergyboardPanel extends HTMLElement {
     if (!all.length) return "";
     const active = all.filter((g) => g.w >= IDLE_W);
     const sum = all.reduce((a, g) => a + g.w, 0);
+    // Without a selection the card covers the whole house, so the rest is shown as well and the total
+    // equals the house power. With a selection it is only a part of the house: no rest row.
+    const everything = !(this._cfg.area_ids || []).length;
+    const other = everything && house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
     return this._listCard({
-      title: this._t("areas"), rows: active, idle: all.length - active.length, sum, other: null, house,
+      title: this._t("areas"), rows: active, idle: all.length - active.length, sum: sum + (other ? other.w : 0), other, house,
       expanded: this._areaExpanded, toggle: "data-areatoggle", limit,
     });
   }
