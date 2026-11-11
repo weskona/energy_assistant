@@ -34,7 +34,7 @@ Getrennte und kombinierte Sensoren lassen sich mischen.
 
 | Kategorie | Positiv | Negativ | Umkehr-Schalter |
 |-----------|---------|---------|-----------------|
-| Netz kombiniert | Bezug | Einspeisung | nein |
+| Netz kombiniert | Bezug | Einspeisung | ja |
 | Speicher kombiniert | Entladen | Laden | ja |
 
 Zählt dein Sensor andersherum (z. B. Laden positiv), schalte „Vorzeichen umkehren“ ein.
