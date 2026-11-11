@@ -24,7 +24,7 @@ const STYLE = `
 .gear{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--eb-line);background:var(--eb-panel);color:var(--eb-muted);cursor:pointer;padding:0}
 .gear:hover{color:var(--eb-text)}
 .gear.active{background:rgba(255,255,255,.08);color:var(--eb-text);border-color:var(--eb-green)}
-.gear svg{width:20px;height:20px}
+.gear svg{width:20px;height:20px;margin:0}
 .tab{border:0;background:none;color:var(--eb-muted);font:600 14px var(--eb-font);padding:8px 16px;border-radius:10px;cursor:pointer}
 .tab.active{background:rgba(255,255,255,.08);color:var(--eb-text)}
 .grid{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
