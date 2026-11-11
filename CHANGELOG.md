@@ -1,24 +1,34 @@
 # Changelog
 
-Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
+All notable changes to this project are documented in this file.
 
-Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/de/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-11
+
 ### Added
 
-- Initiales Projekt-Repository für ha-energyboard.
-- GitHub-Workflows für CI (Hassfest, HACS, Ruff, Pytest), Changelog-Check und Release sowie Dependabot-Konfiguration.
-- Design-Grundlage im dunklen Kartenstil: CSS-Tokens (`custom_components/energyboard/frontend/energyboard-tokens.css`), Doku (`docs/DESIGN.md`) und Vorschau (`docs/design-preview.html`).
-- Schrift Outfit (SIL OFL 1.1) lokal mitgeliefert unter `custom_components/energyboard/frontend/fonts/`.
-- Integration `energyboard` mit Konfigurationsdialog (getrennte Sensoren für Netzbezug und Einspeisung (je einer) sowie PV und vom/zum Speicher (jeweils mehrere möglich)) sowie Kombisensoren mit Vorzeichen für Netz und Speicher (mit Umkehr-Schalter) und Seitenleisten-Panel.
-- Tab „Haus“: aktuelle Hausleistung, Herkunft (PV/Batterie/Netz), Kacheln und 24-Stunden-Verlauf.
-- Tests: pytest für Config-Flow, Options-Flow, Einrichtung und Übersetzungen, Node-Tests für die Rechenlogik des Panels; beide laufen in der CI.
-- Einrichtung und Optionen in zwei Schritten (Netz/Haus, PV/Speicher) mit kürzeren Beschreibungen.
-- Optionaler Sensor „Speicher aus Netz geladen“, der bei der Berechnung der direkt verbrauchten PV-Leistung berücksichtigt wird.
-- Berechnung der direkt verbrauchten PV-Leistung (PV − Einspeisung − PV-Anteil der Speicherladung) als Kachel, im Herkunftsbalken und im Verlauf.
-- `README.md` mit Installation und Konfiguration, `hacs.json`.
+- Home Assistant integration `energyboard` with a sidebar panel, installable via HACS.
+- **House** tab: current house power, solar power used directly, source of consumption
+  (solar, storage, grid), tiles for every flow and a 24-hour history.
+- Two-step config flow and options flow (1. grid and house, 2. solar and storage).
+- Power sensor inputs: grid import and grid export (one each), solar production,
+  from storage and to storage (one or more each), combined signed sensors for grid and
+  storage with an invert switch, optional "storage charged from grid" and optional
+  direct house consumption sensor.
+- Calculation of house power (solar + grid import + from storage − grid export − to storage)
+  and of directly used solar power (solar − export − solar share of storage charging).
+- Dark card-based design tokens, design documentation and preview
+  (`custom_components/energyboard/frontend/energyboard-tokens.css`, `docs/`).
+- Outfit font (SIL OFL 1.1) bundled locally.
+- English UI with a German translation (config flow and panel).
+- Tests: pytest for config flow, options flow, setup and translations; Node tests for the
+  panel calculation logic.
+- GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
+  automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/commits/main
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/weskona/ha-energyboard/releases/tag/v0.1.0

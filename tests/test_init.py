@@ -1,4 +1,4 @@
-"""Tests für Einrichtung, Panel-Konfiguration und Entladen."""
+"""Tests for setup, panel configuration and unloading."""
 
 from unittest.mock import AsyncMock, MagicMock
 
@@ -20,7 +20,7 @@ async def test_setup_registers_panel_with_normalized_config(
     hass.http = MagicMock(async_register_static_paths=AsyncMock())
     entry = _entry(
         data={
-            "grid_import": "sensor.import",  # Einzelwert wird zur Liste
+            "grid_import": "sensor.import",  # single value becomes a list
             "solar_power": ["sensor.pv1", "sensor.pv2"],
             "invert_grid": True,
         },

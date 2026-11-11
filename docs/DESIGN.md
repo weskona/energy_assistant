@@ -1,29 +1,29 @@
 # Design
 
-Das Design von ha-energyboard orientiert sich am Stil von
-[glow-dashboard](https://github.com/deepblue120/glow-dashboard): dunkel, modern, kartenbasiert.
-Eigene Werte und Code, keine Übernahme von dessen Quelltext.
+The design of ha-energyboard follows the style of
+[glow-dashboard](https://github.com/deepblue120/glow-dashboard): dark, modern, card-based.
+Own values and code, no source taken from it.
 
-![Vorschau](design-preview.png)
+![Preview](design-preview.png)
 
-Tokens: [`frontend/energyboard-tokens.css`](../custom_components/energyboard/frontend/energyboard-tokens.css) · Live-Vorschau: [`design-preview.html`](design-preview.html)
+Tokens: [`energyboard-tokens.css`](../custom_components/energyboard/frontend/energyboard-tokens.css) · Live preview: [`design-preview.html`](design-preview.html)
 
-## Prinzipien
+## Principles
 
-- **Dunkle Flächen, ein Akzent pro Aussage.** Hintergrund `#0b0d12`, Karten `#14171e`, Kacheln mit 3 % Weiß.
-- **Farben tragen Bedeutung:** Grün = aktiv/OK, Orange (HA-Solarfarbe) = PV, Blau (HA-Netzfarbe) = Netz,
-  Gold = Aktion/Plan, Orange-Rot = Warnung, Rot = Limit/Fehler.
-- **Große Zahl, kleine Einheit.** Werte in 700–800, Einheit klein und gedämpft.
-- **Titel in Versalien** mit weitem Buchstabenabstand, Labels in Versalien mit 0,06 em.
-- **Weiche Formen:** Karten 22 px, Kacheln 14 px, Chips voll gerundet.
-- **Glow nur für den aktiven Hauptzustand** (`eb-card--glow`), z. B. laufende Ladung.
-- **Mobil (≤ 600 px):** kompaktere Karten, Details als aufklappbare Zeilen mit dem wichtigsten Wert.
+- **Dark surfaces, one accent per statement.** Background `#0b0d12`, cards `#14171e`, tiles with 3 % white.
+- **Colors carry meaning:** green = active/OK, orange (Home Assistant solar color) = solar,
+  blue (Home Assistant grid color) = grid, gold = action/plan, orange-red = warning, red = limit/error.
+- **Big number, small unit.** Values in weight 700–800, unit small and muted.
+- **Uppercase titles** with wide letter spacing, labels uppercase with 0.06 em.
+- **Soft shapes:** cards 22 px, tiles 14 px, fully rounded chips.
+- **Glow only for the active main state** (`eb-card--glow`), e.g. a running charge.
+- **Mobile (≤ 600 px):** more compact cards.
 
-## Typografie
+## Typography
 
-[Outfit](https://fonts.google.com/specimen/Outfit) (OFL), Gewichte 500/600/700/800.
-Die Schrift wird lokal mitgeliefert (`custom_components/energyboard/frontend/fonts/`, Variable Font als WOFF2 für Latin und Latin-Ext, Lizenz in `OFL-Outfit.txt`) und per `@font-face` in den Tokens eingebunden. Kein CDN, keine Verbindung zu Google.
+[Outfit](https://fonts.google.com/specimen/Outfit) (OFL), weights 500/600/700/800.
+The font is bundled locally (`custom_components/energyboard/frontend/fonts/`, variable font as WOFF2 for Latin and Latin Extended, license in `OFL-Outfit.txt`) and included via `@font-face` in the tokens. No CDN, no connection to Google.
 
-## Komponenten
+## Components
 
 `eb-card`, `eb-card--glow`, `eb-title`, `eb-tile`, `eb-label`, `eb-value`, `eb-chip`, `eb-bar`, `eb-action`.

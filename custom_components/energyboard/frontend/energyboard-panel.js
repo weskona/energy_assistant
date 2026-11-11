@@ -1,7 +1,7 @@
-/* Energyboard – Seitenleisten-Panel. Tab 1: Leistung des Hauses. */
+/* Energyboard sidebar panel. Tab 1: household power. */
 const BASE = new URL(import.meta.url).pathname.replace(/\/[^/]*$/, "");
 
-// @font-face muss im Dokument (nicht im Shadow DOM) stehen.
+// @font-face must live in the document, not in the shadow DOM.
 if (!document.getElementById("energyboard-fonts")) {
   const l = document.createElement("link");
   l.id = "energyboard-fonts";
@@ -39,6 +39,56 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .warn{color:var(--eb-orange)}
 `;
 
+// English is the base language, German is the only translation.
+const STRINGS = {
+  en: {
+    house: "House",
+    live: "Live consumption",
+    noData: "No data",
+    history: "History",
+    historyLoading: "Loading history …",
+    noHistory: "No history available yet",
+    chartLabel: "House power over the last 24 hours",
+    notConfigured:
+      "No sensors configured. Open Settings → Devices & services → Energyboard.",
+    menu: "Menu",
+    solar: "Solar",
+    solarDirect: "Solar used directly",
+    ofProduction: "{pct} % of production",
+    gridImport: "Grid import",
+    gridExport: "Grid export",
+    fromStorage: "From storage",
+    toStorage: "To storage",
+    storageFromGrid: "Storage from grid",
+    storage: "Storage",
+    grid: "Grid",
+    legendSolarDirect: "Solar used directly",
+  },
+  de: {
+    house: "Haus",
+    live: "Verbrauch live",
+    noData: "Keine Daten",
+    history: "Verlauf",
+    historyLoading: "Verlauf wird geladen …",
+    noHistory: "Noch kein Verlauf verfügbar",
+    chartLabel: "Hausleistung der letzten 24 Stunden",
+    notConfigured:
+      "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energyboard auswählen.",
+    menu: "Menü",
+    solar: "PV",
+    solarDirect: "PV direkt verbraucht",
+    ofProduction: "{pct} % der Erzeugung",
+    gridImport: "Netzbezug",
+    gridExport: "Einspeisung",
+    fromStorage: "Vom Speicher",
+    toStorage: "Zum Speicher",
+    storageFromGrid: "Speicher aus Netz",
+    storage: "Speicher",
+    grid: "Netz",
+    legendSolarDirect: "PV direkt verbraucht",
+  },
+};
+
 const fmtPower = (w) => {
   if (w == null || Number.isNaN(w)) return ["–", ""];
   const a = Math.abs(w);
@@ -70,7 +120,14 @@ class EnergyboardPanel extends HTMLElement {
 
   get _cfg() { return this._config || {}; }
 
-  /** Leistung einer Entität in W (nur positive Werte erwartet). */
+  /** Translate a key using the Home Assistant UI language (de, otherwise en). */
+  _t(key, vars = {}) {
+    const lang = (this._hass?.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
+    const text = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
+    return text.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+  }
+
+  /** Power of an entity in W (positive values expected). */
   _watts(entityId) {
     const s = entityId && this._hass?.states?.[entityId];
     if (!s || ["unavailable", "unknown"].includes(s.state)) return null;
@@ -81,19 +138,19 @@ class EnergyboardPanel extends HTMLElement {
     const u = this._hass?.states?.[entityId]?.attributes?.unit_of_measurement;
     return u === "kW" ? 1000 : u === "MW" ? 1e6 : 1;
   }
-  /** Summe mehrerer Sensoren; null, wenn keiner konfiguriert oder verfügbar ist. */
+  /** Sum of several sensors; null if none is configured or available. */
   _sum(ids) {
     const vals = (ids || []).map((id) => this._watts(id)).filter((v) => v != null);
     return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
   }
 
-  /** Summe mit Vorzeichen-Umkehr (für Kombisensoren). */
+  /** Sum with optional sign inversion (for combined sensors). */
   _signed(ids, invert) {
     const v = this._sum(ids);
     return v == null ? null : invert ? -v : v;
   }
 
-  /** Getrennte und kombinierte Sensoren zu sechs positiven Größen zusammenführen. */
+  /** Merge separate and combined sensors into positive quantities. */
   _split({ solar, gridIn, gridOut, discharge, charge, gridCharge, grid, battery }) {
     const add = (a, b) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
     const pos = (v) => (v == null ? null : Math.max(0, v));
@@ -130,24 +187,24 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   /**
-   * Direkt verbrauchte PV-Leistung: Erzeugung minus Einspeisung minus PV-Anteil der Speicherladung,
-   * begrenzt auf [0, min(Erzeugung, Hausleistung)]. Ohne Netzladungs-Sensor wird angenommen,
-   * dass der Speicher komplett aus PV geladen wird.
+   * Solar power used directly: production minus export minus the solar share of storage charging,
+   * limited to [0, min(production, house power)]. Without a grid-charge sensor the storage
+   * is assumed to be charged entirely from solar.
    */
   _calcDirect({ solar, gridOut, charge, gridCharge }, house) {
     if (solar == null) return null;
-    // Nur der PV-Teil der Speicherladung zählt; Netzladung wird abgezogen.
+    // Only the solar share of the charging counts; grid charging is subtracted.
     const pvCharge = Math.max(0, (charge ?? 0) - (gridCharge ?? 0));
     const d = solar - (gridOut ?? 0) - pvCharge;
     return Math.max(0, Math.min(d, solar, house ?? solar));
   }
 
-  /** Herkunft des Verbrauchs in Anteilen (PV, Batterie, Netz). */
+  /** Source of consumption as shares (solar, storage, grid). */
   _mix({ house, gridIn, discharge, direct }) {
     if (!house || house <= 0) return null;
     const g = Math.max(0, gridIn ?? 0);
     const b = Math.max(0, discharge ?? 0);
-    // PV-Anteil = direkt verbrauchte PV, sonst was nach Netzbezug und Speicher übrig bleibt.
+    // Solar share = directly used solar, else what remains after grid import and storage.
     const s = direct != null ? direct : Math.max(0, house - g - b);
     const sum = g + b + s || 1;
     return { solar: s / sum, battery: b / sum, grid: g / sum };
@@ -178,16 +235,16 @@ class EnergyboardPanel extends HTMLElement {
       this._history = this._buildSeries(res, start.getTime(), end.getTime());
       this._lastHistory = now;
     } catch (e) {
-      console.warn("Energyboard: Verlauf nicht ladbar", e);
+      console.warn("Energyboard: could not load history", e);
       this._history = [];
-      this._lastHistory = now - 4 * 60 * 1000; // nach 1 Minute erneut versuchen
+      this._lastHistory = now - 4 * 60 * 1000; // retry after one minute
     } finally {
       this._loading = false;
       this._render();
     }
   }
 
-  /** Zeitreihen auf feste Zeitfenster abbilden und Hausleistung berechnen. */
+  /** Map time series onto fixed time buckets and calculate house power. */
   _buildSeries(res, t0, t1) {
     const step = BUCKET_MIN * 60 * 1000;
     const n = Math.floor((t1 - t0) / step);
@@ -208,7 +265,7 @@ class EnergyboardPanel extends HTMLElement {
       }
       return out;
     };
-    // Mehrere Sensoren je Kategorie addieren (null, wenn zu dem Zeitpunkt kein Wert vorliegt).
+    // Add up several sensors per category (null if there is no value at that time).
     const group = (ids, invert = false) => {
       const list = (ids || []).map(sample).filter(Boolean);
       if (!list.length) return null;
@@ -235,7 +292,7 @@ class EnergyboardPanel extends HTMLElement {
 
   _chart(points) {
     const valid = points.filter((p) => p.v != null);
-    if (valid.length < 2) return `<div class="empty">Noch kein Verlauf verfügbar</div>`;
+    if (valid.length < 2) return `<div class="empty">${this._t("noHistory")}</div>`;
     const W = 640, H = 220, L = 8, R = 8, T = 10, B = 24;
     const max = Math.max(500, ...valid.map((p) => p.v)) * 1.1;
     const t0 = points[0].t, t1 = points[points.length - 1].t;
@@ -269,7 +326,7 @@ class EnergyboardPanel extends HTMLElement {
       const label = new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       return `<text class="axis" x="${x(t)}" y="${H - 6}" text-anchor="${h === 0 ? "start" : h === 24 ? "end" : "middle"}">${label}</text>`;
     }).join("");
-    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hausleistung der letzten 24 Stunden">
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${this._t("chartLabel")}">
       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#34d399" stop-opacity=".35"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/>
       </linearGradient></defs>
@@ -277,27 +334,27 @@ class EnergyboardPanel extends HTMLElement {
       <path d="${d}" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round"/>
       ${hasDirect ? `<path d="${dline("d")}" fill="none" stroke="#ff9800" stroke-width="2" stroke-linejoin="round"/>` : ""}
       ${ticks}</svg>
-      <div class="legend"><span><i style="background:var(--eb-green)"></i>Haus</span>${hasDirect ? `<span><i style="background:var(--eb-solar)"></i>PV direkt verbraucht</span>` : ""}</div>`;
+      <div class="legend"><span><i style="background:var(--eb-green)"></i>${this._t("house")}</span>${hasDirect ? `<span><i style="background:var(--eb-solar)"></i>${this._t("legendSolarDirect")}</span>` : ""}</div>`;
   }
 
   _renderHouse() {
     const cur = this._current();
     if (!this._cfg.house_power && !(this._cfg.grid_import || []).length && !(this._cfg.grid_power || []).length) {
-      return `<div class="eb-card"><div class="empty">Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energyboard auswählen.</div></div>`;
+      return `<div class="eb-card"><div class="empty">${this._t("notConfigured")}</div></div>`;
     }
     const [val, unit] = fmtPower(cur.house);
     const mix = this._mix(cur);
-    const sharePv = cur.direct != null && cur.solar > 0 ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${Math.round((cur.direct / cur.solar) * 100)} % der Erzeugung</div>` : "";
+    const sharePv = cur.direct != null && cur.solar > 0 ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${this._t("ofProduction", { pct: Math.round((cur.direct / cur.solar) * 100) })}</div>` : "";
     const tile = (label, w, extra = "") => {
       if (w == null) return "";
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
-    const hist = this._history ? this._chart(this._history) : `<div class="empty">Verlauf wird geladen …</div>`;
+    const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
       <div class="eb-card eb-card--glow">
-        <div class="row"><span class="eb-title">Haus</span>
-          <span class="eb-chip">${cur.house == null ? "Keine Daten" : "Verbrauch live"}</span></div>
+        <div class="row"><span class="eb-title">${this._t("house")}</span>
+          <span class="eb-chip">${cur.house == null ? this._t("noData") : this._t("live")}</span></div>
         <div class="big"><b>${val}</b><span>${unit}</span></div>
         ${mix ? `<div class="eb-bar bar">
             <div class="eb-solar" style="width:${mix.solar * 100}%"></div>
@@ -305,15 +362,15 @@ class EnergyboardPanel extends HTMLElement {
             <div class="eb-grid" style="width:${mix.grid * 100}%"></div></div>
           <div class="legend">
             <span><i style="background:var(--eb-solar)"></i>PV ${Math.round(mix.solar * 100)} %</span>
-            ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>Speicher ${Math.round(mix.battery * 100)} %</span>` : ""}
-            <span><i style="background:var(--eb-grid)"></i>Netz ${Math.round(mix.grid * 100)} %</span></div>` : ""}
+            ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>${this._t("storage")} ${Math.round(mix.battery * 100)} %</span>` : ""}
+            <span><i style="background:var(--eb-grid)"></i>${this._t("grid")} ${Math.round(mix.grid * 100)} %</span></div>` : ""}
         <div class="tiles">
-          ${tile("PV", cur.solar)}${tile("PV direkt verbraucht", cur.direct, sharePv)}${tile("Netzbezug", cur.gridIn)}${tile("Einspeisung", cur.gridOut)}
-          ${tile("Vom Speicher", cur.discharge)}${tile("Zum Speicher", cur.charge)}${tile("Speicher aus Netz", cur.gridCharge)}
+          ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
+          ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
       </div>
       <div class="eb-card">
-        <div class="row"><span class="eb-title">Verlauf</span><span class="eb-label">24 h</span></div>
+        <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div></div>`;
   }
@@ -325,8 +382,8 @@ class EnergyboardPanel extends HTMLElement {
         <link rel="stylesheet" href="${BASE}/energyboard-tokens.css">
         <div class="wrap">
           <div class="top">
-            <button class="menu" aria-label="Menü" hidden>☰</button>
-            <div class="tabs"><button class="tab active" data-tab="house">Haus</button></div>
+            <button class="menu" aria-label="Menu" hidden>☰</button>
+            <div class="tabs"><button class="tab active" data-tab="house">House</button></div>
           </div>
           <div id="content"></div></div>`;
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
@@ -334,7 +391,9 @@ class EnergyboardPanel extends HTMLElement {
       this._built = true;
     }
     this.shadowRoot.querySelector(".menu").hidden = !this._narrow;
-    // Nur neu zeichnen, wenn sich der Inhalt ändert (verhindert Flackern).
+    this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
+    this.shadowRoot.querySelector(".tab").textContent = this._t("house");
+    // Only redraw when the content changes (avoids flicker).
     const html = this._tab === "house" ? this._renderHouse() : "";
     if (html !== this._html) {
       this._html = html;

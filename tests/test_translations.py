@@ -1,4 +1,4 @@
-"""Übersetzungen müssen zu den Schemas passen."""
+"""Translations must match the schemas."""
 
 import json
 from pathlib import Path

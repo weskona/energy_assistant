@@ -1,4 +1,4 @@
-// Tests der Rechenlogik im Panel (node --test), ohne Browser.
+// Tests for the panel calculation logic (node --test), no browser needed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -20,7 +20,7 @@ function panel(config, states) {
   return p;
 }
 
-test("Haus aus getrennten Sensoren (Beispiel aus der README)", () => {
+test("house from separate sensors (example from the README)", () => {
   const p = panel(
     { solar_power: ["pv1", "pv2"], grid_export: ["ge"], grid_import: ["gi"], battery_discharge: ["bd"] },
     { pv1: st(2000), pv2: st(1100), ge: st(0.4, "kW"), gi: st(0), bd: st(500) },
@@ -32,7 +32,7 @@ test("Haus aus getrennten Sensoren (Beispiel aus der README)", () => {
   assert.equal(c.direct, 2700);
 });
 
-test("Kombisensoren werden in Bezug/Einspeisung und Entladen/Laden zerlegt", () => {
+test("combined sensors are split into import/export and discharge/charge", () => {
   const p = panel(
     { grid_power: ["g"], battery_power: ["b"], solar_power: ["pv"] },
     { g: st(-0.4, "kW"), b: st(-1000), pv: st(3100) },
@@ -45,7 +45,7 @@ test("Kombisensoren werden in Bezug/Einspeisung und Entladen/Laden zerlegt", () 
   assert.equal(c.house, 1700);
 });
 
-test("Vorzeichen umkehren", () => {
+test("inverting the sign", () => {
   const p = panel(
     { grid_power: ["g"], invert_grid: true, battery_power: ["b"], invert_battery: true },
     { g: st(500), b: st(300) },
@@ -56,12 +56,12 @@ test("Vorzeichen umkehren", () => {
   assert.equal(c.charge, 300);
 });
 
-test("Getrennte und kombinierte Sensoren werden addiert", () => {
+test("separate and combined sensors are added", () => {
   const p = panel({ grid_import: ["gi"], grid_power: ["g"] }, { gi: st(200), g: st(300) });
   assert.equal(p._current().gridIn, 500);
 });
 
-test("Netzladung des Speichers wird bei PV direkt abgezogen", () => {
+test("grid charging of the storage is subtracted from direct PV", () => {
   const p = panel(
     { solar_power: ["pv"], grid_export: ["ge"], battery_charge: ["bc"], battery_grid_charge: ["bgc"], grid_import: ["gi"] },
     { pv: st(3100), ge: st(400), bc: st(1000), bgc: st(600), gi: st(600) },
@@ -71,7 +71,7 @@ test("Netzladung des Speichers wird bei PV direkt abgezogen", () => {
   assert.equal(c.direct, 2300);
 });
 
-test("Ohne Netzladungs-Sensor wird Ladung komplett als PV gewertet", () => {
+test("without a grid-charge sensor all charging counts as PV", () => {
   const p = panel(
     { solar_power: ["pv"], battery_charge: ["bc"], grid_import: ["gi"] },
     { pv: st(3000), bc: st(1000), gi: st(0) },
@@ -79,19 +79,19 @@ test("Ohne Netzladungs-Sensor wird Ladung komplett als PV gewertet", () => {
   assert.equal(p._current().direct, 2000);
 });
 
-test("PV direkt ist nie negativ und nie größer als Haus oder PV", () => {
+test("direct PV is never negative and never above house or PV", () => {
   const p = new Panel();
   assert.equal(p._calcDirect({ solar: 500, gridOut: 800, charge: 0 }, 1000), 0);
   assert.equal(p._calcDirect({ solar: 5000, gridOut: 0, charge: 0 }, 1200), 1200);
   assert.equal(p._calcDirect({ solar: null }, 1000), null);
 });
 
-test("Hausverbrauch-Sensor hat Vorrang vor der Berechnung", () => {
+test("a house consumption sensor takes precedence over the calculation", () => {
   const p = panel({ house_power: "h", grid_import: ["gi"] }, { h: st(1.5, "kW"), gi: st(100) });
   assert.equal(p._current().house, 1500);
 });
 
-test("Nicht verfügbare Sensoren ergeben null, nicht 0", () => {
+test("unavailable sensors give null, not 0", () => {
   const p = panel({ grid_import: ["gi"], solar_power: ["pv"] }, { gi: st("unavailable"), pv: st("unknown") });
   const c = p._current();
   assert.equal(c.gridIn, null);
@@ -99,19 +99,19 @@ test("Nicht verfügbare Sensoren ergeben null, nicht 0", () => {
   assert.equal(c.solar, null);
 });
 
-test("Haus ist nie negativ", () => {
+test("house is never negative", () => {
   const p = panel({ grid_import: ["gi"], grid_export: ["ge"] }, { gi: st(0), ge: st(900) });
   assert.equal(p._current().house, 0);
 });
 
-test("Herkunftsmix summiert zu 100 %", () => {
+test("source mix sums to 100 %", () => {
   const p = new Panel();
   const m = p._mix({ house: 3200, gridIn: 200, discharge: 500, direct: 2500 });
   assert.ok(Math.abs(m.solar + m.battery + m.grid - 1) < 1e-9);
   assert.equal(p._mix({ house: 0 }), null);
 });
 
-test("Verlauf: Zeitfenster werden summiert und Haus berechnet", () => {
+test("history: buckets are summed and the house is calculated", () => {
   const p = panel({ solar_power: ["a", "b"], grid_import: ["gi"] }, {});
   const t0 = 0, t1 = 3600 * 1000;
   const rows = (v) => [{ s: String(v), lu: 0 }];
@@ -120,4 +120,16 @@ test("Verlauf: Zeitfenster werden summiert und Haus berechnet", () => {
   assert.equal(pts[0].v, 350);
   assert.equal(pts[12].v, 350);
   assert.equal(pts[12].d, 300);
+});
+
+test("UI strings: English by default, German for German Home Assistant", () => {
+  const p = new Panel();
+  assert.equal(p._t("house"), "House");
+  p._hass = { language: "de" };
+  assert.equal(p._t("house"), "Haus");
+  assert.equal(p._t("ofProduction", { pct: 74 }), "74 % der Erzeugung");
+  p._hass = { language: "de-AT" };
+  assert.equal(p._t("gridImport"), "Netzbezug");
+  p._hass = { language: "fr" };
+  assert.equal(p._t("gridImport"), "Grid import");
 });

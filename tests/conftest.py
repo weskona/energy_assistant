@@ -1,4 +1,4 @@
-"""Gemeinsame Fixtures."""
+"""Shared fixtures."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -13,7 +13,7 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 @pytest.fixture(autouse=True)
 def skip_dependencies():
-    """frontend, http und panel_custom brauchen wir für die Tests nicht wirklich."""
+    """The tests do not need frontend, http and panel_custom to be set up."""
     with (
         patch("homeassistant.config_entries.async_process_deps_reqs", AsyncMock()),
         patch("homeassistant.setup.async_process_deps_reqs", AsyncMock()),
@@ -23,7 +23,7 @@ def skip_dependencies():
 
 @pytest.fixture
 def mock_panel():
-    """Panel-Registrierung und statische Pfade abfangen."""
+    """Intercept panel registration."""
     with (
         patch(
             "homeassistant.components.panel_custom.async_register_panel",

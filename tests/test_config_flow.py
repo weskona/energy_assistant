@@ -1,4 +1,4 @@
-"""Tests für den Config-Flow (zwei Schritte) und den Options-Flow."""
+"""Tests for the two-step config flow and the options flow."""
 
 from unittest.mock import patch
 

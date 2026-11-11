@@ -1,4 +1,4 @@
-name: Changelog-Check
+name: Changelog check
 
 on:
   pull_request:
@@ -15,9 +15,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: CHANGELOG.md muss angepasst sein
+      - name: CHANGELOG.md must be changed
         run: |
           if ! git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qx 'CHANGELOG.md'; then
-            echo "::error file=CHANGELOG.md::Bitte CHANGELOG.md unter [Unreleased] ergänzen (oder Label 'skip-changelog' setzen)."
+            echo "::error file=CHANGELOG.md::Please add an entry to CHANGELOG.md under [Unreleased] (or set the 'skip-changelog' label)."
             exit 1
           fi

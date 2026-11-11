@@ -1,6 +1,6 @@
-/* ha-energyboard – Design-Tokens (dunkel, kartenbasiert, Glow-Stil) */
+/* ha-energyboard design tokens (dark, card-based, glow style) */
 
-/* Outfit (SIL OFL 1.1, siehe fonts/OFL-Outfit.txt), lokal mitgeliefert */
+/* Outfit (SIL OFL 1.1, see fonts/OFL-Outfit.txt), bundled locally */
 @font-face {
   font-family: "Outfit";
   font-style: normal;
@@ -19,7 +19,7 @@
 }
 :root,
 :host {
-  /* Flächen */
+  /* Surfaces */
   --eb-bg: #0b0d12;
   --eb-panel: #14171e;
   --eb-tile: rgba(255, 255, 255, 0.032);
@@ -31,24 +31,24 @@
   --eb-muted: #8b91a1;
   --eb-dim: #5d6373;
 
-  /* Akzente (Energie-Semantik) */
-  --eb-green: #34d399; /* aktiv, Laden, OK */
-  --eb-solar: var(--energy-solar-color, #ff9800); /* PV */
-  --eb-grid: var(--energy-grid-consumption-color, #488fc2); /* Netz */
+  /* Accents (energy semantics) */
+  --eb-green: #34d399; /* active, charging, OK */
+  --eb-solar: var(--energy-solar-color, #ff9800); /* solar */
+  --eb-grid: var(--energy-grid-consumption-color, #488fc2); /* grid */
   --eb-blue: #60a5fa;
   --eb-cyan: #38bdf8;
-  --eb-gold: #f7b733; /* Aktion, Plan */
-  --eb-orange: #fb923c; /* Warnung */
-  --eb-red: #f87171; /* Fehler, Limit */
+  --eb-gold: #f7b733; /* action, plan */
+  --eb-orange: #fb923c; /* warning */
+  --eb-red: #f87171; /* error, limit */
   --eb-violet: #a78bfa;
 
-  /* Form */
+  /* Shape */
   --eb-radius-card: 22px;
   --eb-radius-tile: 14px;
   --eb-radius-chip: 999px;
   --eb-gap: 16px;
 
-  /* Typografie */
+  /* Typography */
   --eb-font: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
   --eb-title-spacing: 0.14em;
   --eb-label-spacing: 0.06em;

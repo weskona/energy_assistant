@@ -1,4 +1,4 @@
-"""Konfiguration von Energyboard."""
+"""Config flow for Energyboard."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _optional(defaults: dict[str, Any], key: str) -> vol.Optional:
 
 
 def _grid_schema(defaults: dict[str, Any]) -> vol.Schema:
-    """Schritt 1: Netz und Haus."""
+    """Step 1: grid and house."""
     return vol.Schema(
         {
             _optional(defaults, CONF_GRID_POWER): _MULTI,
@@ -55,7 +55,7 @@ def _grid_schema(defaults: dict[str, Any]) -> vol.Schema:
 
 
 def _storage_schema(defaults: dict[str, Any]) -> vol.Schema:
-    """Schritt 2: PV und Speicher."""
+    """Step 2: solar and storage."""
     return vol.Schema(
         {
             _optional(defaults, CONF_SOLAR_POWER): _MULTI,
@@ -71,7 +71,7 @@ def _storage_schema(defaults: dict[str, Any]) -> vol.Schema:
 
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
-    """Hausverbrauch direkt oder Netzsensor zur Berechnung ist nötig."""
+    """Require house consumption or a grid sensor to calculate it."""
     if not (
         user_input.get(CONF_HOUSE_POWER)
         or user_input.get(CONF_GRID_IMPORT)
@@ -82,7 +82,7 @@ def _validate(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Einrichtung in zwei Schritten: Netz/Haus, dann PV/Speicher."""
+    """Setup in two steps: grid/house, then solar/storage."""
 
     VERSION = 1
 
@@ -122,7 +122,7 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class EnergyboardOptionsFlow(OptionsFlow):
-    """Sensoren nachträglich ändern, ebenfalls in zwei Schritten."""
+    """Change sensors later, also in two steps."""
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}

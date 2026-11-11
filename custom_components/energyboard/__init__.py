@@ -1,4 +1,4 @@
-"""Energyboard: Dashboard-Panel für Energie im Haus."""
+"""Energyboard: sidebar panel showing household energy flows."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 
 def _as_list(value: str | list[str] | None) -> list[str]:
-    """Einzelne Entität oder Liste einheitlich als Liste für das Panel."""
+    """Normalize a single entity or a list to a list for the panel."""
     if not value:
         return []
     return [value] if isinstance(value, str) else list(value)
@@ -28,7 +28,7 @@ def _version() -> str:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Panel registrieren."""
+    """Register the panel."""
     data = hass.data.setdefault(DOMAIN, {})
     if not data.get("static_registered"):
         await hass.http.async_register_static_paths(
@@ -64,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Panel entfernen."""
+    """Remove the panel."""
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     return True
 
