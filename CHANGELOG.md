@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Added
 
 - **Settings** tab in the panel: change all sensors after the first setup directly in the panel (add/remove sensors, invert switches, devices). Changes apply immediately without a reload. Only administrators can save, other users see the settings read-only.
@@ -44,5 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/weskona/ha-energyboard/releases/tag/v0.1.0
