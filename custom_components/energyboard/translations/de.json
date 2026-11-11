@@ -1,0 +1,43 @@
+{
+  "title": "Energyboard",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Energyboard einrichten",
+        "description": "Wähle die Leistungssensoren. Entweder den Hausverbrauch direkt oder mindestens die Netzleistung, dann wird der Verbrauch berechnet (PV + Netz + Batterie).",
+        "data": {
+          "house_power": "Hausverbrauch (optional)",
+          "grid_power": "Netzleistung (Bezug positiv)",
+          "solar_power": "PV-Leistung (optional)",
+          "battery_power": "Batterieleistung (Entladen positiv, optional)",
+          "invert_grid": "Netzvorzeichen umkehren",
+          "invert_battery": "Batterievorzeichen umkehren"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Bitte Hausverbrauch oder Netzleistung angeben."
+    },
+    "abort": {
+      "single_instance_allowed": "Energyboard ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energyboard-Sensoren",
+        "data": {
+          "house_power": "Hausverbrauch (optional)",
+          "grid_power": "Netzleistung (Bezug positiv)",
+          "solar_power": "PV-Leistung (optional)",
+          "battery_power": "Batterieleistung (Entladen positiv, optional)",
+          "invert_grid": "Netzvorzeichen umkehren",
+          "invert_battery": "Batterievorzeichen umkehren"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Bitte Hausverbrauch oder Netzleistung angeben."
+    }
+  }
+}

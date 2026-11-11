@@ -6,7 +6,7 @@ Eigene Werte und Code, keine Übernahme von dessen Quelltext.
 
 ![Vorschau](design-preview.png)
 
-Tokens: [`frontend/energyboard-tokens.css`](../frontend/energyboard-tokens.css) · Live-Vorschau: [`design-preview.html`](design-preview.html)
+Tokens: [`frontend/energyboard-tokens.css`](../custom_components/energyboard/frontend/energyboard-tokens.css) · Live-Vorschau: [`design-preview.html`](design-preview.html)
 
 ## Prinzipien
 
@@ -22,7 +22,7 @@ Tokens: [`frontend/energyboard-tokens.css`](../frontend/energyboard-tokens.css) 
 ## Typografie
 
 [Outfit](https://fonts.google.com/specimen/Outfit) (OFL), Gewichte 500/600/700/800.
-Die Schrift wird lokal mitgeliefert (`frontend/fonts/`, Variable Font als WOFF2 für Latin und Latin-Ext, Lizenz in `OFL-Outfit.txt`) und per `@font-face` in den Tokens eingebunden. Kein CDN, keine Verbindung zu Google.
+Die Schrift wird lokal mitgeliefert (`custom_components/energyboard/frontend/fonts/`, Variable Font als WOFF2 für Latin und Latin-Ext, Lizenz in `OFL-Outfit.txt`) und per `@font-face` in den Tokens eingebunden. Kein CDN, keine Verbindung zu Google.
 
 ## Komponenten
 

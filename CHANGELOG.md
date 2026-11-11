@@ -11,7 +11,10 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/d
 
 - Initiales Projekt-Repository für ha-energyboard.
 - GitHub-Workflows für CI (Hassfest, HACS, Ruff, Pytest), Changelog-Check und Release sowie Dependabot-Konfiguration.
-- Design-Grundlage im dunklen Kartenstil: CSS-Tokens (`frontend/energyboard-tokens.css`), Doku (`docs/DESIGN.md`) und Vorschau (`docs/design-preview.html`).
-- Schrift Outfit (SIL OFL 1.1) lokal mitgeliefert unter `frontend/fonts/`.
+- Design-Grundlage im dunklen Kartenstil: CSS-Tokens (`custom_components/energyboard/frontend/energyboard-tokens.css`), Doku (`docs/DESIGN.md`) und Vorschau (`docs/design-preview.html`).
+- Schrift Outfit (SIL OFL 1.1) lokal mitgeliefert unter `custom_components/energyboard/frontend/fonts/`.
+- Integration `energyboard` mit Konfigurationsdialog (Haus-, Netz-, PV-, Batteriesensor, Vorzeichen) und Seitenleisten-Panel.
+- Tab „Haus“: aktuelle Hausleistung, Herkunft (PV/Batterie/Netz), Kacheln und 24-Stunden-Verlauf.
+- `README.md` mit Installation und Konfiguration, `hacs.json`.
 
 [Unreleased]: https://github.com/weskona/ha-energyboard/commits/main

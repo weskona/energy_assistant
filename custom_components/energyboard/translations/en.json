@@ -1,0 +1,43 @@
+{
+  "title": "Energyboard",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Energyboard",
+        "description": "Pick your power sensors. Either the house consumption directly, or at least grid power so consumption is calculated (PV + grid + battery).",
+        "data": {
+          "house_power": "House consumption (optional)",
+          "grid_power": "Grid power (import positive)",
+          "solar_power": "Solar power (optional)",
+          "battery_power": "Battery power (discharge positive, optional)",
+          "invert_grid": "Invert grid sign",
+          "invert_battery": "Invert battery sign"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Please provide house consumption or grid power."
+    },
+    "abort": {
+      "single_instance_allowed": "Energyboard is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energyboard sensors",
+        "data": {
+          "house_power": "House consumption (optional)",
+          "grid_power": "Grid power (import positive)",
+          "solar_power": "Solar power (optional)",
+          "battery_power": "Battery power (discharge positive, optional)",
+          "invert_grid": "Invert grid sign",
+          "invert_battery": "Invert battery sign"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Please provide house consumption or grid power."
+    }
+  }
+}
