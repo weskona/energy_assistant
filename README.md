@@ -59,8 +59,10 @@ Separate and combined sensors can be mixed.
   (searches names and entity ids) and **Exclude shown** / **Include shown**, which only act on the shown sensors.
 - **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
   Sensors picked here always stay in the list, even if they are on the exclude list or match an exclude pattern.
-- The House tab lists devices in their own full-width row with several columns. It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
-  as "Other (not measured)".
+- The House tab lists the devices one below the other in their own full-width row, strongest first. Next to each value
+  the share of the house power is shown, and the bar has the same length (without a known house power the strongest
+  device fills the bar). It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as
+  idle and are only counted. If a house power is known, the remainder is shown as "Other (not measured)".
 
 In the panel's **Settings** tab the field shows live which sensors a pattern matches.
 

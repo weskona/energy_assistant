@@ -507,3 +507,28 @@ test("exclude patterns: input is validated and stored in lowercase", () => {
   p._onClick({ target: { closest: () => null } }); // any other action clears the message
   assert.deepEqual(p._fieldError, {});
 });
+
+test("device card: the share of the house power is shown next to the value", () => {
+  const p = discoverPanel(
+    { device_power: ["sensor.a", "sensor.b"] },
+    {
+      "sensor.a": { state: "1400", attributes: { unit_of_measurement: "W", friendly_name: "Wallbox" } },
+      "sensor.b": { state: "100", attributes: { unit_of_measurement: "W", friendly_name: "Router" } },
+    },
+  );
+  const html = p._renderDevices(2000);
+  assert.match(html, /Wallbox[\s\S]*?<small class="pct">70 %<\/small>/);
+  assert.match(html, /Router[\s\S]*?<small class="pct">5 %<\/small>/);
+  // the unmeasured rest has a share too: 2000 - 1500 = 500 W = 25 %
+  assert.match(html, /Other \(not measured\)[\s\S]*?<small class="pct">25 %<\/small>/);
+  assert.match(html, /title="70 % of house"/);
+});
+
+test("device card: no percentage when the house power is unknown", () => {
+  const p = discoverPanel(
+    { device_power: ["sensor.a"] },
+    { "sensor.a": { state: "1400", attributes: { unit_of_measurement: "W", friendly_name: "Wallbox" } } },
+  );
+  assert.doesNotMatch(p._renderDevices(null), /class="pct"/);
+  assert.doesNotMatch(p._renderDevices(0), /class="pct"/);
+});

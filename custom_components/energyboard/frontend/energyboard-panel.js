@@ -41,12 +41,12 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .axis{fill:var(--eb-dim);font-size:11px}
 .empty{padding:40px 0;text-align:center;color:var(--eb-muted)}
 .state{color:var(--eb-green)}
-.devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:32px}
 .dev{margin-top:14px}
 .dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 .dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dev .val{font-weight:700;white-space:nowrap}
 .dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
+.dev .val small.pct{margin-left:10px;color:var(--eb-muted);display:inline-block;min-width:36px;text-align:right}
 .dev .track{height:6px;border-radius:3px;background:var(--eb-line);margin:6px 0 12px;overflow:hidden}
 .dev .fill{height:100%;border-radius:3px;background:var(--eb-green);transition:width .6s}
 .dev .fill.other{background:var(--eb-dim)}
@@ -843,9 +843,11 @@ class EnergyboardPanel extends HTMLElement {
     const list = rows
       .map((d) => {
         const [v, u] = fmtPower(d.w);
-        const pct = house > 0 ? this._t("share", { pct: Math.round((d.w / house) * 100) }) : "";
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(pct)}">${esc(d.name)}</span>
-          <span class="val">${v}<small>${u}</small></span></div>
+        // Share of the house power, only known when the house power is known.
+        const share = house > 0 ? Math.round((d.w / house) * 100) : null;
+        const tip = share != null ? this._t("share", { pct: share }) : "";
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${esc(d.name)}</span>
+          <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })
       .join("");
