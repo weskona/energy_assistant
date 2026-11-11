@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-11
+
+### Fixed
+
+- The totals in the headers of the Devices card and the Areas card (automatic mode) now include the "Other (not measured)" row, so they add up to the house power instead of staying below it.
+
+### Changed
+
+- Power is always shown in watts without decimal places (for example `1,900 W` instead of `1.9 kW`), on the tiles, in the lists, in the chart axis and in the settings. Sensors reporting kW or MW are still converted.
+
 ## [0.5.0] - 2026-11-11
 
 ### Added

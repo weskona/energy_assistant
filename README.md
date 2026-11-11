@@ -24,7 +24,7 @@ they stack. Areas and labels show their Home Assistant icon in front of the name
 
 Setup runs in three steps: **1. Grid and house**, **2. Solar and storage** (optional), **3. Devices** (optional).
 
-All sensors are power sensors (`device_class: power`, W or kW).
+All sensors are power sensors (`device_class: power`, W, kW or MW). Power is always displayed in whole watts.
 Several sensors can be selected per category where noted, they are added up.
 Separate and combined sensors can be mixed.
 

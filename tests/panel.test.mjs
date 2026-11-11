@@ -817,7 +817,7 @@ test("labels: the settings list shows the existing labels with their sensor coun
   assert.match(html, /data-label="klima" checked/);
   assert.doesNotMatch(html, /data-label="unbenutzt"/); // no power sensors, so it is not offered
   // same count as the card: klimaanlage, lüftung, split (the excluded and the grid sensor do not count)
-  assert.match(html, /Klima<\/span><\/span><span class="mi">3 power sensors · 1\.6 kW/);
+  assert.match(html, /Klima<\/span><\/span><span class="mi">3 power sensors · 1[.,\s]?620 W/);
   assert.match(html, /Licht<\/span><\/span><span class="mi">1 power sensor · 15 W</);
 });
 
@@ -1267,7 +1267,7 @@ test("fold limit: the page shows that many rows per list and unfolds the rest pe
   };
   const rows = (title) => (card(title).match(/class="dev"/g) || []).length;
   assert.equal(rows("Devices"), 7); // 6 devices + the unmeasured rest
-  assert.equal(rows("Areas"), 6);
+  assert.equal(rows("Areas"), 7); // 6 areas + the unmeasured rest (no area selected)
   assert.equal(rows("Labels"), 6);
   assert.match(html, /Show all 13/); // devices fold
   assert.match(html, /Show all 9/); // areas fold
@@ -1275,7 +1275,7 @@ test("fold limit: the page shows that many rows per list and unfolds the rest pe
   p._devExpanded = true;
   html = p._renderHouse();
   assert.equal(rows("Devices"), 14); // all 13 + the rest
-  assert.equal(rows("Areas"), 6); // the others stay folded
+  assert.equal(rows("Areas"), 7); // the others stay folded
 });
 
 test("fold limit: the cards still unfold fully with a custom limit", () => {
@@ -1425,4 +1425,71 @@ test("area picker: area names are HTML-escaped", () => {
 test("area ids survive the settings form (normalize keeps them)", () => {
   assert.deepEqual(new Panel()._normalize({ area_ids: ["kueche"] }).area_ids, ["kueche"]);
   assert.deepEqual(new Panel()._normalize({}).area_ids, []);
+});
+
+
+// Sum shown in the header of a card (the small label right of the title).
+const headerTotal = (html) => html.match(/class="eb-label">([^<]*)</)[1];
+// The panel shows whole watts. The thousands separator depends on the locale, so only digits count.
+const watts = (text) => parseFloat(text.replace(/[^\d]/g, ""));
+
+test("totals: the device card total includes the unmeasured rest and so equals the house power", () => {
+  const p = renamePanel();
+  p._editName = null;
+  // devices: 1400 + 900 W = 2300 W, house 2500 W -> rest 200 W
+  const html = p._renderDevices(2500);
+  assert.match(html, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(html)) - 2500) < 1); // exactly the house power
+});
+
+test("totals: without a rest the total is the sum of the devices", () => {
+  const p = renamePanel();
+  p._editName = null;
+  const html = p._renderDevices(2300); // house = devices
+  assert.doesNotMatch(html, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(html)) - 2300) < 1);
+  const over = p._renderDevices(1000); // devices exceed the house (overlapping sensors): no negative rest
+  assert.doesNotMatch(over, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(over)) - 2300) < 1);
+});
+
+test("totals: the areas card without a selection shows the rest and its total equals the house power", () => {
+  const p = areaPanel(); // area sensors add up to 1644 W
+  const html = p._renderAreas(2000);
+  assert.match(html, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(html)) - 2000) < 1);
+  assert.match(html, /Other \(not measured\)[\s\S]*?<small class="pct">18 %<\/small>/); // 356 of 2000 W
+});
+
+test("totals: the areas card with a selection is only a part of the house, no rest row", () => {
+  const p = areaPanel({ area_ids: ["kueche", "technik"] });
+  const html = p._renderAreas(2000);
+  assert.doesNotMatch(html, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(html)) - 120) < 1); // 32 + 88 W
+});
+
+test("totals: without a known house power there is no rest and the total is the sum", () => {
+  const html = areaPanel()._renderAreas(null);
+  assert.doesNotMatch(html, /Other \(not measured\)/);
+  assert.ok(Math.abs(watts(headerTotal(html)) - 1644) < 1);
+});
+
+test("totals: the labels card stays a part of the house, no rest row", () => {
+  const html = labelPanel()._renderLabels(2000);
+  assert.doesNotMatch(html, /Other \(not measured\)/);
+});
+
+
+test("display: power is always shown in whole watts, never in kW and without decimals", () => {
+  const html = limitPanel({ devices: 3 })._renderHouse();
+  assert.doesNotMatch(html, /kW/);
+  assert.match(html, /9[.,\s]?000<small>W<\/small>|9[.,\s]?000\s*W/); // the 9000 W grid import
+  assert.doesNotMatch(html, /\d[.,]\d{1,2}\s*<small>W|\d[.,]\d\s*W\b/); // no decimal digits next to a W unit
+});
+
+test("display: sensors in kW are converted and shown in watts", () => {
+  const p = panel({ house_power: "h" }, { h: st(1.9, "kW") });
+  const c = p._current();
+  assert.equal(c.house, 1900);
+  assert.doesNotMatch(p._renderHouse.call(Object.assign(p, { _ready: true, _labelData: null })), /kW/);
 });
