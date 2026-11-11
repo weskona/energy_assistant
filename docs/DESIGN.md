@@ -22,7 +22,7 @@ Tokens: [`frontend/energyboard-tokens.css`](../frontend/energyboard-tokens.css) 
 ## Typografie
 
 [Outfit](https://fonts.google.com/specimen/Outfit) (OFL), Gewichte 500/600/700/800.
-Die Schrift muss mit der Karte ausgeliefert werden (Lizenztext beilegen), nicht per CDN geladen werden.
+Die Schrift wird lokal mitgeliefert (`frontend/fonts/`, Variable Font als WOFF2 für Latin und Latin-Ext, Lizenz in `OFL-Outfit.txt`) und per `@font-face` in den Tokens eingebunden. Kein CDN, keine Verbindung zu Google.
 
 ## Komponenten
 
