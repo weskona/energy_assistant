@@ -24,10 +24,20 @@
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
         }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors.",
+        "data": {
+          "device_patterns": "Name patterns (e.g. *_power)",
+          "device_exclude": "Excluded sensors (never added by a pattern)",
+          "device_power": "Additional device sensors (optional)"
+        }
       }
     },
     "error": {
-      "no_source": "Please provide grid import, grid combined or house consumption."
+      "no_source": "Please provide grid import, grid combined or house consumption.",
+      "invalid_pattern": "Only letters, digits, _ . * and ? are allowed."
     },
     "abort": {
       "single_instance_allowed": "Energyboard is already set up."
@@ -57,10 +67,20 @@
           "battery_charge": "To storage / charging (optional, multiple allowed)",
           "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
         }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Optional: name patterns with * as wildcard, e.g. *_power. Every power sensor whose name matches is listed on the House tab. You can also add single sensors.",
+        "data": {
+          "device_patterns": "Name patterns (e.g. *_power)",
+          "device_exclude": "Excluded sensors (never added by a pattern)",
+          "device_power": "Additional device sensors (optional)"
+        }
       }
     },
     "error": {
-      "no_source": "Please provide grid import, grid combined or house consumption."
+      "no_source": "Please provide grid import, grid combined or house consumption.",
+      "invalid_pattern": "Only letters, digits, _ . * and ? are allowed."
     }
   }
 }

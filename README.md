@@ -7,7 +7,8 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 | Tab | Content |
 |-----|---------|
-| **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours |
+| **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
+| **Settings** | Change all sensors directly in the panel (see below) |
 
 ## Installation
 
@@ -17,7 +18,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 ## Configuration
 
-Setup runs in two steps: **1. Grid and house**, **2. Solar and storage** (optional).
+Setup runs in three steps: **1. Grid and house**, **2. Solar and storage** (optional), **3. Devices** (optional).
 
 All sensors are power sensors (`device_class: power`, W or kW).
 Several sensors can be selected per category where noted, they are added up.
@@ -41,6 +42,25 @@ Separate and combined sensors can be mixed.
 | Grid combined | Import | Export | yes |
 | Storage combined | Discharge | Charge | yes |
 
+**Devices** (step 3): the House tab lists the power of individual devices with a bar, highest first.
+
+- **Name patterns:** enter patterns with `*` as wildcard, e.g. `*_power` (or `*_leistung` for German entity names).
+  Every power sensor whose name matches is listed, so new devices appear automatically.
+  `?` matches one character. A pattern without a dot is compared with the part after `sensor.`,
+  a pattern with a dot (`sensor.kitchen_*`) with the full entity id. Upper and lower case do not matter.
+- **Only power entities:** only `sensor` entities with `device_class: power` are considered.
+  Sensors that are part of the energy balance (grid, solar, storage, house) are never listed as devices.
+- **Exclude list:** not every sensor that matches a pattern is wanted. In the Settings tab all matches are listed
+  with a checkbox each. Untick a sensor to exclude it, tick it again to bring it back. Excluded sensors stay in the
+  list (struck through) and are collected in the **excluded sensors** field. With many matches use the filter box
+  (searches names and entity ids) and **Exclude shown** / **Include shown**, which only act on the shown sensors.
+- **Additional device sensors:** you can also pick single sensors, e.g. one without a matching name.
+  Sensors picked here always stay in the list, even if they are on the exclude list.
+- The House tab shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as idle and are only counted. If a house power is known, the remainder is shown
+  as "Other (not measured)".
+
+In the panel's **Settings** tab the field shows live which sensors a pattern matches.
+
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.
 Required: grid import, grid combined or house consumption.
@@ -57,7 +77,18 @@ Without the optional "storage charged from grid" sensor the storage is assumed t
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile with its share of production, in the source bar and as a second line in the history.
 
-You can change the sensors later via *Configure*.
+### Changing the settings
+
+After the first setup in the config flow you can change everything in the panel itself:
+open the **Settings** tab, add sensors by typing or picking from the list of power sensors, remove them with the ×
+and press **Save**. The changes apply immediately, no restart or reload is needed.
+
+- Only administrators can save. Other users see the settings read-only.
+- Saving is blocked while neither grid import, grid combined nor house consumption is set.
+- The same settings are still available via *Configure* on the integration.
+
+The panel talks to the integration over two WebSocket commands, `energyboard/get_config` and
+`energyboard/update_config` (admin only), and stores the result in the options of the config entry.
 
 ## Development
 
@@ -73,3 +104,7 @@ npm test
 Every merge to `main` that contains a new `version` in `custom_components/energyboard/manifest.json`
 creates the tag `v<version>` and a GitHub release. The release notes come from the matching
 `## [<version>]` section of `CHANGELOG.md`, which therefore must exist before merging.
+
+## License
+
+[MIT](LICENSE). The bundled font Outfit is licensed under the SIL Open Font License 1.1, see `custom_components/energyboard/frontend/fonts/OFL-Outfit.txt`.

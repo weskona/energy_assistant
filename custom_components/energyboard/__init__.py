@@ -9,17 +9,22 @@ from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 
-from .const import BOOL_KEYS, CONFIG_KEYS, DOMAIN, LIST_KEYS, PANEL_URL_PATH, STATIC_URL
+from . import websocket
+from .const import DOMAIN, PANEL_URL_PATH, STATIC_URL
+from .settings import normalize
 
 _FRONTEND_DIR = Path(__file__).parent / "frontend"
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-def _as_list(value: str | list[str] | None) -> list[str]:
-    """Normalize a single entity or a list to a list for the panel."""
-    if not value:
-        return []
-    return [value] if isinstance(value, str) else list(value)
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the WebSocket API used by the panel settings."""
+    websocket.async_register(hass)
+    return True
 
 
 def _version() -> str:
@@ -36,15 +41,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         data["static_registered"] = True
 
-    merged = {**entry.data, **entry.options}
-    config = {
-        key: _as_list(merged.get(key))
-        if key in LIST_KEYS
-        else bool(merged.get(key))
-        if key in BOOL_KEYS
-        else merged.get(key)
-        for key in CONFIG_KEYS
-    }
+    # The panel loads the live settings over the WebSocket API. This initial copy is only a
+    # fallback, so changing the settings does not need to reload the entry or the panel.
+    config = normalize({**entry.data, **entry.options})
 
     await panel_custom.async_register_panel(
         hass,
@@ -59,7 +58,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update=True,
     )
 
-    entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
 
@@ -67,7 +65,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Remove the panel."""
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     return True
-
-
-async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)

@@ -24,10 +24,20 @@
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
         }
+      },
+      "devices": {
+        "title": "Geräte",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
+        "data": {
+          "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
+        }
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben.",
+      "invalid_pattern": "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?."
     },
     "abort": {
       "single_instance_allowed": "Energyboard ist bereits eingerichtet."
@@ -57,10 +67,20 @@
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
           "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
         }
+      },
+      "devices": {
+        "title": "Geräte",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
+        "data": {
+          "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
+          "device_power": "Zusätzliche Geräte-Sensoren (optional)"
+        }
       }
     },
     "error": {
-      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben."
+      "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben.",
+      "invalid_pattern": "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?."
     }
   }
 }
