@@ -17,6 +17,8 @@ CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
 CONF_DEVICE_PATTERNS = "device_patterns"
 # Sensors that a pattern must not add to the device list.
 CONF_DEVICE_EXCLUDE = "device_exclude"
+# Patterns for sensors that must not be listed as devices (e.g. "alpha_ess_*").
+CONF_DEVICE_EXCLUDE_PATTERNS = "device_exclude_patterns"
 
 # Combined signed sensors (one or more each, summed)
 CONF_GRID_POWER = "grid_power"  # grid: import positive, export negative
@@ -36,9 +38,10 @@ LIST_KEYS = (
     CONF_DEVICE_POWER,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
+    CONF_DEVICE_EXCLUDE_PATTERNS,
 )
 # List keys that hold text patterns instead of entity ids.
-TEXT_KEYS = (CONF_DEVICE_PATTERNS,)
+TEXT_KEYS = (CONF_DEVICE_PATTERNS, CONF_DEVICE_EXCLUDE_PATTERNS)
 # Keys that hold exactly one entity in storage (the panel always sees lists).
 SINGLE_KEYS = (CONF_GRID_IMPORT, CONF_GRID_EXPORT, CONF_BATTERY_GRID_CHARGE)
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)

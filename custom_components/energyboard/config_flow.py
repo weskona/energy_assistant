@@ -16,6 +16,7 @@ from .const import (
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_POWER,
     CONF_DEVICE_EXCLUDE,
+    CONF_DEVICE_EXCLUDE_PATTERNS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_POWER,
     CONF_GRID_EXPORT,
@@ -26,6 +27,7 @@ from .const import (
     CONF_INVERT_GRID,
     CONF_SOLAR_POWER,
     DOMAIN,
+    TEXT_KEYS,
 )
 from .settings import clean_patterns, has_source, valid_patterns
 
@@ -80,6 +82,7 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             _optional(defaults, CONF_DEVICE_PATTERNS): _PATTERNS,
+            _optional(defaults, CONF_DEVICE_EXCLUDE_PATTERNS): _PATTERNS,
             _optional(defaults, CONF_DEVICE_EXCLUDE): _MULTI,
             _optional(defaults, CONF_DEVICE_POWER): _MULTI,
         }
@@ -89,14 +92,14 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
 def _clean_devices(
     user_input: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Normalize the device patterns and check that they only use allowed characters."""
-    cleaned = {
-        **user_input,
-        CONF_DEVICE_PATTERNS: clean_patterns(user_input.get(CONF_DEVICE_PATTERNS)),
-    }
-    if not valid_patterns(cleaned[CONF_DEVICE_PATTERNS]):
-        return cleaned, {CONF_DEVICE_PATTERNS: "invalid_pattern"}
-    return cleaned, {}
+    """Normalize the patterns and check that they only use allowed characters."""
+    cleaned = {**user_input}
+    errors: dict[str, str] = {}
+    for key in TEXT_KEYS:
+        cleaned[key] = clean_patterns(user_input.get(key))
+        if not valid_patterns(cleaned[key]):
+            errors[key] = "invalid_pattern"
+    return cleaned, errors
 
 
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:

@@ -81,3 +81,9 @@ def test_normalize_cleans_patterns() -> None:
         "*_leistung"
     ]
     assert normalize({})["device_patterns"] == []
+
+
+def test_exclude_patterns_are_cleaned_like_patterns() -> None:
+    result = normalize({"device_exclude_patterns": [" Alpha_ESS_* ", "alpha_ess_*"]})
+    assert result["device_exclude_patterns"] == ["alpha_ess_*"]
+    assert normalize({})["device_exclude_patterns"] == []

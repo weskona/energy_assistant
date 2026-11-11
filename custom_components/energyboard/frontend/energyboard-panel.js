@@ -16,13 +16,18 @@ const BUCKET_MIN = 5;
 const STYLE = `
 :host{display:block;min-height:100%;background:var(--eb-bg);color:var(--eb-text);font-family:var(--eb-font)}
 *{box-sizing:border-box}
-.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.wrap{padding:16px 24px}
 .top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .menu{background:none;border:0;color:var(--eb-muted);cursor:pointer;padding:6px}
 .tabs{display:flex;gap:4px;padding:4px;background:var(--eb-panel);border:1px solid var(--eb-line);border-radius:14px;margin:0 auto}
 .tab{border:0;background:none;color:var(--eb-muted);font:600 14px var(--eb-font);padding:8px 16px;border-radius:10px;cursor:pointer}
 .tab.active{background:rgba(255,255,255,.08);color:var(--eb-text)}
-.grid{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.grid{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.set .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.wide{grid-column:1/-1}
+.sec .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:28px;align-items:start}
+.fld.span{grid-column:1/-1}
+@media (max-width:800px){.grid,.set .grid{grid-template-columns:minmax(0,1fr)}.wrap{padding:12px}}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .big{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px}
 .big b{font-size:64px;font-weight:800;line-height:1}
@@ -36,6 +41,7 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .axis{fill:var(--eb-dim);font-size:11px}
 .empty{padding:40px 0;text-align:center;color:var(--eb-muted)}
 .state{color:var(--eb-green)}
+.devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:32px}
 .dev{margin-top:14px}
 .dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 .dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -56,12 +62,12 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .chip button:hover{color:var(--eb-red)}
 .set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
 .set input[type=text]:focus{outline:none;border-color:var(--eb-green)}
-.mlist{max-height:260px;overflow:auto;border:1px solid var(--eb-tile-border);border-radius:10px;margin-top:8px}
-.mrow{display:flex;align-items:center;gap:10px;padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--eb-line)}
-.mrow:last-child{border-bottom:0}
+.mlist{max-height:340px;overflow:auto;border:1px solid var(--eb-tile-border);border-radius:10px;margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.mrow{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--eb-line);min-width:0}
 .mrow input{accent-color:var(--eb-green);flex:none}
-.mn{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mi{color:var(--eb-dim);font-size:11.5px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt{display:flex;flex-direction:column;min-width:0}
+.mn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi{color:var(--eb-dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mrow.ex .mn{color:var(--eb-dim);text-decoration:line-through}
 .mbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .mbar .btn{padding:7px 12px;font-size:12.5px}
@@ -144,6 +150,9 @@ const STRINGS = {
     showAll: "Show all {n}",
     showLess: "Show less",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
+    f_device_exclude_patterns: "Exclude patterns (e.g. alpha_ess_*)",
+    addExcludePattern: "e.g. alpha_ess_*",
+    excludedByPattern: "Excluded by an exclude pattern",
     noMatches: "No power sensor matches yet",
   },
   de: {
@@ -209,6 +218,9 @@ const STRINGS = {
     showAll: "Alle {n} zeigen",
     showLess: "Weniger zeigen",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
+    f_device_exclude_patterns: "Ausschluss-Muster (z. B. alpha_ess_*)",
+    addExcludePattern: "z. B. alpha_ess_*",
+    excludedByPattern: "Durch ein Ausschluss-Muster ausgeschlossen",
     noMatches: "Noch kein Leistungssensor passt",
   },
 };
@@ -220,9 +232,9 @@ const esc = (t) =>
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude", "multi"], ["device_power", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns"];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
@@ -360,6 +372,7 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   _onClick(e) {
+    this._fieldError = {};
     const rm = e.target.closest("[data-remove]");
     const bulk = e.target.closest("[data-bulk]");
     if (e.target.closest("[data-devtoggle]")) {
@@ -370,7 +383,8 @@ class EnergyboardPanel extends HTMLElement {
       this._edited();
     } else if (bulk && this._isAdmin) {
       // Applies to the sensors currently shown (respects the filter).
-      const ids = this._matchList().shown;
+      const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+      const ids = this._matchList().shown.filter((id) => !byPattern(id));
       const rest = this._draft.device_exclude.filter((id) => !ids.includes(id));
       this._draft.device_exclude = bulk.dataset.bulk === "exclude" ? [...rest, ...ids] : rest;
       this._edited();
@@ -385,6 +399,7 @@ class EnergyboardPanel extends HTMLElement {
   _onChange(e) {
     const t = e.target;
     if (!this._isAdmin) return;
+    this._fieldError = {};
     if (t.dataset?.device) {
       const id = t.dataset.device;
       const rest = this._draft.device_exclude.filter((x) => x !== id);
@@ -455,12 +470,15 @@ class EnergyboardPanel extends HTMLElement {
     const { shown } = this._matchList();
     const states = this._hass?.states || {};
     const excluded = new Set(this._draft.device_exclude);
+    const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
     if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t("noMatches"))}</div>`;
     return shown
       .map((id) => {
-        const off = excluded.has(id);
+        const viaPattern = byPattern(id);
+        const off = excluded.has(id) || viaPattern;
         const name = states[id]?.attributes?.friendly_name || id;
-        return `<label class="mrow${off ? " ex" : ""}" title="${esc(id)}"><input type="checkbox" data-device="${esc(id)}" ${off ? "" : "checked"} ${ro ? "disabled" : ""}><span class="mn">${esc(name)}</span><span class="mi">${esc(id)}</span></label>`;
+        const title = viaPattern ? `${id} – ${this._t("excludedByPattern")}` : id;
+        return `<label class="mrow${off ? " ex" : ""}" title="${esc(title)}"><input type="checkbox" data-device="${esc(id)}" ${off ? "" : "checked"} ${ro || viaPattern ? "disabled" : ""}><span class="mt"><span class="mn">${esc(name)}</span><span class="mi">${esc(id)}</span></span></label>`;
       })
       .join("");
   }
@@ -469,7 +487,8 @@ class EnergyboardPanel extends HTMLElement {
     const { found } = this._matchList();
     if (!found.length) return `<div class="hint">${esc(this._t("noMatches"))}</div>`;
     const excluded = new Set(this._draft.device_exclude);
-    const x = found.filter((id) => excluded.has(id)).length;
+    const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+    const x = found.filter((id) => excluded.has(id) || byPattern(id)).length;
     return `<div class="hint" id="mcount">${esc(this._t("matchesCount", { n: found.length, x }))}</div>
       <div class="mbar"><input type="text" data-filter value="${esc(this._filter || "")}" placeholder="${esc(this._t("filterMatches"))}" autocomplete="off" style="flex:1 1 160px;width:auto">
       ${ro ? "" : `<button class="btn ghost" data-bulk="exclude">${esc(this._t("excludeShown"))}</button><button class="btn ghost" data-bulk="include">${esc(this._t("includeShown"))}</button>`}</div>
@@ -490,15 +509,14 @@ class EnergyboardPanel extends HTMLElement {
       const chips = this._draftList(key)
         .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
         .join("");
-      let hint = "";
-      if (kind === "text" && this._draft.device_patterns.length) hint = this._renderMatches(ro);
+      if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? "addPattern" : "addSensor"))}" autocomplete="off">`}${hint}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec"><div class="eb-title">${this._t(sec.title)}</div>${sec.fields.map(field).join("")}</div>`,
+      (sec) => `<div class="eb-card sec${sec.title === "sectionDevices" ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";
@@ -600,10 +618,11 @@ class EnergyboardPanel extends HTMLElement {
       ...(ignoreExclude ? [] : cfg.device_exclude || []),
     ]);
     const matches = compilePatterns(patterns);
+    const excludedByPattern = ignoreExclude ? () => false : compilePatterns(cfg.device_exclude_patterns || []);
     return Object.entries(this._hass?.states || {})
       .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
       .map(([id]) => id)
-      .filter((id) => !skip.has(id) && matches(id))
+      .filter((id) => !skip.has(id) && matches(id) && !excludedByPattern(id))
       .sort();
   }
 
@@ -830,9 +849,9 @@ class EnergyboardPanel extends HTMLElement {
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">
+    return `<div class="eb-card wide">
       <div class="row"><span class="eb-title">${this._t("devices")}</span><span class="eb-label">${tv} ${tu}</span></div>
-      <div class="${this._devExpanded ? "devlist" : ""}">${list || `<div class="empty">–</div>`}</div>
+      <div class="devgrid${this._devExpanded ? " devlist" : ""}">${list || `<div class="empty">–</div>`}</div>
       ${folded ? `<button class="linkbtn" data-devtoggle>${this._devExpanded ? this._t("showLess") : this._t("showAll", { n: active.length })}</button>` : ""}
       ${idle > 0 ? `<div class="note">${this._t("idleDevices", { n: idle })}</div>` : ""}
     </div>`;

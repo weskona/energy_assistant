@@ -27,9 +27,10 @@
       },
       "devices": {
         "title": "Geräte",
-        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen. Ausschluss-Muster und ausgeschlossene Sensoren halten unerwünschte Sensoren aus der Liste.",
         "data": {
           "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }
@@ -70,9 +71,10 @@
       },
       "devices": {
         "title": "Geräte",
-        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen.",
+        "description": "Optional: Namensmuster mit * als Platzhalter, z. B. *_leistung. Jeder Leistungssensor, dessen Name passt, erscheint im Haus-Tab. Einzelne Sensoren lassen sich zusätzlich wählen. Ausschluss-Muster und ausgeschlossene Sensoren halten unerwünschte Sensoren aus der Liste.",
         "data": {
           "device_patterns": "Namensmuster (z. B. *_leistung)",
+          "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)"
         }

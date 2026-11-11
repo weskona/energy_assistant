@@ -64,6 +64,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
     assert result["step_id"] == "devices"
     assert list(result["data_schema"].schema) == [
         "device_patterns",
+        "device_exclude_patterns",
         "device_exclude",
         "device_power",
     ]
@@ -72,6 +73,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
             result["flow_id"],
             {
                 "device_patterns": [" *_Power ", "*_power", "sensor.x_*"],
+                "device_exclude_patterns": [" Alpha_ESS_* ", "alpha_ess_*"],
                 "device_exclude": ["sensor.skip_power"],
                 "device_power": ["sensor.oven", "sensor.fridge"],
             },
@@ -86,6 +88,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_grid_charge": "sensor.bat_grid",
         "invert_battery": False,
         "device_patterns": ["*_power", "sensor.x_*"],
+        "device_exclude_patterns": ["alpha_ess_*"],
         "device_exclude": ["sensor.skip_power"],
         "device_power": ["sensor.oven", "sensor.fridge"],
     }
@@ -169,3 +172,18 @@ async def test_devices_step_rejects_invalid_patterns(hass: HomeAssistant) -> Non
     )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"device_patterns": "invalid_pattern"}
+
+
+async def test_devices_step_rejects_invalid_exclude_patterns(
+    hass: HomeAssistant,
+) -> None:
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"house_power": "sensor.house"}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_exclude_patterns": ["no spaces"]}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"device_exclude_patterns": "invalid_pattern"}
