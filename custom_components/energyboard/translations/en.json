@@ -1,0 +1,66 @@
+{
+  "title": "Energyboard",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Grid and house",
+        "description": "Pick the power sensors for grid and house. At least grid import, grid combined or house consumption is required. Combined sensors are signed, separate ones report positive values.",
+        "data": {
+          "grid_power": "Grid combined (import +, export −)",
+          "invert_grid": "Invert grid sign",
+          "grid_import": "Grid import separate (optional)",
+          "grid_export": "Grid export separate (optional)",
+          "house_power": "House consumption directly (optional, otherwise calculated)"
+        }
+      },
+      "storage": {
+        "title": "Solar and storage",
+        "description": "Optional: solar production and storage. Multiple sensors per field are summed.",
+        "data": {
+          "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_power": "Storage combined (discharge +, charge −)",
+          "invert_battery": "Invert storage sign",
+          "battery_discharge": "From storage / discharging (optional, multiple allowed)",
+          "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Please provide grid import, grid combined or house consumption."
+    },
+    "abort": {
+      "single_instance_allowed": "Energyboard is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Grid and house",
+        "description": "Pick the power sensors for grid and house. At least grid import, grid combined or house consumption is required. Combined sensors are signed, separate ones report positive values.",
+        "data": {
+          "grid_power": "Grid combined (import +, export −)",
+          "invert_grid": "Invert grid sign",
+          "grid_import": "Grid import separate (optional)",
+          "grid_export": "Grid export separate (optional)",
+          "house_power": "House consumption directly (optional, otherwise calculated)"
+        }
+      },
+      "storage": {
+        "title": "Solar and storage",
+        "description": "Optional: solar production and storage. Multiple sensors per field are summed.",
+        "data": {
+          "solar_power": "Solar production (optional, multiple allowed)",
+          "battery_power": "Storage combined (discharge +, charge −)",
+          "invert_battery": "Invert storage sign",
+          "battery_discharge": "From storage / discharging (optional, multiple allowed)",
+          "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
+        }
+      }
+    },
+    "error": {
+      "no_source": "Please provide grid import, grid combined or house consumption."
+    }
+  }
+}

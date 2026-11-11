@@ -1,0 +1,131 @@
+/* ha-energyboard design tokens (dark, card-based, glow style) */
+
+/* Outfit (SIL OFL 1.1, see fonts/OFL-Outfit.txt), bundled locally */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./fonts/outfit-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./fonts/outfit-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+:root,
+:host {
+  /* Surfaces */
+  --eb-bg: #0b0d12;
+  --eb-panel: #14171e;
+  --eb-tile: rgba(255, 255, 255, 0.032);
+  --eb-tile-border: rgba(255, 255, 255, 0.07);
+  --eb-line: rgba(255, 255, 255, 0.065);
+
+  /* Text */
+  --eb-text: #f3f5f9;
+  --eb-muted: #8b91a1;
+  --eb-dim: #5d6373;
+
+  /* Accents (energy semantics) */
+  --eb-green: #34d399; /* active, charging, OK */
+  --eb-solar: var(--energy-solar-color, #ff9800); /* solar */
+  --eb-grid: var(--energy-grid-consumption-color, #488fc2); /* grid */
+  --eb-blue: #60a5fa;
+  --eb-cyan: #38bdf8;
+  --eb-gold: #f7b733; /* action, plan */
+  --eb-orange: #fb923c; /* warning */
+  --eb-red: #f87171; /* error, limit */
+  --eb-violet: #a78bfa;
+
+  /* Shape */
+  --eb-radius-card: 22px;
+  --eb-radius-tile: 14px;
+  --eb-radius-chip: 999px;
+  --eb-gap: 16px;
+
+  /* Typography */
+  --eb-font: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --eb-title-spacing: 0.14em;
+  --eb-label-spacing: 0.06em;
+}
+
+.eb-card {
+  background: var(--eb-panel);
+  border: 1px solid var(--eb-line);
+  border-radius: var(--eb-radius-card);
+  padding: 22px;
+  color: var(--eb-text);
+  font-family: var(--eb-font);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.eb-card--glow {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(52, 211, 153, 0.14), transparent 60%),
+    var(--eb-panel);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+.eb-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: var(--eb-title-spacing);
+  text-transform: uppercase;
+  color: var(--eb-muted);
+}
+.eb-tile {
+  background: var(--eb-tile);
+  border: 1px solid var(--eb-tile-border);
+  border-radius: var(--eb-radius-tile);
+  padding: 12px 14px;
+}
+.eb-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: var(--eb-label-spacing);
+  text-transform: uppercase;
+  color: var(--eb-muted);
+}
+.eb-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+.eb-value small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--eb-muted);
+  margin-left: 3px;
+}
+.eb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--eb-radius-chip);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--eb-green);
+  background: rgba(52, 211, 153, 0.14);
+}
+.eb-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--eb-line);
+}
+.eb-bar > .eb-solar { background: var(--eb-solar); }
+.eb-bar > .eb-grid { background: var(--eb-grid); }
+.eb-action {
+  border: 1px dashed rgba(247, 183, 51, 0.5);
+  color: var(--eb-gold);
+  border-radius: var(--eb-radius-tile);
+  padding: 12px 16px;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .eb-card { padding: 18px; border-radius: 20px; }
+}
