@@ -15,9 +15,9 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def skip_dependencies(request):
     """The tests do not need frontend, http and panel_custom to be set up.
 
-    The WebSocket tests need a real http and websocket_api, so they keep the real setup.
+    Tests that use a real http client or WebSocket client keep the real setup.
     """
-    if "hass_ws_client" in request.fixturenames:
+    if {"hass_ws_client", "hass_client"} & set(request.fixturenames):
         yield
         return
     with (
@@ -33,8 +33,10 @@ def mock_panel():
     with (
         patch(
             "homeassistant.components.panel_custom.async_register_panel",
-            AsyncMock(),
+            autospec=True,
         ) as register,
-        patch("homeassistant.components.frontend.async_remove_panel") as remove,
+        patch(
+            "homeassistant.components.frontend.async_remove_panel", autospec=True
+        ) as remove,
     ):
         yield register, remove

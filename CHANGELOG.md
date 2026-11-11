@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-11
+
+### Fixed
+
+- The panel did not show up: setting up the config entry failed with `async_register_panel() got an unexpected keyword argument 'update'`. The unsupported argument is removed.
+
+### Added
+
+- Tests that set the integration up with the real frontend, http and panel_custom components (panel registration, served files, reload, unload, settings over the WebSocket API). The mocks of the panel registration now check the real signature.
+
 ## [0.2.0] - 2026-11-11
 
 ### Added
@@ -48,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/weskona/ha-energyboard/releases/tag/v0.1.0

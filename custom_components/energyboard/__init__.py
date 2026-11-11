@@ -55,7 +55,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         require_admin=False,
         config=config,
         config_panel_domain=DOMAIN,
-        update=True,
     )
 
     return True
