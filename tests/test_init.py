@@ -31,6 +31,7 @@ async def test_setup_registers_panel_with_normalized_config(
             "device_exclude": ["sensor.skip_power"],
             "device_exclude_patterns": ["alpha_ess_*"],
             "label_ids": ["klima", "licht"],
+            "area_ids": ["kueche"],
             "device_names": {"sensor.oven": " Ofen "},
         },
     )
@@ -60,6 +61,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "device_exclude": ["sensor.skip_power"],
         "device_exclude_patterns": ["alpha_ess_*"],
         "label_ids": ["klima", "licht"],
+        "area_ids": ["kueche"],
         "device_names": {"sensor.oven": "Ofen"},
         "invert_grid": True,
         "invert_battery": False,

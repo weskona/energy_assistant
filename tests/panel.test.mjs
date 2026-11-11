@@ -560,7 +560,7 @@ function areaPanel(config = { device_patterns: ["*_leistung"] }, registry = {}) 
   return p;
 }
 
-test("areas: the device list is summed up per area (own area or the area of the device)", () => {
+test("areas: the power sensors are summed up per area (own area or the area of the device)", () => {
   const byName = Object.fromEntries(areaPanel()._areas().map((a) => [a.name, a]));
   assert.equal(byName["Küche"].w, 32);
   assert.equal(byName["Küche"].n, 2);
@@ -588,14 +588,14 @@ test("areas: uses the same filters as the devices", () => {
   assert.equal(byName["Küche"], 32);
 });
 
-test("areas: card lists areas strongest first, with the device count, share and \"No area\" last", () => {
+test("areas: card lists areas strongest first, with the sensor count, share and \"No area\" last", () => {
   const html = areaPanel()._renderAreas(2000);
   assert.match(html, /Areas/);
   const order = ["Wohnzimmer", "Technik", "Küche", "No area"].map((n) => html.indexOf(n));
   assert.ok(order.every((i) => i > -1));
   assert.deepEqual([...order].sort((a, b) => a - b), order); // Wohnzimmer, Technik, Küche, No area
-  assert.match(html, /2 devices/);
-  assert.match(html, /1 device</);
+  assert.match(html, /2 power sensors/);
+  assert.match(html, /1 power sensor</);
   assert.match(html, /Wohnzimmer[\s\S]*?<small class="pct">6 %<\/small>/);
   assert.match(html, /title="6 % of house · Media 124 W"/);
 });
@@ -606,9 +606,8 @@ test("areas: idle areas are only counted", () => {
   assert.match(html, /1 idle/);
 });
 
-test("areas: no card when no sensor belongs to an area or there are no devices", () => {
+test("areas: no card when no sensor belongs to an area", () => {
   assert.equal(areaPanel(undefined, { entities: {}, devices: {} })._renderAreas(2000), "");
-  assert.equal(areaPanel({})._renderAreas(2000), "");
   const noRegistry = areaPanel();
   noRegistry._hass.entities = undefined;
   noRegistry._hass.devices = undefined;
@@ -871,7 +870,7 @@ function pickerPanel(selected = []) {
   return p;
 }
 const lseg = (value) => ({ target: { closest: (s) => (s === "[data-lseg]" ? { dataset: { lseg: value } } : null) } });
-const names = (p) => p._labelPicker().shown.map((x) => x.label.name);
+const names = (p) => p._labelPicker().shown.map((x) => x.item.name);
 
 test("label picker: only labels with power sensors are offered", () => {
   const p = pickerPanel();
@@ -1207,4 +1206,223 @@ test("live updates: redrawing works without any expanded list", () => {
   content.next = [];
   p._swapMarkup(content, "<plain/>");
   assert.equal(content.html, "<plain/>");
+});
+
+// Panel with `devices` active power sensors, spread over `areas` areas, and `labels` selected labels
+// that each carry one sensor. `idle` of the devices are below 5 W.
+function limitPanel({ devices, areas = 0, labels = 0, idle = 0 }) {
+  const states = { "sensor.netz_leistung": { state: "9000", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Netz" } } };
+  const entities = {};
+  const labelEntities = {};
+  for (let i = 0; i < devices; i++) {
+    const id = `sensor.d${i}_leistung`;
+    states[id] = { state: String(i < idle ? 2 : 100 + i), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: `D${i}` } };
+    if (areas) entities[id] = { area_id: `a${i % areas}` };
+    if (i < labels) labelEntities[id] = [`l${i}`];
+  }
+  const cfg = {
+    grid_import: ["sensor.netz_leistung"],
+    device_patterns: ["*_leistung"],
+    label_ids: Array.from({ length: labels }, (_, i) => `l${i}`),
+  };
+  const p = discoverPanel(cfg, states);
+  p._hass.entities = entities;
+  p._hass.devices = {};
+  p._hass.areas = Object.fromEntries(Array.from({ length: areas }, (_, i) => [`a${i}`, { name: `Area ${i}` }]));
+  p._labelData = {
+    labels: Array.from({ length: labels }, (_, i) => ({ label_id: `l${i}`, name: `Label ${i}`, color: null })),
+    entities: labelEntities,
+  };
+  p._ready = true;
+  return p;
+}
+
+test("fold limit: follows the shortest list (here the labels)", () => {
+  assert.equal(limitPanel({ devices: 13, areas: 9, labels: 6 })._collapsedLimit(), 6);
+  assert.equal(limitPanel({ devices: 13, areas: 7, labels: 12 })._collapsedLimit(), 7);
+});
+
+test("fold limit: at least 5 and at most 8 rows", () => {
+  assert.equal(limitPanel({ devices: 13, areas: 9, labels: 2 })._collapsedLimit(), 5);
+  assert.equal(limitPanel({ devices: 20, areas: 12, labels: 10 })._collapsedLimit(), 8);
+});
+
+test("fold limit: only the cards that exist count, idle rows are not counted", () => {
+  assert.equal(limitPanel({ devices: 7 })._collapsedLimit(), 7); // no areas, no labels
+  assert.equal(limitPanel({ devices: 10, idle: 4 })._collapsedLimit(), 6); // 6 active devices
+  assert.equal(limitPanel({ devices: 0 })._collapsedLimit(), 5);
+  const none = new Panel();
+  none._config = {};
+  none._hass = { states: {} };
+  assert.equal(none._collapsedLimit(), 8); // nothing configured
+});
+
+test("fold limit: the page shows that many rows per list and unfolds the rest per list", () => {
+  const p = limitPanel({ devices: 13, areas: 9, labels: 6 });
+  let html = p._renderHouse();
+  const card = (title) => {
+    const start = html.indexOf(`<span class="eb-title">${title}</span>`);
+    const end = html.indexOf('<div class="eb-card', start + 10);
+    return html.slice(start, end > 0 ? end : undefined);
+  };
+  const rows = (title) => (card(title).match(/class="dev"/g) || []).length;
+  assert.equal(rows("Devices"), 7); // 6 devices + the unmeasured rest
+  assert.equal(rows("Areas"), 6);
+  assert.equal(rows("Labels"), 6);
+  assert.match(html, /Show all 13/); // devices fold
+  assert.match(html, /Show all 9/); // areas fold
+  assert.equal((html.match(/data-labeltoggle/g) || []).length, 0); // labels have exactly 6, nothing to fold
+  p._devExpanded = true;
+  html = p._renderHouse();
+  assert.equal(rows("Devices"), 14); // all 13 + the rest
+  assert.equal(rows("Areas"), 6); // the others stay folded
+});
+
+test("fold limit: the cards still unfold fully with a custom limit", () => {
+  const p = limitPanel({ devices: 13, areas: 9, labels: 6 });
+  p._areaExpanded = true;
+  const html = p._renderAreas(null, 6);
+  assert.equal((html.match(/class="dev"/g) || []).length, 9);
+  assert.match(html, /Show less/);
+});
+
+
+test("areas: no name pattern is needed, every power sensor in the area counts", () => {
+  const p = areaPanel({}); // no device patterns at all
+  const byName = Object.fromEntries(p._areas().map((a) => [a.name, a.w]));
+  assert.equal(byName["Küche"], 32);
+  assert.equal(byName["Technik"], 88);
+  assert.equal(byName["No area"], 1400);
+  assert.notEqual(p._renderAreas(2000), "");
+});
+
+test("areas: the sensors of the energy balance and excluded sensors never count", () => {
+  const p = areaPanel({ grid_import: ["sensor.herd_leistung"], device_exclude: ["sensor.media_leistung"], device_exclude_patterns: ["sensor.wallbox*"] });
+  assert.deepEqual(p._areaMembers("kueche"), ["sensor.kuehl_leistung"]); // herd is the grid sensor here
+  assert.deepEqual(p._areaMembers("wohnzimmer"), []); // media excluded
+  assert.deepEqual(p._noAreaMembers(), []); // wallbox excluded by pattern
+});
+
+test("areas: with a selection only the selected areas are shown, in the order of the selection", () => {
+  const p = areaPanel({ area_ids: ["technik", "kueche"] });
+  assert.deepEqual(p._areas().map((a) => a.name), ["Technik", "Küche"]);
+  assert.ok(!p._areas().some((a) => a.none)); // no "No area" row in the selected view
+});
+
+test("areas: a selected area without power sensors stays as an idle row, unknown ids are ignored", () => {
+  const p = areaPanel({ area_ids: ["keller", "wohnzimmer", "geloescht"] });
+  p._hass.areas.leer = { name: "Leer" };
+  p._config = { ...p._cfg, area_ids: ["leer", "wohnzimmer", "geloescht"] };
+  const groups = p._areas();
+  assert.deepEqual(groups.map((a) => a.name), ["Leer", "Wohnzimmer"]);
+  assert.equal(groups[0].w, 0);
+  const html = p._renderAreas(2000);
+  assert.match(html, /1 idle/);
+  assert.doesNotMatch(html, />Leer</); // idle rows are only counted
+});
+
+test("areas: the card is empty for a selection of unknown areas", () => {
+  assert.equal(areaPanel({ area_ids: ["geloescht"] })._renderAreas(2000), "");
+});
+
+function areaPickerPanel(selected = []) {
+  const p = areaPanel({ area_ids: selected });
+  p._hass.user = { is_admin: true };
+  p._hass.areas.leer = { name: "Leer", icon: "mdi:tree" }; // no power sensors
+  p._draft = p._normalize(p._cfg);
+  p._ready = true;
+  p._edited = () => {};
+  return p;
+}
+const aseg = (value) => ({ target: { closest: (s) => (s === "[data-aseg]" ? { dataset: { aseg: value } } : null) } });
+const areaNames = (p) => p._picker("area").shown.map((x) => x.item.name);
+
+test("area picker: lists the areas of Home Assistant that have power sensors", () => {
+  const p = areaPickerPanel();
+  assert.deepEqual(areaNames(p), ["Keller", "Küche", "Technik", "Wohnzimmer"]); // sorted by name, "Leer" has no sensors
+  assert.equal(p._picker("area").counts.all, 4);
+});
+
+test("area picker: a selected area without power sensors stays so it can be unselected", () => {
+  assert.ok(areaNames(areaPickerPanel(["leer"])).includes("Leer"));
+});
+
+test("area picker: ticking an area selects it, unticking removes it", () => {
+  const p = areaPickerPanel();
+  p._onChange({ target: { dataset: { area: "kueche" }, checked: true } });
+  p._onChange({ target: { dataset: { area: "kueche" }, checked: true } });
+  assert.deepEqual(p._draft.area_ids, ["kueche"]);
+  p._onChange({ target: { dataset: { area: "kueche" }, checked: false } });
+  assert.deepEqual(p._draft.area_ids, []);
+});
+
+test("area picker: filters for activity, selection and text", () => {
+  const p = areaPickerPanel(["wohnzimmer"]);
+  p._onClick(aseg("state:idle"));
+  assert.deepEqual(areaNames(p), ["Keller"]); // 0 W
+  p._onClick(aseg("state:active"));
+  assert.deepEqual(areaNames(p), ["Küche", "Technik", "Wohnzimmer"]);
+  p._onClick(aseg("sel:selected"));
+  assert.deepEqual(areaNames(p), ["Wohnzimmer"]);
+  p._onClick(aseg("sel:all"));
+  p._aFilter = "tech";
+  assert.deepEqual(areaNames(p), ["Technik"]);
+  p._aFilter = "nothing";
+  assert.match(p._renderPickerRows("area", false), /No area matches the filters/);
+});
+
+test("area picker: the filters of areas and labels are independent", () => {
+  const p = areaPickerPanel();
+  p._labelData = { labels: [{ label_id: "klima", name: "Klima" }], entities: { "sensor.herd_leistung": ["klima"] } };
+  p._onClick(aseg("state:idle"));
+  assert.equal(p._aState, "idle");
+  assert.equal(p._lState, undefined);
+});
+
+test("area picker: the settings show the picker, the hint for an empty selection and the section", () => {
+  const p = areaPickerPanel();
+  const html = p._renderSettings();
+  assert.match(html, /id="alist"/);
+  assert.match(html, /data-afilter/);
+  assert.match(html, /data-area="kueche"/);
+  assert.match(html, /Nothing selected: all areas with power sensors are shown/);
+  assert.match(html, /Areas \(their power sensors are summed up per area\)/);
+  p._onChange({ target: { dataset: { area: "kueche" }, checked: true } });
+  assert.doesNotMatch(p._renderSettings(), /Nothing selected: all areas/);
+});
+
+test("area picker: rows show the area icon with default, the sensor count and the power", () => {
+  globalThis.haIcon = true;
+  try {
+    const p = areaPickerPanel();
+    p._hass.areas.kueche.icon = "mdi:silverware-fork-knife";
+    const html = p._renderPickerRows("area", false);
+    assert.match(html, /icon="mdi:silverware-fork-knife"[^>]*><\/ha-icon><span class="nt">Küche/);
+    assert.match(html, /icon="mdi:texture-box"[^>]*><\/ha-icon><span class="nt">Technik/);
+    assert.match(html, /Küche<\/span><\/span><span class="mi">2 power sensors · 32 W/);
+  } finally {
+    globalThis.haIcon = false;
+  }
+});
+
+test("area picker: read-only for non-admins, without areas in Home Assistant a hint", () => {
+  const ro = areaPickerPanel();
+  ro._hass.user = { is_admin: false };
+  assert.match(ro._renderPickerRows("area", true).match(/<input type="checkbox" data-area="kueche"[^>]*>/)[0], /disabled/);
+  ro._onChange({ target: { dataset: { area: "kueche" }, checked: true } });
+  assert.deepEqual(ro._draft.area_ids, []);
+  const none = areaPickerPanel();
+  none._hass.areas = {};
+  assert.match(none._renderSettings(), /No areas exist in Home Assistant yet/);
+});
+
+test("area picker: area names are HTML-escaped", () => {
+  const p = areaPickerPanel();
+  p._hass.areas.kueche.name = '<img src=x onerror="x">';
+  assert.doesNotMatch(p._renderPickerRows("area", false), /<img/);
+});
+
+test("area ids survive the settings form (normalize keeps them)", () => {
+  assert.deepEqual(new Panel()._normalize({ area_ids: ["kueche"] }).area_ids, ["kueche"]);
+  assert.deepEqual(new Panel()._normalize({}).area_ids, []);
 });

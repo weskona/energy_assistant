@@ -126,3 +126,11 @@ def test_device_names_are_normalized_and_stored() -> None:
     assert to_storage(settings)["device_names"] == {"sensor.a": "Wallbox"}
     assert "device_names" not in to_storage(normalize({}))
     assert normalize(to_storage(settings)) == settings
+
+
+def test_area_ids_are_normalized_and_stored_as_a_list() -> None:
+    settings = normalize({"area_ids": [" kueche ", "kueche", "wohnzimmer"]})
+    assert settings["area_ids"] == ["kueche", "wohnzimmer"]
+    assert normalize({})["area_ids"] == []  # none selected means all areas
+    assert to_storage(settings)["area_ids"] == ["kueche", "wohnzimmer"]
+    assert normalize(to_storage(settings)) == settings

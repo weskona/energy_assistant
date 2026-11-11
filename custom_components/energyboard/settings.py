@@ -12,7 +12,7 @@ from .const import (
     CONF_HOUSE_POWER,
     CONFIG_KEYS,
     DICT_KEYS,
-    LABEL_KEYS,
+    ID_KEYS,
     LIST_KEYS,
     PATTERN_REGEX,
     SINGLE_KEYS,
@@ -72,7 +72,7 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
-        if key in LABEL_KEYS
+        if key in ID_KEYS
         else as_list(data.get(key))
         if key in LIST_KEYS
         else bool(data.get(key))
@@ -103,7 +103,7 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
         elif key in DICT_KEYS:
             if value:
                 stored[key] = clean_names(value)
-        elif key in LIST_KEYS or key in LABEL_KEYS:
+        elif key in LIST_KEYS or key in ID_KEYS:
             stored[key] = as_list(value)
         elif key in BOOL_KEYS:
             stored[key] = bool(value)

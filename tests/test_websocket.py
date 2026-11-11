@@ -371,3 +371,38 @@ async def test_renaming_keeps_names_when_other_settings_change(
     )
     msg = await client.receive_json()
     assert msg["result"]["device_names"] == {"sensor.a_leistung": "A"}
+
+
+async def test_update_config_stores_area_ids(hass, hass_ws_client, entry) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"area_ids": ["kueche", "wz_2"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["area_ids"] == ["kueche", "wz_2"]
+    assert entry.options["area_ids"] == ["kueche", "wz_2"]
+    # an empty selection is stored too and means "all areas"
+    await client.send_json_auto_id(
+        {"type": "energyboard/update_config", "config": {"area_ids": []}}
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["area_ids"] == []
+
+
+async def test_update_config_rejects_invalid_area_ids(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    for ids in (["Küche"], ["a b"], ["Wohnzimmer"], [""]):
+        await client.send_json_auto_id(
+            {"type": "energyboard/update_config", "config": {"area_ids": ids}}
+        )
+        msg = await client.receive_json()
+        assert not msg["success"], ids
+        assert msg["error"]["code"] == "invalid_format"
+    assert entry.options == {}

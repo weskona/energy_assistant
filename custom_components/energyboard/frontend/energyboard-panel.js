@@ -176,6 +176,13 @@ const STRINGS = {
     filterUnselected: "Not selected",
     filterLabels: "Filter labels …",
     noLabelMatches: "No label matches the filters",
+    sectionAreas: "Areas",
+    f_area_ids: "Areas (their power sensors are summed up per area)",
+    filterAreas: "Filter areas …",
+    noAreaMatches: "No area matches the filters",
+    noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
+    noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    areaAutoHint: "Nothing selected: all areas with power sensors are shown. Select areas to show only these.",
     noPowerLabels: "No label has power sensors yet. Add a label to your power sensors under Settings → Areas, labels & zones.",
     filterActive: "Active",
     filterIdle: "Inactive",
@@ -271,6 +278,13 @@ const STRINGS = {
     filterUnselected: "Nicht ausgewählt",
     filterLabels: "Labels filtern …",
     noLabelMatches: "Kein Label passt zu den Filtern",
+    sectionAreas: "Bereiche",
+    f_area_ids: "Bereiche (ihre Leistungssensoren werden je Bereich zusammengefasst)",
+    filterAreas: "Bereiche filtern …",
+    noAreaMatches: "Kein Bereich passt zu den Filtern",
+    noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
+    noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    areaAutoHint: "Nichts ausgewählt: Es werden alle Bereiche mit Leistungssensoren gezeigt. Wähle Bereiche, um nur diese zu zeigen.",
     noPowerLabels: "Noch kein Label hat Leistungssensoren. Versieh deine Leistungssensoren unter Einstellungen → Bereiche, Labels & Zonen mit einem Label.",
     filterActive: "Aktiv",
     filterIdle: "Inaktiv",
@@ -308,12 +322,23 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
+  { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids"];
 // Sensors that are part of the energy balance and therefore never listed as devices.
+// The two pick lists of the settings (labels and areas) share their code. Each has its own
+// attribute names, element id and filter state.
+const PICKERS = {
+  label: { attr: "label", filter: "lfilter", seg: "lseg", list: "llist", state: ["_lFilter", "_lState", "_lSel"], key: "label_ids", icon: "mdi:label", noMatches: "noLabelMatches", nonePower: "noPowerLabels", empty: "noLabelsDefined", placeholder: "filterLabels" },
+  area: { attr: "area", filter: "afilter", seg: "aseg", list: "alist", state: ["_aFilter", "_aState", "_aSel"], key: "area_ids", icon: "mdi:texture-box", noMatches: "noAreaMatches", nonePower: "noPowerAreas", empty: "noAreasDefined", placeholder: "filterAreas" },
+};
+
 // Power below this counts as idle and is only counted, not listed.
 const IDLE_W = 5;
+// Rows the lists show before they fold. They follow the shortest list, but within these bounds.
+const MAX_ROWS = 8;
+const MIN_ROWS = 5;
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
 
@@ -528,10 +553,12 @@ class EnergyboardPanel extends HTMLElement {
     const bulk = e.target.closest("[data-bulk]");
     const seg = e.target.closest("[data-seg]");
     const lseg = e.target.closest("[data-lseg]");
-    if (lseg) {
-      const [group, value] = lseg.dataset.lseg.split(":");
-      if (group === "state") this._lState = value;
-      else this._lSel = value;
+    const aseg = e.target.closest("[data-aseg]");
+    if (lseg || aseg) {
+      const kind = lseg ? "label" : "area";
+      const P = PICKERS[kind];
+      const [group, value] = (lseg || aseg).dataset[P.seg].split(":");
+      this[P.state[group === "state" ? 1 : 2]] = value;
       this._edited();
     } else if (seg) {
       // View filters of the match list. They also decide what the bulk buttons act on.
@@ -570,7 +597,12 @@ class EnergyboardPanel extends HTMLElement {
     const t = e.target;
     if (!this._isAdmin) return;
     this._fieldError = {};
-    if (t.dataset?.label) {
+    if (t.dataset?.area) {
+      const id = t.dataset.area;
+      const rest = this._draft.area_ids.filter((x) => x !== id);
+      this._draft.area_ids = t.checked ? [...rest, id] : rest;
+      this._edited();
+    } else if (t.dataset?.label) {
       const id = t.dataset.label;
       const rest = this._draft.label_ids.filter((x) => x !== id);
       this._draft.label_ids = t.checked ? [...rest, id] : rest;
@@ -606,10 +638,12 @@ class EnergyboardPanel extends HTMLElement {
 
   /** Typing in the filter box only redraws the match list, so the box keeps its focus. */
   _onInput(e) {
-    if (e.target.dataset?.lfilter !== undefined) {
-      this._lFilter = e.target.value.toLowerCase();
-      const list = this.shadowRoot.getElementById("llist");
-      if (list) list.innerHTML = this._renderLabelRows(!this._isAdmin);
+    for (const kind of ["label", "area"]) {
+      const P = PICKERS[kind];
+      if (e.target.dataset?.[P.filter] === undefined) continue;
+      this[P.state[0]] = e.target.value.toLowerCase();
+      const list = this.shadowRoot.getElementById(P.list);
+      if (list) list.innerHTML = this._renderPickerRows(kind, !this._isAdmin);
       return;
     }
     if (e.target.dataset?.filter === undefined) return;
@@ -623,7 +657,7 @@ class EnergyboardPanel extends HTMLElement {
     this._settingsDirty = true;
     // The form is redrawn as a whole. Keep the scroll position of the long lists so ticking a
     // checkbox does not throw the list back to its start.
-    const scrolls = ["mlist", "llist"].map((id) => [id, this.shadowRoot.getElementById(id)?.scrollTop]);
+    const scrolls = ["mlist", "llist", "alist"].map((id) => [id, this.shadowRoot.getElementById(id)?.scrollTop]);
     this._render();
     for (const [id, top] of scrolls) {
       const list = this.shadowRoot.getElementById(id);
@@ -688,18 +722,34 @@ class EnergyboardPanel extends HTMLElement {
       .join("");
   }
 
+  /** Items of a pick list: labels from the label list, areas from the areas of Home Assistant. */
+  _pickerItems(kind) {
+    if (kind === "label") {
+      return this._labelData ? this._labelData.labels.map((l) => ({ id: l.label_id, name: l.name, icon: l.icon, color: l.color })) : null;
+    }
+    return Object.entries(this._hass?.areas || {})
+      .map(([id, a]) => ({ id, name: a.name || id, icon: a.icon || null, color: null }))
+      .sort((x, y) => x.name.localeCompare(y.name));
+  }
+
+  _pickerMembers(kind, id, cfg) {
+    return kind === "label" ? this._labelMembers(id, cfg) : this._areaMembers(id, cfg);
+  }
+
   /**
-   * Labels for the picker: only labels that have power sensors (plus already selected ones, so they
+   * Entries of a pick list: only items that have power sensors (plus already selected ones, so they
    * can be unselected again), with the summed power of their sensors and the filters applied.
    */
-  _labelPicker() {
-    const selected = new Set(this._draft.label_ids);
-    const all = (this._labelData?.labels || [])
-      .map((label) => {
+  _picker(kind) {
+    const P = PICKERS[kind];
+    const [fFilter, fState, fSel] = P.state;
+    const selected = new Set(this._draft[P.key]);
+    const all = (this._pickerItems(kind) || [])
+      .map((item) => {
         // Same count as the card: sensors of the energy balance and excluded sensors do not count.
-        const members = this._labelMembers(label.label_id, this._draft);
+        const members = this._pickerMembers(kind, item.id, this._draft);
         const w = members.reduce((a, id) => a + (this._watts(id) || 0), 0);
-        return { label, n: members.length, w, selected: selected.has(label.label_id) };
+        return { item, n: members.length, w, selected: selected.has(item.id) };
       })
       .filter((x) => x.n > 0 || x.selected);
     const count = (fn) => all.filter(fn).length;
@@ -710,45 +760,52 @@ class EnergyboardPanel extends HTMLElement {
       selected: count((x) => x.selected),
       unselected: count((x) => !x.selected),
     };
-    const q = (this._lFilter || "").trim();
-    const fState = this._lState || "all";
-    const fSel = this._lSel || "all";
+    const q = (this[fFilter] || "").trim();
+    const stateFilter = this[fState] || "all";
+    const selFilter = this[fSel] || "all";
     const shown = all.filter((x) => {
-      if (fState === "active" && x.w < IDLE_W) return false;
-      if (fState === "idle" && x.w >= IDLE_W) return false;
-      if (fSel === "selected" && !x.selected) return false;
-      if (fSel === "unselected" && x.selected) return false;
-      return !q || `${x.label.name} ${x.label.label_id}`.toLowerCase().includes(q);
+      if (stateFilter === "active" && x.w < IDLE_W) return false;
+      if (stateFilter === "idle" && x.w >= IDLE_W) return false;
+      if (selFilter === "selected" && !x.selected) return false;
+      if (selFilter === "unselected" && x.selected) return false;
+      return !q || `${x.item.name} ${x.item.id}`.toLowerCase().includes(q);
     });
     return { all, shown, counts };
   }
 
-  _renderLabelRows(ro) {
-    const { shown } = this._labelPicker();
-    if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t("noLabelMatches"))}</div>`;
+  _renderPickerRows(kind, ro) {
+    const P = PICKERS[kind];
+    const { shown } = this._picker(kind);
+    if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t(P.noMatches))}</div>`;
     return shown
-      .map(({ label: l, n, w, selected }) => {
-        const dot = this._iconHtml(l.icon || "mdi:label", l.color);
+      .map(({ item: l, n, w, selected }) => {
+        const icon = this._iconHtml(l.icon || P.icon, l.color);
         const sub = this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }) + (w >= IDLE_W ? ` · ${fmtPower(w).join(" ")}` : "");
-        return `<label class="mrow"><input type="checkbox" data-label="${esc(l.label_id)}" ${selected ? "checked" : ""} ${ro ? "disabled" : ""}><span class="mt"><span class="mn">${dot}<span class="nt">${esc(l.name)}</span></span><span class="mi">${esc(sub)}</span></span></label>`;
+        return `<label class="mrow"><input type="checkbox" data-${P.attr}="${esc(l.id)}" ${selected ? "checked" : ""} ${ro ? "disabled" : ""}><span class="mt"><span class="mn">${icon}<span class="nt">${esc(l.name)}</span></span><span class="mi">${esc(sub)}</span></span></label>`;
       })
       .join("");
   }
 
-  /** Checkbox list of the labels that exist in Home Assistant, with filters. */
-  _renderLabelPicker(ro) {
-    if (!this._labelData) return `<div class="hint">${esc(this._t("loading"))}</div>`;
-    if (!this._labelData.labels.length) return `<div class="hint">${esc(this._t("noLabelsDefined"))}</div>`;
-    const { all, counts } = this._labelPicker();
-    if (!all.length) return `<div class="hint">${esc(this._t("noPowerLabels"))}</div>`;
+  /** Checkbox list with filters of the labels or areas that exist in Home Assistant. */
+  _renderPicker(kind, ro) {
+    const P = PICKERS[kind];
+    const [fFilter, fState, fSel] = P.state;
+    if (kind === "label" && !this._labelData) return `<div class="hint">${esc(this._t("loading"))}</div>`;
+    if (!(this._pickerItems(kind) || []).length) return `<div class="hint">${esc(this._t(P.empty))}</div>`;
+    const { all, counts } = this._picker(kind);
+    if (!all.length) return `<div class="hint">${esc(this._t(P.nonePower))}</div>`;
     const seg = (group, value, key, tipKey) => {
-      const on = (group === "state" ? this._lState || "all" : this._lSel || "all") === value;
-      return `<button type="button" class="seg${on ? " on" : ""}" data-lseg="${group}:${value}"${tipKey ? ` title="${esc(this._t(tipKey))}"` : ""}>${esc(this._t(key))} <small>${counts[value]}</small></button>`;
+      const on = (group === "state" ? this[fState] || "all" : this[fSel] || "all") === value;
+      return `<button type="button" class="seg${on ? " on" : ""}" data-${P.seg}="${group}:${value}"${tipKey ? ` title="${esc(this._t(tipKey))}"` : ""}>${esc(this._t(key))} <small>${counts[value]}</small></button>`;
     };
-    return `<div class="mbar"><input type="text" data-lfilter value="${esc(this._lFilter || "")}" placeholder="${esc(this._t("filterLabels"))}" autocomplete="off" style="flex:1 1 160px;width:auto"></div>
+    return `<div class="mbar"><input type="text" data-${P.filter} value="${esc(this[fFilter] || "")}" placeholder="${esc(this._t(P.placeholder))}" autocomplete="off" style="flex:1 1 160px;width:auto"></div>
       <div class="segs"><span class="seglab">${esc(this._t("filterGroupState"))}</span>${seg("state", "all", "filterAll")}${seg("state", "active", "filterActive", "filterActiveTip")}${seg("state", "idle", "filterIdle", "filterIdleTip")}<span class="sep"></span><span class="seglab">${esc(this._t("filterGroupSel"))}</span>${seg("sel", "all", "filterAll")}${seg("sel", "selected", "filterSelected")}${seg("sel", "unselected", "filterUnselected")}</div>
-      <div class="mlist" id="llist">${this._renderLabelRows(ro)}</div>`;
+      <div class="mlist" id="${P.list}">${this._renderPickerRows(kind, ro)}</div>`;
   }
+
+  _labelPicker() { return this._picker("label"); }
+  _renderLabelRows(ro) { return this._renderPickerRows("label", ro); }
+  _renderLabelPicker(ro) { return this._renderPicker("label", ro); }
 
   _renderMatches(ro) {
     const { found, counts } = this._matchList();
@@ -781,6 +838,7 @@ class EnergyboardPanel extends HTMLElement {
       const chips = this._draftList(key)
         .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
         .join("");
+      if (kind === "areas") return `<div class="fld span"><label>${esc(label)}</label>${this._renderPicker("area", ro)}${this._draft.area_ids.length ? "" : `<div class="hint">${esc(this._t("areaAutoHint"))}</div>`}</div>`;
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
@@ -789,7 +847,7 @@ class EnergyboardPanel extends HTMLElement {
         ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec${sec.title === "sectionDevices" || sec.title === "sectionLabels" ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
+      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";
@@ -1089,9 +1147,10 @@ class EnergyboardPanel extends HTMLElement {
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
-    const areas = this._renderAreas(cur.house);
-    const labels = this._renderLabels(cur.house);
-    const devices = this._renderDevices(cur.house);
+    const limit = this._collapsedLimit();
+    const areas = this._renderAreas(cur.house, limit);
+    const labels = this._renderLabels(cur.house, limit);
+    const devices = this._renderDevices(cur.house, limit);
     // Devices, areas and labels share one row, in this order. Missing cards leave more room for the others.
     const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
@@ -1121,7 +1180,25 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
-  _renderDevices(house) {
+  /**
+   * Rows the lists show before they fold: as many as the shortest list has, so devices, areas and
+   * labels end at about the same height. At least MIN_ROWS and at most MAX_ROWS. The rest can be
+   * unfolded per list.
+   */
+  _collapsedLimit() {
+    const counts = [];
+    if ((this._cfg.device_power || []).length || (this._cfg.device_patterns || []).length) {
+      counts.push(this._devices().filter((d) => d.w >= IDLE_W).length);
+    }
+    const areas = this._areas();
+    if (areas.length) counts.push(areas.filter((g) => g.w >= IDLE_W).length);
+    const labels = this._labelGroups();
+    if (labels.length) counts.push(labels.filter((g) => g.w >= IDLE_W).length);
+    const smallest = counts.length ? Math.min(...counts) : MAX_ROWS;
+    return Math.max(MIN_ROWS, Math.min(MAX_ROWS, smallest));
+  }
+
+  _renderDevices(house, limit = MAX_ROWS) {
     if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
     const all = this._devices();
     // Admins can rename the sensors right in the list (pencil next to the name).
@@ -1130,7 +1207,7 @@ class EnergyboardPanel extends HTMLElement {
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
     return this._listCard({
       title: this._t("devices"), rows: active, idle: all.length - active.length, sum, other, house,
-      expanded: this._devExpanded, toggle: "data-devtoggle",
+      expanded: this._devExpanded, toggle: "data-devtoggle", limit,
     });
   }
 
@@ -1155,38 +1232,58 @@ class EnergyboardPanel extends HTMLElement {
     return areaId ? { id: areaId, name: area?.name || areaId, icon: area?.icon || null } : null;
   }
 
-  /** The same sensors as the device list, summed up per Home Assistant area. */
-  _areas() {
-    const groups = new Map();
-    for (const d of this._devices()) {
-      const area = this._areaOf(d.id);
-      const key = area ? area.id : "";
-      const g = groups.get(key) || {
-        name: area ? area.name : this._t("noArea"),
-        icon: area ? area.icon || "mdi:texture-box" : "mdi:help-circle-outline",
-        w: 0, n: 0, none: !area, tips: [],
-      };
-      g.w += d.w;
-      g.n += 1;
-      g.tips.push(`${d.name} ${fmtPower(d.w).join(" ")}`);
-      groups.set(key, g);
-    }
-    return [...groups.values()].map((g) => ({
-      ...g,
-      sub: this._t(g.n === 1 ? "deviceCount1" : "deviceCountN", { n: g.n }),
-      tip: g.tips.slice(0, 12).join(", ") + (g.tips.length > 12 ? " …" : ""),
-    }));
+  /**
+   * Power sensors in an area (own area or the area of the device). Like for the labels no name
+   * pattern is needed. The sensors of the energy balance and excluded sensors do not count.
+   */
+  _areaMembers(areaId, cfg = this._cfg) {
+    const excluded = this._excluder(cfg);
+    return this._powerSensors()
+      .filter((id) => !excluded(id) && this._areaOf(id)?.id === areaId)
+      .sort();
   }
 
-  _renderAreas(house) {
+  /** Power sensors without any area, for the "No area" row of the automatic view. */
+  _noAreaMembers(cfg = this._cfg) {
+    const excluded = this._excluder(cfg);
+    return this._powerSensors().filter((id) => !excluded(id) && !this._areaOf(id)).sort();
+  }
+
+  /**
+   * Rows of the Areas card. With areas selected only those are shown (even without sensors, they
+   * count as idle). Without a selection all areas that have power sensors are shown, plus "No area".
+   * Empty if there is nothing to group (e.g. no sensor belongs to an area).
+   */
+  _areas() {
+    const selected = this._cfg.area_ids || [];
+    const known = this._hass?.areas || {};
+    const group = (name, icon, ids, none = false) => {
+      const members = ids.map((id) => ({ name: this._deviceName(id), w: this._watts(id) })).filter((m) => m.w != null);
+      const n = members.length;
+      return {
+        name, icon, none, n,
+        w: members.reduce((a, m) => a + m.w, 0),
+        sub: this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }),
+        tip: members.slice(0, 12).map((m) => `${m.name} ${fmtPower(m.w).join(" ")}`).join(", ") + (n > 12 ? " …" : ""),
+      };
+    };
+    const areaGroup = (id) => group(known[id].name || id, known[id].icon || "mdi:texture-box", this._areaMembers(id));
+    if (selected.length) return selected.filter((id) => known[id]).map(areaGroup);
+    const groups = Object.keys(known).map(areaGroup).filter((g) => g.n > 0);
+    // Without any area assigned the list would only repeat the device list.
+    if (!groups.length) return [];
+    const none = this._noAreaMembers();
+    return none.length ? [...groups, group(this._t("noArea"), "mdi:help-circle-outline", none, true)] : groups;
+  }
+
+  _renderAreas(house, limit = MAX_ROWS) {
     const all = this._areas();
-    // Without any area assignment there is nothing to group, the device list says it all.
-    if (!all.some((g) => !g.none)) return "";
+    if (!all.length) return "";
     const active = all.filter((g) => g.w >= IDLE_W);
     const sum = all.reduce((a, g) => a + g.w, 0);
     return this._listCard({
       title: this._t("areas"), rows: active, idle: all.length - active.length, sum, other: null, house,
-      expanded: this._areaExpanded, toggle: "data-areatoggle",
+      expanded: this._areaExpanded, toggle: "data-areatoggle", limit,
     });
   }
 
@@ -1226,24 +1323,23 @@ class EnergyboardPanel extends HTMLElement {
       });
   }
 
-  _renderLabels(house) {
+  _renderLabels(house, limit = MAX_ROWS) {
     const all = this._labelGroups();
     if (!all.length) return "";
     const active = all.filter((g) => g.w >= IDLE_W);
     const sum = all.reduce((a, g) => a + g.w, 0);
     return this._listCard({
       title: this._t("labels"), rows: active, idle: all.length - active.length, sum, other: null, house,
-      expanded: this._labelExpanded, toggle: "data-labeltoggle",
+      expanded: this._labelExpanded, toggle: "data-labeltoggle", limit,
     });
   }
 
   /** Card with a ranked list of rows with value, share of the house power and a bar. */
-  _listCard({ title, rows, idle, sum, other, house, expanded, toggle }) {
+  _listCard({ title, rows, idle, sum, other, house, expanded, toggle, limit = MAX_ROWS }) {
     // Strongest first (rows without a group such as "No area" go last). Only the top ones show by default.
-    const LIMIT = 8;
     const active = [...rows].sort((a, b) => (a.none ? 1 : b.none ? -1 : b.w - a.w));
-    const folded = active.length > LIMIT;
-    const shown = folded && !expanded ? active.slice(0, LIMIT) : active;
+    const folded = active.length > limit;
+    const shown = folded && !expanded ? active.slice(0, limit) : active;
     const list = other ? [...shown, other] : shown;
     const scale = Math.max(1, house ?? 0, ...list.map((d) => d.w));
     const [tv, tu] = fmtPower(sum);
