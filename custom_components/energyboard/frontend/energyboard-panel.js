@@ -94,7 +94,7 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   /** Getrennte und kombinierte Sensoren zu sechs positiven Größen zusammenführen. */
-  _split({ solar, gridIn, gridOut, discharge, charge, grid, battery }) {
+  _split({ solar, gridIn, gridOut, discharge, charge, gridCharge, grid, battery }) {
     const add = (a, b) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
     const pos = (v) => (v == null ? null : Math.max(0, v));
     const neg = (v) => (v == null ? null : Math.max(0, -v));
@@ -104,6 +104,7 @@ class EnergyboardPanel extends HTMLElement {
       gridOut: add(gridOut, neg(grid)),
       discharge: add(discharge, pos(battery)),
       charge: add(charge, neg(battery)),
+      gridCharge,
     };
   }
 
@@ -116,6 +117,7 @@ class EnergyboardPanel extends HTMLElement {
       gridOut: this._sum(c.grid_export),
       discharge: this._sum(c.battery_discharge),
       charge: this._sum(c.battery_charge),
+      gridCharge: this._sum(c.battery_grid_charge),
       grid: this._signed(c.grid_power, c.invert_grid),
       battery: this._signed(c.battery_power, c.invert_battery),
     });
@@ -128,12 +130,15 @@ class EnergyboardPanel extends HTMLElement {
   }
 
   /**
-   * Direkt verbrauchte PV-Leistung: Erzeugung minus Einspeisung minus Speicherladung,
-   * begrenzt auf [0, min(Erzeugung, Hausleistung)]. Annahme: Speicher wird aus PV geladen.
+   * Direkt verbrauchte PV-Leistung: Erzeugung minus Einspeisung minus PV-Anteil der Speicherladung,
+   * begrenzt auf [0, min(Erzeugung, Hausleistung)]. Ohne Netzladungs-Sensor wird angenommen,
+   * dass der Speicher komplett aus PV geladen wird.
    */
-  _calcDirect({ solar, gridOut, charge }, house) {
+  _calcDirect({ solar, gridOut, charge, gridCharge }, house) {
     if (solar == null) return null;
-    const d = solar - (gridOut ?? 0) - (charge ?? 0);
+    // Nur der PV-Teil der Speicherladung zählt; Netzladung wird abgezogen.
+    const pvCharge = Math.max(0, (charge ?? 0) - (gridCharge ?? 0));
+    const d = solar - (gridOut ?? 0) - pvCharge;
     return Math.max(0, Math.min(d, solar, house ?? solar));
   }
 
@@ -154,7 +159,7 @@ class EnergyboardPanel extends HTMLElement {
     const c = this._cfg;
     const ids = [c.house_power, ...(c.solar_power || []), ...(c.grid_import || []), ...(c.grid_export || []),
       ...(c.battery_discharge || []), ...(c.battery_charge || []),
-      ...(c.grid_power || []), ...(c.battery_power || [])].filter(Boolean);
+      ...(c.battery_grid_charge || []), ...(c.grid_power || []), ...(c.battery_power || [])].filter(Boolean);
     if (!ids.length) return;
     this._loading = true;
     try {
@@ -216,6 +221,7 @@ class EnergyboardPanel extends HTMLElement {
     const g = {
       solar: group(c.solar_power), gridIn: group(c.grid_import), gridOut: group(c.grid_export),
       discharge: group(c.battery_discharge), charge: group(c.battery_charge),
+      gridCharge: group(c.battery_grid_charge),
       grid: group(c.grid_power, c.invert_grid), battery: group(c.battery_power, c.invert_battery),
     };
     const pts = [];
@@ -303,7 +309,7 @@ class EnergyboardPanel extends HTMLElement {
             <span><i style="background:var(--eb-grid)"></i>Netz ${Math.round(mix.grid * 100)} %</span></div>` : ""}
         <div class="tiles">
           ${tile("PV", cur.solar)}${tile("PV direkt verbraucht", cur.direct, sharePv)}${tile("Netzbezug", cur.gridIn)}${tile("Einspeisung", cur.gridOut)}
-          ${tile("Vom Speicher", cur.discharge)}${tile("Zum Speicher", cur.charge)}
+          ${tile("Vom Speicher", cur.discharge)}${tile("Zum Speicher", cur.charge)}${tile("Speicher aus Netz", cur.gridCharge)}
         </div>
       </div>
       <div class="eb-card">

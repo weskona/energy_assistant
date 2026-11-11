@@ -29,6 +29,7 @@ Getrennte und kombinierte Sensoren lassen sich mischen.
 | PV-Erzeugung | ja | z. B. ein Sensor je Wechselrichter oder Dachfläche |
 | Vom Speicher | ja | Entladeleistung der Batterien |
 | Zum Speicher | ja | Ladeleistung der Batterien |
+| Speicher aus Netz geladen | nein | Teil von „Zum Speicher“, der aus dem Netz stammt |
 
 **Kombisensoren** haben ein Vorzeichen und werden intern in die getrennten Größen zerlegt:
 
@@ -47,9 +48,9 @@ Ohne Hausverbrauchssensor berechnet Energyboard:
 
 Die **direkt verbrauchte PV-Leistung** ergibt sich aus:
 
-**PV direkt = PV − Einspeisung − zum Speicher** (mindestens 0, höchstens PV und Hausleistung)
+**PV direkt = PV − Einspeisung − (zum Speicher − Speicher aus Netz geladen)** (mindestens 0, höchstens PV und Hausleistung)
 
-Dabei wird angenommen, dass der Speicher aus PV geladen wird. Wird er aus dem Netz geladen, ist der Wert zu niedrig.
+Ohne den optionalen Sensor „Speicher aus Netz geladen“ wird angenommen, dass der Speicher komplett aus PV geladen wird. Lädt er aus dem Netz, ist der Wert dann zu niedrig.
 Im Panel erscheint der Wert als Kachel mit Anteil an der Erzeugung, im Herkunftsbalken und als zweite Linie im Verlauf.
 
 Die Sensoren lassen sich später über *Konfigurieren* ändern.

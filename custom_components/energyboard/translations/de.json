@@ -15,6 +15,7 @@
           "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
+          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)",
           "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
         }
       }
@@ -41,6 +42,7 @@
           "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
+          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)",
           "house_power": "Hausverbrauch direkt (optional, sonst berechnet)"
         }
       }

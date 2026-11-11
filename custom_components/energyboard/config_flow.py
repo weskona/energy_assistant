@@ -13,6 +13,7 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_BATTERY_CHARGE,
+    CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_DISCHARGE,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
@@ -54,6 +55,7 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
             ): bool,
             optional(CONF_BATTERY_DISCHARGE): _MULTI,
             optional(CONF_BATTERY_CHARGE): _MULTI,
+            optional(CONF_BATTERY_GRID_CHARGE): _SINGLE,
             optional(CONF_HOUSE_POWER): _SINGLE,
         }
     )

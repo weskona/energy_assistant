@@ -11,6 +11,7 @@ CONF_GRID_EXPORT = "grid_export"  # Einspeisung, ein oder mehrere Sensoren
 CONF_SOLAR_POWER = "solar_power"  # PV-Erzeugung, ein oder mehrere Sensoren
 CONF_BATTERY_DISCHARGE = "battery_discharge"  # vom Speicher, ein oder mehrere
 CONF_BATTERY_CHARGE = "battery_charge"  # zum Speicher, ein oder mehrere
+CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # davon aus dem Netz, ein Sensor
 
 # Kombisensoren mit Vorzeichen (je ein oder mehrere Sensoren, werden addiert)
 CONF_GRID_POWER = "grid_power"  # Netz: Bezug positiv, Einspeisung negativ
@@ -26,6 +27,7 @@ LIST_KEYS = (
     CONF_SOLAR_POWER,
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_CHARGE,
+    CONF_BATTERY_GRID_CHARGE,
 )
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
 CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *BOOL_KEYS)

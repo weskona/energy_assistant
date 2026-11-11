@@ -15,6 +15,7 @@
           "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)",
           "house_power": "House consumption directly (optional, otherwise calculated)"
         }
       }
@@ -41,6 +42,7 @@
           "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)",
           "house_power": "House consumption directly (optional, otherwise calculated)"
         }
       }
