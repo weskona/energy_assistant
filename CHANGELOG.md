@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.3] - 2026-11-11
+## [0.3.0] - 2026-11-11
 
 ### Added
 
+- **Areas** card on the House tab: the sensors of the device list (same filters: patterns, exclude patterns, exclude list, additional sensors) are summed up per Home Assistant area. The area comes from the entity or from its device, sensors without an area are collected in "No area". Value, share of the house power, bar, folding and idle count work like in the device list. Nothing extra to configure, the card is hidden while no sensor belongs to an area.
 - The device card shows the share of the house power next to each value (also for the unmeasured rest), as long as the house power is known. The bar has the same length.
 
 ### Changed
@@ -81,8 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.3...HEAD
-[0.2.3]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.2.3
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...v0.2.0

@@ -532,3 +532,110 @@ test("device card: no percentage when the house power is unknown", () => {
   assert.doesNotMatch(p._renderDevices(null), /class="pct"/);
   assert.doesNotMatch(p._renderDevices(0), /class="pct"/);
 });
+
+function areaPanel(config = { device_patterns: ["*_leistung"] }, registry = {}) {
+  const dev = (name, w) => ({ state: String(w), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+  const states = {
+    "sensor.herd_leistung": dev("Herd", 21),
+    "sensor.kuehl_leistung": dev("Kühlschrank", 11),
+    "sensor.media_leistung": dev("Media", 124),
+    "sensor.server_leistung": dev("Server", 88),
+    "sensor.wallbox_leistung": dev("Wallbox", 1400),
+    "sensor.keller_leistung": dev("Keller-Pumpe", 0),
+  };
+  const p = discoverPanel(config, states);
+  p._hass.entities = registry.entities ?? {
+    "sensor.herd_leistung": { area_id: "kueche" },
+    "sensor.kuehl_leistung": { area_id: "kueche" },
+    "sensor.media_leistung": { area_id: "wohnzimmer" },
+    "sensor.server_leistung": { device_id: "d1" }, // area comes from the device
+    "sensor.keller_leistung": { area_id: "keller" },
+  };
+  p._hass.devices = registry.devices ?? { d1: { area_id: "technik" } };
+  p._hass.areas = registry.areas ?? { kueche: { name: "Küche" }, wohnzimmer: { name: "Wohnzimmer" }, technik: { name: "Technik" }, keller: { name: "Keller" } };
+  return p;
+}
+
+test("areas: the device list is summed up per area (own area or the area of the device)", () => {
+  const byName = Object.fromEntries(areaPanel()._areas().map((a) => [a.name, a]));
+  assert.equal(byName["Küche"].w, 32);
+  assert.equal(byName["Küche"].n, 2);
+  assert.equal(byName["Wohnzimmer"].w, 124);
+  assert.equal(byName["Technik"].w, 88); // via the device
+  assert.equal(byName["No area"].w, 1400);
+  assert.equal(byName["No area"].none, true);
+});
+
+test("areas: an entity's own area wins over the area of its device", () => {
+  const p = areaPanel(undefined, {
+    entities: { "sensor.server_leistung": { area_id: "keller", device_id: "d1" } },
+    devices: { d1: { area_id: "technik" } },
+  });
+  const names = p._areas().map((a) => a.name);
+  assert.ok(names.includes("Keller"));
+  assert.ok(!names.includes("Technik"));
+});
+
+test("areas: uses the same filters as the devices", () => {
+  const p = areaPanel({ device_patterns: ["*_leistung"], device_exclude: ["sensor.media_leistung"], device_exclude_patterns: ["sensor.wallbox*"] });
+  const byName = Object.fromEntries(p._areas().map((a) => [a.name, a.w]));
+  assert.equal(byName["Wohnzimmer"], undefined); // Media excluded
+  assert.equal(byName["No area"], undefined); // Wallbox excluded by pattern
+  assert.equal(byName["Küche"], 32);
+});
+
+test("areas: card lists areas strongest first, with the device count, share and \"No area\" last", () => {
+  const html = areaPanel()._renderAreas(2000);
+  assert.match(html, /Areas/);
+  const order = ["Wohnzimmer", "Technik", "Küche", "No area"].map((n) => html.indexOf(n));
+  assert.ok(order.every((i) => i > -1));
+  assert.deepEqual([...order].sort((a, b) => a - b), order); // Wohnzimmer, Technik, Küche, No area
+  assert.match(html, /2 devices/);
+  assert.match(html, /1 device</);
+  assert.match(html, /Wohnzimmer[\s\S]*?<small class="pct">6 %<\/small>/);
+  assert.match(html, /title="6 % of house · Media 124 W"/);
+});
+
+test("areas: idle areas are only counted", () => {
+  const html = areaPanel()._renderAreas(2000);
+  assert.doesNotMatch(html, /Keller</); // 0 W
+  assert.match(html, /1 idle/);
+});
+
+test("areas: no card when no sensor belongs to an area or there are no devices", () => {
+  assert.equal(areaPanel(undefined, { entities: {}, devices: {} })._renderAreas(2000), "");
+  assert.equal(areaPanel({})._renderAreas(2000), "");
+  const noRegistry = areaPanel();
+  noRegistry._hass.entities = undefined;
+  noRegistry._hass.devices = undefined;
+  assert.equal(noRegistry._renderAreas(2000), "");
+});
+
+test("areas: the card folds like the device card and has its own toggle", () => {
+  const states = {};
+  const entities = {};
+  const areas = {};
+  for (let i = 1; i <= 12; i++) {
+    states[`sensor.s${i}_leistung`] = { state: String(i * 100), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: `S${i}` } };
+    entities[`sensor.s${i}_leistung`] = { area_id: `a${i}` };
+    areas[`a${i}`] = { name: `Area ${i}` };
+  }
+  const p = discoverPanel({ device_patterns: ["*_leistung"] }, states);
+  p._hass.entities = entities;
+  p._hass.devices = {};
+  p._hass.areas = areas;
+  let html = p._renderAreas(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 8);
+  assert.match(html, /data-areatoggle/);
+  assert.match(html, /Show all 12/);
+  p._onClick({ target: { closest: (s) => (s === "[data-areatoggle]" ? {} : null) } });
+  html = p._renderAreas(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 12);
+  assert.doesNotMatch(html, /<small class="pct">/); // house power unknown
+});
+
+test("areas: area names are HTML-escaped", () => {
+  const p = areaPanel(undefined, { areas: { kueche: { name: '<img src=x onerror="x">' }, wohnzimmer: { name: "W" }, technik: { name: "T" }, keller: { name: "K" } } });
+  p._hass.entities["sensor.herd_leistung"] = { area_id: "kueche" };
+  assert.doesNotMatch(p._renderAreas(2000), /<img/);
+});

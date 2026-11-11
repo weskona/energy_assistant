@@ -44,6 +44,7 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .dev{margin-top:14px}
 .dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 .dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .cnt{color:var(--eb-dim);font-size:12px;margin-left:6px}
 .dev .val{font-weight:700;white-space:nowrap}
 .dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
 .dev .val small.pct{margin-left:10px;color:var(--eb-muted);display:inline-block;min-width:36px;text-align:right}
@@ -149,6 +150,10 @@ const STRINGS = {
     includeShown: "Include shown",
     showAll: "Show all {n}",
     showLess: "Show less",
+    areas: "Areas",
+    noArea: "No area",
+    deviceCount1: "1 device",
+    deviceCountN: "{n} devices",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
     f_device_exclude_patterns: "Exclude patterns (e.g. alpha_ess_*)",
     addExcludePattern: "e.g. alpha_ess_*",
@@ -217,6 +222,10 @@ const STRINGS = {
     includeShown: "Gezeigte zulassen",
     showAll: "Alle {n} zeigen",
     showLess: "Weniger zeigen",
+    areas: "Bereiche",
+    noArea: "Ohne Bereich",
+    deviceCount1: "1 Gerät",
+    deviceCountN: "{n} Geräte",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
     f_device_exclude_patterns: "Ausschluss-Muster (z. B. alpha_ess_*)",
     addExcludePattern: "z. B. alpha_ess_*",
@@ -236,6 +245,8 @@ const SETTINGS_SECTIONS = [
 ];
 const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns"];
 // Sensors that are part of the energy balance and therefore never listed as devices.
+// Power below this counts as idle and is only counted, not listed.
+const IDLE_W = 5;
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
 
@@ -377,6 +388,9 @@ class EnergyboardPanel extends HTMLElement {
     const bulk = e.target.closest("[data-bulk]");
     if (e.target.closest("[data-devtoggle]")) {
       this._devExpanded = !this._devExpanded;
+      this._render();
+    } else if (e.target.closest("[data-areatoggle]")) {
+      this._areaExpanded = !this._areaExpanded;
       this._render();
     } else if (rm && this._isAdmin) {
       this._draftRemove(rm.dataset.remove, rm.dataset.id);
@@ -796,6 +810,7 @@ class EnergyboardPanel extends HTMLElement {
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
+    const areas = this._renderAreas(cur.house);
     const devices = this._renderDevices(cur.house);
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
@@ -820,41 +835,85 @@ class EnergyboardPanel extends HTMLElement {
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${devices}</div>`;
+      ${areas}${devices}</div>`;
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
   _renderDevices(house) {
     if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
-    const IDLE_W = 5;
     const all = this._devices();
     const active = all.filter((d) => d.w >= IDLE_W);
-    const idle = all.length - active.length;
     const sum = all.reduce((a, d) => a + d.w, 0);
-    const other = house != null && house - sum >= IDLE_W ? house - sum : null;
-    // Strongest devices first. By default only the top ones are shown, the rest folds away.
+    const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
+    return this._listCard({
+      title: this._t("devices"), rows: active, idle: all.length - active.length, sum, other, house,
+      expanded: this._devExpanded, toggle: "data-devtoggle",
+    });
+  }
+
+  /** Area of an entity: its own area, otherwise the area of its device. null if none. */
+  _areaOf(entityId) {
+    const ent = this._hass?.entities?.[entityId];
+    const areaId = ent?.area_id || (ent?.device_id && this._hass?.devices?.[ent.device_id]?.area_id);
+    return areaId ? { id: areaId, name: this._hass?.areas?.[areaId]?.name || areaId } : null;
+  }
+
+  /** The same sensors as the device list, summed up per Home Assistant area. */
+  _areas() {
+    const groups = new Map();
+    for (const d of this._devices()) {
+      const area = this._areaOf(d.id);
+      const key = area ? area.id : "";
+      const g = groups.get(key) || { name: area ? area.name : this._t("noArea"), w: 0, n: 0, none: !area, tips: [] };
+      g.w += d.w;
+      g.n += 1;
+      g.tips.push(`${d.name} ${fmtPower(d.w).join(" ")}`);
+      groups.set(key, g);
+    }
+    return [...groups.values()].map((g) => ({
+      ...g,
+      sub: this._t(g.n === 1 ? "deviceCount1" : "deviceCountN", { n: g.n }),
+      tip: g.tips.slice(0, 12).join(", ") + (g.tips.length > 12 ? " …" : ""),
+    }));
+  }
+
+  _renderAreas(house) {
+    const all = this._areas();
+    // Without any area assignment there is nothing to group, the device list says it all.
+    if (!all.some((g) => !g.none)) return "";
+    const active = all.filter((g) => g.w >= IDLE_W);
+    const sum = all.reduce((a, g) => a + g.w, 0);
+    return this._listCard({
+      title: this._t("areas"), rows: active, idle: all.length - active.length, sum, other: null, house,
+      expanded: this._areaExpanded, toggle: "data-areatoggle",
+    });
+  }
+
+  /** Card with a ranked list of rows with value, share of the house power and a bar. */
+  _listCard({ title, rows, idle, sum, other, house, expanded, toggle }) {
+    // Strongest first (rows without a group such as "No area" go last). Only the top ones show by default.
     const LIMIT = 8;
-    active.sort((a, b) => b.w - a.w);
+    const active = [...rows].sort((a, b) => (a.none ? 1 : b.none ? -1 : b.w - a.w));
     const folded = active.length > LIMIT;
-    const shown = folded && !this._devExpanded ? active.slice(0, LIMIT) : active;
-    const rows = other != null ? [...shown, { name: this._t("otherDevices"), w: other, other: true }] : shown;
-    const scale = Math.max(1, house ?? 0, ...rows.map((d) => d.w));
+    const shown = folded && !expanded ? active.slice(0, LIMIT) : active;
+    const list = other ? [...shown, other] : shown;
+    const scale = Math.max(1, house ?? 0, ...list.map((d) => d.w));
     const [tv, tu] = fmtPower(sum);
-    const list = rows
+    const html = list
       .map((d) => {
         const [v, u] = fmtPower(d.w);
         // Share of the house power, only known when the house power is known.
         const share = house > 0 ? Math.round((d.w / house) * 100) : null;
-        const tip = share != null ? this._t("share", { pct: share }) : "";
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${esc(d.name)}</span>
+        const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || ""].filter(Boolean).join(" · ");
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${esc(d.name)}${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
           <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })
       .join("");
     return `<div class="eb-card wide">
-      <div class="row"><span class="eb-title">${this._t("devices")}</span><span class="eb-label">${tv} ${tu}</span></div>
-      <div class="devgrid${this._devExpanded ? " devlist" : ""}">${list || `<div class="empty">–</div>`}</div>
-      ${folded ? `<button class="linkbtn" data-devtoggle>${this._devExpanded ? this._t("showLess") : this._t("showAll", { n: active.length })}</button>` : ""}
+      <div class="row"><span class="eb-title">${title}</span><span class="eb-label">${tv} ${tu}</span></div>
+      <div class="devgrid${expanded ? " devlist" : ""}">${html || `<div class="empty">–</div>`}</div>
+      ${folded ? `<button class="linkbtn" ${toggle}>${expanded ? this._t("showLess") : this._t("showAll", { n: active.length })}</button>` : ""}
       ${idle > 0 ? `<div class="note">${this._t("idleDevices", { n: idle })}</div>` : ""}
     </div>`;
   }

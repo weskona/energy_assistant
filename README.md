@@ -66,6 +66,13 @@ Separate and combined sensors can be mixed.
 
 In the panel's **Settings** tab the field shows live which sensors a pattern matches.
 
+**Areas:** below the house card the panel also shows an **Areas** card. It uses exactly the sensors of the device list
+(same patterns, exclude patterns, exclude list and additional sensors) and sums their power per Home Assistant area.
+The area is taken from the entity, or from its device if the entity has none. Sensors without an area are collected in
+**No area**, shown last. Like the devices, areas show the value, the share of the house power and a bar, fold after the
+8 strongest and count idle areas (< 5 W). There is nothing extra to configure. The card is hidden as long as none of the
+sensors belongs to an area.
+
 If your sensor counts the other way round (e.g. charging positive), enable "Invert sign".
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.
 Required: grid import, grid combined or house consumption.
