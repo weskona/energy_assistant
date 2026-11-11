@@ -8,7 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **House** | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
-| **Settings** | Change all sensors directly in the panel (see below) |
+| **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the House tab. |
 
 ## Installation
 

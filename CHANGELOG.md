@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Settings tab is opened with a gear icon in the top right corner instead of a tab button. The icon is highlighted while the settings are open, a second click leads back to the House tab. The House tab stays centered.
 - The devices on the House tab are listed one below the other again (single column) instead of in several columns. They keep their own full-width row.
 
 ## [0.2.2] - 2026-11-11

@@ -17,9 +17,14 @@ const STYLE = `
 :host{display:block;min-height:100%;background:var(--eb-bg);color:var(--eb-text);font-family:var(--eb-font)}
 *{box-sizing:border-box}
 .wrap{padding:16px 24px}
-.top{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:16px}
+.top .right{justify-self:end}
 .menu{background:none;border:0;color:var(--eb-muted);cursor:pointer;padding:6px}
-.tabs{display:flex;gap:4px;padding:4px;background:var(--eb-panel);border:1px solid var(--eb-line);border-radius:14px;margin:0 auto}
+.tabs{display:flex;gap:4px;padding:4px;background:var(--eb-panel);border:1px solid var(--eb-line);border-radius:14px}
+.gear{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--eb-line);background:var(--eb-panel);color:var(--eb-muted);cursor:pointer;padding:0}
+.gear:hover{color:var(--eb-text)}
+.gear.active{background:rgba(255,255,255,.08);color:var(--eb-text);border-color:var(--eb-green)}
+.gear svg{width:20px;height:20px}
 .tab{border:0;background:none;color:var(--eb-muted);font:600 14px var(--eb-font);padding:8px 16px;border-radius:10px;cursor:pointer}
 .tab.active{background:rgba(255,255,255,.08);color:var(--eb-text)}
 .grid{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
@@ -1104,8 +1109,9 @@ class EnergyboardPanel extends HTMLElement {
         <link rel="stylesheet" href="${BASE}/energyboard-tokens.css">
         <div class="wrap">
           <div class="top">
-            <button class="menu" aria-label="Menu" hidden>☰</button>
-            <div class="tabs"><button class="tab active" data-tab="house">House</button><button class="tab" data-tab="settings">Settings</button></div>
+            <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
+            <div class="tabs"><button class="tab active" data-tab="house">House</button></div>
+            <div class="right"><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
           </div>
           <div id="content"></div></div>`;
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
@@ -1114,8 +1120,10 @@ class EnergyboardPanel extends HTMLElement {
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
-      this.shadowRoot.querySelector(".tabs").addEventListener("click", (e) => {
-        const tab = e.target.closest("[data-tab]")?.dataset.tab;
+      this.shadowRoot.querySelector(".top").addEventListener("click", (e) => {
+        let tab = e.target.closest("[data-tab]")?.dataset.tab;
+        // The gear toggles: a second click on it leads back to the house tab.
+        if (tab === "settings" && this._tab === "settings") tab = "house";
         if (tab && tab !== this._tab) {
           this._tab = tab;
           this._html = null;
@@ -1132,6 +1140,10 @@ class EnergyboardPanel extends HTMLElement {
       tab.textContent = this._t(tab.dataset.tab);
       tab.classList.toggle("active", tab.dataset.tab === this._tab);
     }
+    const gear = this.shadowRoot.querySelector(".gear");
+    gear.setAttribute("aria-label", this._t("settings"));
+    gear.setAttribute("title", this._t("settings"));
+    gear.classList.toggle("active", this._tab === "settings");
     const content = this.shadowRoot.getElementById("content");
     if (this._tab === "settings") {
       // The settings form only redraws on its own edits, so typing is not interrupted
