@@ -44,6 +44,7 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .dev{margin-top:14px}
 .dev .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
 .dev .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px}
 .dev .cnt{color:var(--eb-dim);font-size:12px;margin-left:6px}
 .dev .val{font-weight:700;white-space:nowrap}
 .dev .val small{font-weight:500;color:var(--eb-muted);margin-left:3px}
@@ -70,6 +71,13 @@ svg{width:100%;height:auto;display:block;margin-top:12px}
 .mn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mi{color:var(--eb-dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mrow.ex .mn{color:var(--eb-dim);text-decoration:line-through}
+.segs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.segs .seglab{font-size:12px;color:var(--eb-dim);margin-right:2px}
+.segs .sep{width:1px;height:20px;background:var(--eb-line);margin:0 6px}
+.seg{border:1px solid var(--eb-tile-border);background:var(--eb-tile);color:var(--eb-muted);border-radius:999px;padding:5px 12px;font:600 12.5px var(--eb-font);cursor:pointer}
+.seg small{font-weight:500;margin-left:3px;color:var(--eb-dim)}
+.seg.on{color:var(--eb-text);border-color:var(--eb-green);background:rgba(52,211,153,.12)}
+.seg.on small{color:var(--eb-muted)}
 .mbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .mbar .btn{padding:7px 12px;font-size:12.5px}
 .devlist{max-height:480px;overflow:auto}
@@ -146,12 +154,27 @@ const STRINGS = {
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
     matchesCount: "{n} matching, {x} excluded. Untick a sensor to exclude it.",
     filterMatches: "Filter matches …",
+    filterAll: "All",
+    filterGroupState: "Activity",
+    filterGroupSel: "Selection",
+    filterActive: "Active",
+    filterIdle: "Inactive",
+    filterIncluded: "Included",
+    filterExcluded: "Excluded",
+    filterActiveTip: "At least 5 W right now",
+    filterIdleTip: "Below 5 W or no value",
     excludeShown: "Exclude shown",
     includeShown: "Include shown",
     showAll: "Show all {n}",
     showLess: "Show less",
     areas: "Areas",
     noArea: "No area",
+    labels: "Labels",
+    sectionLabels: "Labels",
+    f_label_ids: "Labels (their power sensors are summed up per label)",
+    noLabelsDefined: "No labels exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    labelSensors1: "1 power sensor",
+    labelSensorsN: "{n} power sensors",
     deviceCount1: "1 device",
     deviceCountN: "{n} devices",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
@@ -218,12 +241,27 @@ const STRINGS = {
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
     matchesCount: "{n} passend, {x} ausgeschlossen. Häkchen entfernen schließt einen Sensor aus.",
     filterMatches: "Treffer filtern …",
+    filterAll: "Alle",
+    filterGroupState: "Aktivität",
+    filterGroupSel: "Auswahl",
+    filterActive: "Aktiv",
+    filterIdle: "Inaktiv",
+    filterIncluded: "Enthalten",
+    filterExcluded: "Ausgeschlossen",
+    filterActiveTip: "Aktuell mindestens 5 W",
+    filterIdleTip: "Unter 5 W oder kein Wert",
     excludeShown: "Gezeigte ausschließen",
     includeShown: "Gezeigte zulassen",
     showAll: "Alle {n} zeigen",
     showLess: "Weniger zeigen",
     areas: "Bereiche",
     noArea: "Ohne Bereich",
+    labels: "Labels",
+    sectionLabels: "Labels",
+    f_label_ids: "Labels (ihre Leistungssensoren werden je Label zusammengefasst)",
+    noLabelsDefined: "In Home Assistant gibt es noch keine Labels. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    labelSensors1: "1 Leistungssensor",
+    labelSensorsN: "{n} Leistungssensoren",
     deviceCount1: "1 Gerät",
     deviceCountN: "{n} Geräte",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
@@ -242,8 +280,9 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
+  { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids"];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // Power below this counts as idle and is only counted, not listed.
 const IDLE_W = 5;
@@ -318,6 +357,25 @@ class EnergyboardPanel extends HTMLElement {
       this._settingsDirty = true;
       this._render();
       this._maybeLoadHistory();
+      this._loadLabels();
+    }
+  }
+
+  /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
+  async _loadLabels() {
+    if (this._labelsLoading || !this._hass) return;
+    this._labelsLoading = true;
+    try {
+      const res = await this._hass.callWS({ type: "energyboard/labels" });
+      // Never let an incomplete answer break the settings form.
+      this._labelData = { labels: Array.isArray(res?.labels) ? res.labels : [], entities: res?.entities || {} };
+    } catch (e) {
+      console.warn("Energyboard: could not load labels", e);
+      this._labelData = this._labelData || { labels: [], entities: {} };
+    } finally {
+      this._labelsLoading = false;
+      this._settingsDirty = true;
+      this._render();
     }
   }
 
@@ -386,11 +444,21 @@ class EnergyboardPanel extends HTMLElement {
     this._fieldError = {};
     const rm = e.target.closest("[data-remove]");
     const bulk = e.target.closest("[data-bulk]");
-    if (e.target.closest("[data-devtoggle]")) {
+    const seg = e.target.closest("[data-seg]");
+    if (seg) {
+      // View filters of the match list. They also decide what the bulk buttons act on.
+      const [group, value] = seg.dataset.seg.split(":");
+      if (group === "state") this._fState = value;
+      else this._fSel = value;
+      this._edited();
+    } else if (e.target.closest("[data-devtoggle]")) {
       this._devExpanded = !this._devExpanded;
       this._render();
     } else if (e.target.closest("[data-areatoggle]")) {
       this._areaExpanded = !this._areaExpanded;
+      this._render();
+    } else if (e.target.closest("[data-labeltoggle]")) {
+      this._labelExpanded = !this._labelExpanded;
       this._render();
     } else if (rm && this._isAdmin) {
       this._draftRemove(rm.dataset.remove, rm.dataset.id);
@@ -414,7 +482,12 @@ class EnergyboardPanel extends HTMLElement {
     const t = e.target;
     if (!this._isAdmin) return;
     this._fieldError = {};
-    if (t.dataset?.device) {
+    if (t.dataset?.label) {
+      const id = t.dataset.label;
+      const rest = this._draft.label_ids.filter((x) => x !== id);
+      this._draft.label_ids = t.checked ? [...rest, id] : rest;
+      this._edited();
+    } else if (t.dataset?.device) {
       const id = t.dataset.device;
       const rest = this._draft.device_exclude.filter((x) => x !== id);
       this._draft.device_exclude = t.checked ? rest : [...rest, id];
@@ -472,12 +545,34 @@ class EnergyboardPanel extends HTMLElement {
     const found = this._discoverDevices(this._draft.device_patterns, this._draft, { ignoreExclude: true });
     const states = this._hass?.states || {};
     const q = (this._filter || "").trim();
-    return {
-      found,
-      shown: q
-        ? found.filter((id) => `${states[id]?.attributes?.friendly_name || ""} ${id}`.toLowerCase().includes(q))
-        : found,
+    const excluded = new Set(this._draft.device_exclude);
+    const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+    // Active = at least IDLE_W right now. Inactive also covers sensors without a value.
+    const info = new Map(
+      found.map((id) => {
+        const w = this._watts(id);
+        return [id, { active: w != null && w >= IDLE_W, excluded: excluded.has(id) || byPattern(id) }];
+      }),
+    );
+    const count = (fn) => found.filter((id) => fn(info.get(id))).length;
+    const counts = {
+      all: found.length,
+      active: count((i) => i.active),
+      idle: count((i) => !i.active),
+      included: count((i) => !i.excluded),
+      excluded: count((i) => i.excluded),
     };
+    const fState = this._fState || "all";
+    const fSel = this._fSel || "all";
+    const shown = found.filter((id) => {
+      const i = info.get(id);
+      if (fState === "active" && !i.active) return false;
+      if (fState === "idle" && i.active) return false;
+      if (fSel === "included" && i.excluded) return false;
+      if (fSel === "excluded" && !i.excluded) return false;
+      return !q || `${states[id]?.attributes?.friendly_name || ""} ${id}`.toLowerCase().includes(q);
+    });
+    return { found, shown, counts };
   }
 
   _renderMatchRows(ro) {
@@ -497,15 +592,37 @@ class EnergyboardPanel extends HTMLElement {
       .join("");
   }
 
+  /** Checkbox list of the labels that exist in Home Assistant. */
+  _renderLabelPicker(ro) {
+    if (!this._labelData) return `<div class="hint">${esc(this._t("loading"))}</div>`;
+    const labels = this._labelData.labels;
+    if (!labels.length) return `<div class="hint">${esc(this._t("noLabelsDefined"))}</div>`;
+    const selected = new Set(this._draft.label_ids);
+    const rows = labels
+      .map((l) => {
+        // Same count as the card: sensors of the energy balance and excluded sensors do not count.
+        const n = this._labelMembers(l.label_id, this._draft).length;
+        const dot = l.color && /^[a-z-]+$/.test(l.color) ? `<i class="dot" style="background:var(--${l.color}-color, var(--eb-green))"></i>` : "";
+        return `<label class="mrow"><input type="checkbox" data-label="${esc(l.label_id)}" ${selected.has(l.label_id) ? "checked" : ""} ${ro ? "disabled" : ""}><span class="mt"><span class="mn">${dot}${esc(l.name)}</span><span class="mi">${esc(this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }))}</span></span></label>`;
+      })
+      .join("");
+    return `<div class="mlist">${rows}</div>`;
+  }
+
   _renderMatches(ro) {
-    const { found } = this._matchList();
+    const { found, counts } = this._matchList();
     if (!found.length) return `<div class="hint">${esc(this._t("noMatches"))}</div>`;
+    const seg = (group, value, key, tipKey) => {
+      const on = (group === "state" ? this._fState || "all" : this._fSel || "all") === value;
+      return `<button type="button" class="seg${on ? " on" : ""}" data-seg="${group}:${value}"${tipKey ? ` title="${esc(this._t(tipKey))}"` : ""}>${esc(this._t(key))} <small>${counts[value]}</small></button>`;
+    };
     const excluded = new Set(this._draft.device_exclude);
     const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
     const x = found.filter((id) => excluded.has(id) || byPattern(id)).length;
     return `<div class="hint" id="mcount">${esc(this._t("matchesCount", { n: found.length, x }))}</div>
       <div class="mbar"><input type="text" data-filter value="${esc(this._filter || "")}" placeholder="${esc(this._t("filterMatches"))}" autocomplete="off" style="flex:1 1 160px;width:auto">
       ${ro ? "" : `<button class="btn ghost" data-bulk="exclude">${esc(this._t("excludeShown"))}</button><button class="btn ghost" data-bulk="include">${esc(this._t("includeShown"))}</button>`}</div>
+      <div class="segs"><span class="seglab">${esc(this._t("filterGroupState"))}</span>${seg("state", "all", "filterAll")}${seg("state", "active", "filterActive", "filterActiveTip")}${seg("state", "idle", "filterIdle", "filterIdleTip")}<span class="sep"></span><span class="seglab">${esc(this._t("filterGroupSel"))}</span>${seg("sel", "all", "filterAll")}${seg("sel", "included", "filterIncluded")}${seg("sel", "excluded", "filterExcluded")}</div>
       <div class="mlist" id="mlist">${this._renderMatchRows(ro)}</div>`;
   }
 
@@ -523,6 +640,7 @@ class EnergyboardPanel extends HTMLElement {
       const chips = this._draftList(key)
         .map((id) => `<span class="chip" title="${esc(id)}">${esc(nameOf(id))}${ro ? "" : `<button data-remove="${key}" data-id="${esc(id)}" aria-label="${esc(this._t("remove"))}">×</button>`}</span>`)
         .join("");
+      if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
@@ -530,7 +648,7 @@ class EnergyboardPanel extends HTMLElement {
         ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec${sec.title === "sectionDevices" ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
+      (sec) => `<div class="eb-card sec${sec.title === "sectionDevices" || sec.title === "sectionLabels" ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";
@@ -627,17 +745,31 @@ class EnergyboardPanel extends HTMLElement {
    */
   _discoverDevices(patterns = [], cfg = this._cfg, { ignoreExclude = false } = {}) {
     if (!patterns?.length) return [];
+    const excluded = this._excluder(cfg, ignoreExclude);
+    const matches = compilePatterns(patterns);
+    return this._powerSensors()
+      .filter((id) => !excluded(id) && matches(id))
+      .sort();
+  }
+
+  /** All `sensor` entities with device_class power. */
+  _powerSensors() {
+    return Object.entries(this._hass?.states || {})
+      .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
+      .map(([id]) => id);
+  }
+
+  /**
+   * Predicate for sensors that never count as device, area or label member: the sensors of the
+   * energy balance (grid, solar, storage, house) and, unless ignored, the exclude list and patterns.
+   */
+  _excluder(cfg, ignoreExclude = false) {
     const skip = new Set([
       ...SYSTEM_KEYS.flatMap((k) => (Array.isArray(cfg[k]) ? cfg[k] : cfg[k] ? [cfg[k]] : [])),
       ...(ignoreExclude ? [] : cfg.device_exclude || []),
     ]);
-    const matches = compilePatterns(patterns);
-    const excludedByPattern = ignoreExclude ? () => false : compilePatterns(cfg.device_exclude_patterns || []);
-    return Object.entries(this._hass?.states || {})
-      .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
-      .map(([id]) => id)
-      .filter((id) => !skip.has(id) && matches(id) && !excludedByPattern(id))
-      .sort();
+    const byPattern = ignoreExclude ? () => false : compilePatterns(cfg.device_exclude_patterns || []);
+    return (id) => skip.has(id) || byPattern(id);
   }
 
   _calcHouse({ solar, gridIn, gridOut, discharge, charge }) {
@@ -811,6 +943,7 @@ class EnergyboardPanel extends HTMLElement {
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
     const areas = this._renderAreas(cur.house);
+    const labels = this._renderLabels(cur.house);
     const devices = this._renderDevices(cur.house);
     const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
@@ -835,7 +968,7 @@ class EnergyboardPanel extends HTMLElement {
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${areas}${devices}</div>`;
+      ${areas}${labels}${devices}</div>`;
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
@@ -889,6 +1022,52 @@ class EnergyboardPanel extends HTMLElement {
     });
   }
 
+  /**
+   * Power sensors that carry a label. Like for the devices, the sensors of the energy balance and
+   * excluded sensors do not count. Unlike the devices no name pattern is needed: the label decides.
+   */
+  _labelMembers(labelId, cfg = this._cfg) {
+    const excluded = this._excluder(cfg);
+    const power = new Set(this._powerSensors());
+    return Object.entries(this._labelData?.entities || {})
+      .filter(([id, labels]) => labels.includes(labelId) && power.has(id) && !excluded(id))
+      .map(([id]) => id)
+      .sort();
+  }
+
+  /** The selected labels, each with the summed power of its sensors. */
+  _labelGroups() {
+    const byId = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l]));
+    return (this._cfg.label_ids || [])
+      .filter((id) => byId[id])
+      .map((id) => {
+        const members = this._labelMembers(id).map((sid) => ({
+          name: this._hass?.states?.[sid]?.attributes?.friendly_name || sid,
+          w: this._watts(sid),
+        })).filter((m) => m.w != null);
+        const n = members.length;
+        return {
+          name: byId[id].name,
+          color: byId[id].color,
+          w: members.reduce((a, m) => a + m.w, 0),
+          n,
+          sub: this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }),
+          tip: members.slice(0, 12).map((m) => `${m.name} ${fmtPower(m.w).join(" ")}`).join(", ") + (n > 12 ? " …" : ""),
+        };
+      });
+  }
+
+  _renderLabels(house) {
+    const all = this._labelGroups();
+    if (!all.length) return "";
+    const active = all.filter((g) => g.w >= IDLE_W);
+    const sum = all.reduce((a, g) => a + g.w, 0);
+    return this._listCard({
+      title: this._t("labels"), rows: active, idle: all.length - active.length, sum, other: null, house,
+      expanded: this._labelExpanded, toggle: "data-labeltoggle",
+    });
+  }
+
   /** Card with a ranked list of rows with value, share of the house power and a bar. */
   _listCard({ title, rows, idle, sum, other, house, expanded, toggle }) {
     // Strongest first (rows without a group such as "No area" go last). Only the top ones show by default.
@@ -905,7 +1084,7 @@ class EnergyboardPanel extends HTMLElement {
         // Share of the house power, only known when the house power is known.
         const share = house > 0 ? Math.round((d.w / house) * 100) : null;
         const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || ""].filter(Boolean).join(" · ");
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${esc(d.name)}${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
+        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${d.color && /^[a-z-]+$/.test(d.color) ? `<i class="dot" style="background:var(--${d.color}-color, var(--eb-green))"></i>` : ""}${esc(d.name)}${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}</span>
           <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
       })
@@ -942,6 +1121,7 @@ class EnergyboardPanel extends HTMLElement {
           this._html = null;
           this._settingsDirty = true;
           this._render();
+          this._loadLabels();
         }
       });
       this._built = true;

@@ -191,3 +191,104 @@ async def test_update_config_rejects_invalid_exclude_patterns(
     assert not msg["success"]
     assert msg["error"]["code"] == "invalid_format"
     assert entry.options == {}
+
+
+async def test_update_config_stores_label_ids(hass, hass_ws_client, entry) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"label_ids": [" klima ", "klima", "licht"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"] is False  # whitespace is not a valid label id
+    assert msg["error"]["code"] == "invalid_format"
+
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"label_ids": ["klima", "licht"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["label_ids"] == ["klima", "licht"]
+    assert entry.options["label_ids"] == ["klima", "licht"]
+
+
+async def test_update_config_rejects_invalid_label_ids(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "energyboard/update_config", "config": {"label_ids": ["Klima Anlage"]}}
+    )
+    msg = await client.receive_json()
+    assert not msg["success"]
+    assert msg["error"]["code"] == "invalid_format"
+    assert entry.options == {}
+
+
+async def test_labels_lists_labels_and_labelled_sensors(
+    hass, hass_ws_client, entry
+) -> None:
+    from homeassistant.helpers import device_registry as dr
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import label_registry as lr
+
+    labels = lr.async_get(hass)
+    klima = labels.async_create("Klima", color="blue", icon="mdi:snowflake")
+    licht = labels.async_create("Licht")
+    unused = labels.async_create("Unbenutzt")
+
+    devices = dr.async_get(hass)
+    config_entry = MockConfigEntry(domain="test")
+    config_entry.add_to_hass(hass)
+    device = devices.async_get_or_create(
+        config_entry_id=config_entry.entry_id, identifiers={("test", "1")}
+    )
+    devices.async_update_device(device.id, labels={licht.label_id})
+
+    entities = er.async_get(hass)
+    own = entities.async_get_or_create(
+        "sensor", "test", "own", suggested_object_id="own"
+    )
+    entities.async_update_entity(own.entity_id, labels={klima.label_id})
+    via_device = entities.async_get_or_create(
+        "sensor", "test", "dev", suggested_object_id="via_device", device_id=device.id
+    )
+    both = entities.async_get_or_create(
+        "sensor", "test", "both", suggested_object_id="both", device_id=device.id
+    )
+    entities.async_update_entity(both.entity_id, labels={klima.label_id})
+    entities.async_get_or_create("sensor", "test", "plain", suggested_object_id="plain")
+    other_domain = entities.async_get_or_create(
+        "switch", "test", "sw", suggested_object_id="sw"
+    )
+    entities.async_update_entity(other_domain.entity_id, labels={klima.label_id})
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "energyboard/labels"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    result = msg["result"]
+    by_id = {label["label_id"]: label for label in result["labels"]}
+    assert set(by_id) == {klima.label_id, licht.label_id, unused.label_id}
+    assert by_id[klima.label_id]["name"] == "Klima"
+    assert by_id[klima.label_id]["icon"] == "mdi:snowflake"
+    assert result["entities"] == {
+        own.entity_id: [klima.label_id],  # own label
+        via_device.entity_id: [licht.label_id],  # label of the device
+        both.entity_id: sorted([klima.label_id, licht.label_id]),  # both
+    }  # no plain sensor, no switch
+
+
+async def test_labels_is_available_to_non_admins(
+    hass, hass_ws_client, hass_read_only_access_token, entry
+) -> None:
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    await client.send_json_auto_id({"type": "energyboard/labels"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"] == {"labels": [], "entities": {}}

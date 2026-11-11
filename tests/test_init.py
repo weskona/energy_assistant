@@ -30,6 +30,7 @@ async def test_setup_registers_panel_with_normalized_config(
             "device_patterns": ["*_power"],
             "device_exclude": ["sensor.skip_power"],
             "device_exclude_patterns": ["alpha_ess_*"],
+            "label_ids": ["klima", "licht"],
         },
     )
     entry.add_to_hass(hass)
@@ -57,6 +58,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "device_patterns": ["*_power"],
         "device_exclude": ["sensor.skip_power"],
         "device_exclude_patterns": ["alpha_ess_*"],
+        "label_ids": ["klima", "licht"],
         "invert_grid": True,
         "invert_battery": False,
     }

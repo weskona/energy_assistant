@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Areas** card on the House tab: the sensors of the device list (same filters: patterns, exclude patterns, exclude list, additional sensors) are summed up per Home Assistant area. The area comes from the entity or from its device, sensors without an area are collected in "No area". Value, share of the house power, bar, folding and idle count work like in the device list. Nothing extra to configure, the card is hidden while no sensor belongs to an area.
+- **Labels** card on the House tab: pick labels from the list of labels in Home Assistant (Settings tab, also in the config flow and options flow) and the power sensors that carry a label are summed up per label. A sensor carries the labels of its entity and of its device. No name pattern is needed, the exclusions (energy balance sensors, exclude list, exclude patterns) still apply. Value, share of the house power, bar, folding and idle count work like in the other lists.
+- WebSocket command `energyboard/labels` (available to every user) with the labels and the sensors that carry them.
+- Filters for the match list in the Settings tab: activity (all / active / inactive) and selection (all / included / excluded), with counts, combinable with the text filter. "Exclude shown" / "Include shown" act on what the filters show.
 - The device card shows the share of the house power next to each value (also for the unmeasured rest), as long as the house power is known. The bar has the same length.
 
 ### Changed

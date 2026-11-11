@@ -2,6 +2,7 @@
 
 from custom_components.energyboard.settings import (
     as_list,
+    clean_ids,
     clean_patterns,
     has_source,
     normalize,
@@ -87,3 +88,16 @@ def test_exclude_patterns_are_cleaned_like_patterns() -> None:
     result = normalize({"device_exclude_patterns": [" Alpha_ESS_* ", "alpha_ess_*"]})
     assert result["device_exclude_patterns"] == ["alpha_ess_*"]
     assert normalize({})["device_exclude_patterns"] == []
+
+
+def test_clean_ids() -> None:
+    assert clean_ids(None) == []
+    assert clean_ids("klima") == ["klima"]
+    assert clean_ids([" klima ", "", "klima", "licht"]) == ["klima", "licht"]
+
+
+def test_label_ids_are_normalized_and_stored_as_a_list() -> None:
+    settings = normalize({"label_ids": [" klima ", "klima", "licht"]})
+    assert settings["label_ids"] == ["klima", "licht"]
+    assert normalize({})["label_ids"] == []
+    assert to_storage(settings)["label_ids"] == ["klima", "licht"]

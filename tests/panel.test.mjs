@@ -639,3 +639,220 @@ test("areas: area names are HTML-escaped", () => {
   p._hass.entities["sensor.herd_leistung"] = { area_id: "kueche" };
   assert.doesNotMatch(p._renderAreas(2000), /<img/);
 });
+
+function filterPanel() {
+  const dev = (name, w) => ({ state: String(w), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+  const states = {
+    "sensor.a_leistung": dev("A", 500), // active
+    "sensor.b_leistung": dev("B", 120), // active
+    "sensor.c_leistung": dev("C", 2), // inactive
+    "sensor.d_leistung": dev("D", 0), // inactive
+    "sensor.e_leistung": { state: "unavailable", attributes: { device_class: "power", friendly_name: "E" } }, // no value
+  };
+  const p = settingsPanel({ grid_import: ["sensor.g"], device_patterns: ["*_leistung"], device_exclude: ["sensor.b_leistung"], device_exclude_patterns: ["d_*"] }, { states });
+  p._edited = () => {};
+  return p;
+}
+const seg = (value) => ({ target: { closest: (s) => (s === "[data-seg]" ? { dataset: { seg: value } } : null) } });
+
+test("list filters: counts for active, inactive, included and excluded", () => {
+  const { counts } = filterPanel()._matchList();
+  assert.deepEqual(counts, { all: 5, active: 2, idle: 3, included: 3, excluded: 2 });
+});
+
+test("list filters: activity filter (inactive also covers sensors without a value)", () => {
+  const p = filterPanel();
+  p._onClick(seg("state:active"));
+  assert.deepEqual(p._matchList().shown, ["sensor.a_leistung", "sensor.b_leistung"]);
+  p._onClick(seg("state:idle"));
+  assert.deepEqual(p._matchList().shown, ["sensor.c_leistung", "sensor.d_leistung", "sensor.e_leistung"]);
+  p._onClick(seg("state:all"));
+  assert.equal(p._matchList().shown.length, 5);
+});
+
+test("list filters: selection filter (excluded by list or by pattern)", () => {
+  const p = filterPanel();
+  p._onClick(seg("sel:excluded"));
+  assert.deepEqual(p._matchList().shown, ["sensor.b_leistung", "sensor.d_leistung"]);
+  p._onClick(seg("sel:included"));
+  assert.deepEqual(p._matchList().shown, ["sensor.a_leistung", "sensor.c_leistung", "sensor.e_leistung"]);
+});
+
+test("list filters: the filters combine with each other and with the text filter", () => {
+  const p = filterPanel();
+  p._onClick(seg("state:idle"));
+  p._onClick(seg("sel:included"));
+  assert.deepEqual(p._matchList().shown, ["sensor.c_leistung", "sensor.e_leistung"]);
+  p._filter = "c_leis";
+  assert.deepEqual(p._matchList().shown, ["sensor.c_leistung"]);
+  p._filter = "";
+  p._onClick(seg("state:active"));
+  p._onClick(seg("sel:excluded"));
+  assert.deepEqual(p._matchList().shown, ["sensor.b_leistung"]);
+});
+
+test("list filters: bulk exclude acts on what the filters show, e.g. all inactive sensors", () => {
+  const p = filterPanel();
+  p._onClick(seg("state:idle"));
+  p._onClick({ target: { closest: (s) => (s === "[data-bulk]" ? { dataset: { bulk: "exclude" } } : null) } });
+  // c and e are new, d is already excluded by a pattern and not copied into the list, b was there before
+  assert.deepEqual(p._draft.device_exclude.sort(), ["sensor.b_leistung", "sensor.c_leistung", "sensor.e_leistung"]);
+  p._onClick(seg("state:all"));
+  assert.deepEqual(p._matchList().counts, { all: 5, active: 2, idle: 3, included: 1, excluded: 4 });
+});
+
+test("list filters: the buttons show the counts and mark the chosen filters", () => {
+  const p = filterPanel();
+  p._onClick(seg("state:active"));
+  const html = p._renderSettings();
+  assert.match(html, /class="seg on" data-seg="state:active"[^>]*>Active <small>2<\/small>/);
+  assert.match(html, /class="seg" data-seg="state:idle"[^>]*>Inactive <small>3<\/small>/);
+  assert.match(html, /class="seg on" data-seg="sel:all"[^>]*>All <small>5<\/small>/);
+  assert.match(html, /Activity/);
+  assert.match(html, /Selection/);
+});
+
+test("list filters: also usable by non-admins (they only change the view)", () => {
+  const p = filterPanel();
+  p._hass.user = { is_admin: false };
+  p._onClick(seg("state:active"));
+  assert.equal(p._matchList().shown.length, 2);
+});
+
+function labelPanel(config = { label_ids: ["klima", "licht"], device_patterns: ["*_leistung"] }) {
+  const dev = (name, w) => ({ state: String(w), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: name } });
+  const states = {
+    "sensor.klimaanlage_leistung": dev("Klimaanlage", 900),
+    "sensor.lueftung_leistung": dev("Lüftung", 120),
+    "sensor.split": dev("Split", 600), // no *_leistung name, the label decides
+    "sensor.klima_alt_leistung": dev("Alt", 500),
+    "sensor.netz_leistung": dev("Netz", 4000),
+    "sensor.licht_flur_leistung": dev("Licht Flur", 15),
+    "sensor.temperatur": { state: "21", attributes: { device_class: "temperature", friendly_name: "Temp" } },
+  };
+  const p = discoverPanel({ grid_import: ["sensor.netz_leistung"], device_exclude: ["sensor.klima_alt_leistung"], ...config }, states);
+  p._labelData = {
+    labels: [
+      { label_id: "klima", name: "Klima", color: "blue" },
+      { label_id: "licht", name: "Licht", color: null },
+      { label_id: "unbenutzt", name: "Unbenutzt", color: null },
+    ],
+    entities: {
+      "sensor.klimaanlage_leistung": ["klima"],
+      "sensor.lueftung_leistung": ["klima"],
+      "sensor.split": ["klima"],
+      "sensor.klima_alt_leistung": ["klima"],
+      "sensor.netz_leistung": ["klima"],
+      "sensor.licht_flur_leistung": ["licht"],
+      "sensor.temperatur": ["klima"],
+    },
+  };
+  return p;
+}
+
+test("labels: the power sensors of a label are summed up", () => {
+  const groups = labelPanel()._labelGroups();
+  const klima = groups.find((g) => g.name === "Klima");
+  assert.equal(klima.w, 900 + 120 + 600);
+  assert.equal(klima.n, 3);
+  assert.equal(groups.find((g) => g.name === "Licht").w, 15);
+});
+
+test("labels: same exclusions as the devices, but no name pattern is needed", () => {
+  const members = labelPanel()._labelMembers("klima");
+  assert.ok(members.includes("sensor.split")); // name does not match *_leistung
+  assert.ok(!members.includes("sensor.klima_alt_leistung")); // on the exclude list
+  assert.ok(!members.includes("sensor.netz_leistung")); // sensor of the energy balance
+  assert.ok(!members.includes("sensor.temperatur")); // not a power sensor
+  const withPattern = labelPanel({ label_ids: ["klima"], device_exclude_patterns: ["klima*", "lueft*"] })._labelMembers("klima");
+  assert.deepEqual(withPattern, ["sensor.split"]);
+});
+
+test("labels: only selected labels that still exist are shown", () => {
+  assert.deepEqual(labelPanel({ label_ids: ["licht", "geloescht"] })._labelGroups().map((g) => g.name), ["Licht"]);
+  assert.deepEqual(labelPanel({ label_ids: [] })._labelGroups(), []);
+  assert.equal(labelPanel({ label_ids: [] })._renderLabels(2000), "");
+  const noData = labelPanel();
+  noData._labelData = null;
+  assert.equal(noData._renderLabels(2000), "");
+});
+
+test("labels: card with sums, shares, sensor counts, colors and tooltips", () => {
+  const html = labelPanel()._renderLabels(2000);
+  assert.match(html, /Labels/);
+  assert.match(html, /Klima[\s\S]*?3 power sensors/);
+  assert.match(html, /<small class="pct">81 %<\/small>/); // 1620 of 2000 W
+  assert.match(html, /Licht[\s\S]*?1 power sensor</);
+  assert.ok(html.indexOf("Klima") < html.indexOf("Licht")); // strongest first
+  assert.match(html, /var\(--blue-color/);
+  assert.match(html, /title="81 % of house · Klimaanlage 900 W/);
+});
+
+test("labels: the card folds like the others and has its own toggle", () => {
+  const ids = Array.from({ length: 10 }, (_, i) => `l${i}`);
+  const p = labelPanel({ label_ids: ids });
+  p._labelData.labels = ids.map((id, i) => ({ label_id: id, name: `Label ${i}`, color: null }));
+  p._labelData.entities = {};
+  ids.forEach((id, i) => {
+    p._hass.states[`sensor.x${i}_leistung`] = { state: String((i + 1) * 100), attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: `X${i}` } };
+    p._labelData.entities[`sensor.x${i}_leistung`] = [id];
+  });
+  let html = p._renderLabels(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 8);
+  assert.match(html, /data-labeltoggle/);
+  p._onClick({ target: { closest: (s) => (s === "[data-labeltoggle]" ? {} : null) } });
+  html = p._renderLabels(null);
+  assert.equal((html.match(/class="dev"/g) || []).length, 10);
+});
+
+test("labels: the settings list shows the existing labels with their sensor counts", () => {
+  const p = labelPanel();
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._ready = true;
+  const html = p._renderSettings();
+  assert.match(html, /data-label="klima" checked/);
+  assert.match(html, /data-label="unbenutzt"\s+>/);
+  // same count as the card: klimaanlage, lüftung, split (the excluded and the grid sensor do not count)
+  assert.match(html, /Klima<\/span><span class="mi">3 power sensors/);
+  assert.match(html, /Unbenutzt<\/span><span class="mi">0 power sensors/);
+});
+
+test("labels: ticking a label in the settings selects it", () => {
+  const p = labelPanel({ label_ids: [] });
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._edited = () => {};
+  p._onChange({ target: { dataset: { label: "klima" }, checked: true } });
+  p._onChange({ target: { dataset: { label: "klima" }, checked: true } });
+  assert.deepEqual(p._draft.label_ids, ["klima"]);
+  p._onChange({ target: { dataset: { label: "klima" }, checked: false } });
+  assert.deepEqual(p._draft.label_ids, []);
+});
+
+test("labels: read-only for non-admins, hint when no labels exist, escaped names", () => {
+  const ro = labelPanel();
+  ro._hass.user = { is_admin: false };
+  ro._draft = ro._normalize(ro._cfg);
+  ro._ready = true;
+  assert.match(ro._renderSettings().match(/<input type="checkbox" data-label="klima"[^>]*>/)[0], /disabled/);
+  ro._edited = () => {};
+  ro._onChange({ target: { dataset: { label: "licht" }, checked: true } });
+  assert.deepEqual(ro._draft.label_ids, ["klima", "licht"]); // unchanged
+
+  const none = labelPanel();
+  none._hass.user = { is_admin: true };
+  none._draft = none._normalize(none._cfg);
+  none._ready = true;
+  none._labelData = { labels: [], entities: {} };
+  assert.match(none._renderSettings(), /No labels exist in Home Assistant yet/);
+
+  const evil = labelPanel();
+  evil._hass.user = { is_admin: true };
+  evil._draft = evil._normalize(evil._cfg);
+  evil._ready = true;
+  evil._labelData.labels = [{ label_id: "x", name: '<img src=x onerror="x">', color: 'red"><script>' }];
+  const html = evil._renderSettings();
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /<script>/);
+});

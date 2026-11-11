@@ -64,7 +64,18 @@ Separate and combined sensors can be mixed.
   device fills the bar). It shows the 8 strongest devices, **Show all** unfolds the rest. Devices below 5 W count as
   idle and are only counted. If a house power is known, the remainder is shown as "Other (not measured)".
 
-In the panel's **Settings** tab the field shows live which sensors a pattern matches.
+In the panel's **Settings** tab the field shows live which sensors a pattern matches. Long match lists can be
+narrowed with filter buttons: **Activity** (all / active, at least 5 W right now / inactive, below 5 W or no value) and
+**Selection** (all / included / excluded), combinable with the text filter. **Exclude shown** and **Include shown** act on
+what the filters show, e.g. one click excludes all inactive sensors.
+
+**Labels:** in the Settings tab you pick labels from the list of labels that exist in Home Assistant (checkboxes, with
+the number of power sensors each label has). The **Labels** card on the House tab then shows one row per selected label
+with the summed power of all its power sensors, plus share of the house power, bar, folding and idle count. A sensor
+carries the labels of its entity and of its device. Unlike the devices **no name pattern is needed**, the label decides.
+The exclusions still apply: sensors of the energy balance (grid, solar, storage, house), the exclude list and the exclude
+patterns. A sensor with several selected labels counts in each of them. The labels are read over the `energyboard/labels`
+WebSocket command, available to every user.
 
 **Areas:** below the house card the panel also shows an **Areas** card. It uses exactly the sensors of the device list
 (same patterns, exclude patterns, exclude list and additional sensors) and sums their power per Home Assistant area.
