@@ -159,3 +159,35 @@ async def test_update_config_rejects_invalid_exclude(
     msg = await client.receive_json()
     assert not msg["success"]
     assert msg["error"]["code"] == "invalid_format"
+
+
+async def test_update_config_stores_cleaned_exclude_patterns(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"device_exclude_patterns": ["Alpha_ESS_*", "*_string_*"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["device_exclude_patterns"] == ["alpha_ess_*", "*_string_*"]
+    assert entry.options["device_exclude_patterns"] == ["alpha_ess_*", "*_string_*"]
+
+
+async def test_update_config_rejects_invalid_exclude_patterns(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energyboard/update_config",
+            "config": {"device_exclude_patterns": ["a b"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert not msg["success"]
+    assert msg["error"]["code"] == "invalid_format"
+    assert entry.options == {}

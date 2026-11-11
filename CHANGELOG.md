@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-11
+
+### Added
+
+- Exclude patterns for devices (e.g. `alpha_ess_*`): every sensor that matches is left out of the device list. In the Settings tab such sensors stay visible in the match list, struck through and locked. Available in the Settings tab, the config flow and the options flow, validated and stored in lowercase.
+
+### Changed
+
+- The panel uses the full screen width.
+- The devices card has its own full-width row on the House tab and lists the devices in several columns.
+- In the Settings tab the devices section has its own full-width row. The match list shows the name in the first line and the entity id below it, in several columns, so names are no longer cut off. The fields of all sections are arranged in columns.
+- Error messages in the settings form disappear with the next action.
+
 ## [0.2.1] - 2026-11-11
 
 ### Fixed
@@ -58,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/weskona/ha-energyboard/releases/tag/v0.1.0

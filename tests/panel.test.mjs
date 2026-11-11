@@ -437,3 +437,73 @@ test("device card: no toggle for a short list and the unmeasured rest is always 
   const short = discoverPanel({ device_power: ["sensor.d1", "sensor.d2"] }, states);
   assert.doesNotMatch(short._renderDevices(null), /data-devtoggle/);
 });
+
+function excludePatternPanel(extra = {}) {
+  const states = {
+    "sensor.backofen_leistung": power("Backofen"),
+    "sensor.alpha_ess_string_1_leistung": power("String 1"),
+    "sensor.alpha_ess_string_2_leistung": power("String 2"),
+    "sensor.abzugshaube_leistung": power("Abzugshaube"),
+  };
+  return discoverPanel({ device_patterns: ["*_leistung"], device_exclude_patterns: ["alpha_ess_*"], ...extra }, states);
+}
+
+test("exclude patterns: matching sensors are left out of the device list", () => {
+  const p = excludePatternPanel();
+  assert.deepEqual(p._discoverDevices(p._cfg.device_patterns, p._cfg), ["sensor.abzugshaube_leistung", "sensor.backofen_leistung"]);
+  assert.deepEqual(p._devices().map((d) => d.name).sort(), ["Abzugshaube", "Backofen"]);
+});
+
+test("exclude patterns: combine with the exclude list and explicitly picked sensors stay", () => {
+  const p = excludePatternPanel({ device_exclude: ["sensor.backofen_leistung"], device_power: ["sensor.alpha_ess_string_1_leistung"] });
+  assert.deepEqual(p._devices().map((d) => d.name).sort(), ["Abzugshaube", "String 1"]);
+});
+
+test("exclude patterns: wildcards, full ids and case", () => {
+  const p = excludePatternPanel({ device_exclude_patterns: ["*_STRING_?_leistung", "sensor.back*"] });
+  assert.deepEqual(p._discoverDevices(["*_leistung"], p._cfg), ["sensor.abzugshaube_leistung"]);
+});
+
+test("exclude patterns: ignoreExclude lists every match", () => {
+  const p = excludePatternPanel({ device_exclude: ["sensor.backofen_leistung"] });
+  assert.equal(p._discoverDevices(["*_leistung"], p._cfg, { ignoreExclude: true }).length, 4);
+});
+
+test("exclude patterns: the settings list shows them excluded and locked", () => {
+  const p = excludePatternPanel();
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._ready = true;
+  const html = p._renderSettings();
+  assert.match(html, /4 matching, 2 excluded/);
+  const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
+  assert.match(box("sensor.alpha_ess_string_1_leistung"), /disabled/);
+  assert.doesNotMatch(box("sensor.alpha_ess_string_1_leistung"), /checked/);
+  assert.match(box("sensor.backofen_leistung"), /checked/);
+  assert.doesNotMatch(box("sensor.backofen_leistung"), /disabled/);
+  assert.match(html, /Excluded by an exclude pattern/);
+});
+
+test("exclude patterns: bulk exclude skips sensors already excluded by a pattern", () => {
+  const p = excludePatternPanel();
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._edited = () => {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-bulk]" ? { dataset: { bulk: "exclude" } } : null) } });
+  assert.deepEqual(p._draft.device_exclude.sort(), ["sensor.abzugshaube_leistung", "sensor.backofen_leistung"]);
+});
+
+test("exclude patterns: input is validated and stored in lowercase", () => {
+  const p = excludePatternPanel();
+  p._hass.user = { is_admin: true };
+  p._draft = p._normalize(p._cfg);
+  p._edited = () => {};
+  const add = (value) => p._onChange({ target: { dataset: { add: "device_exclude_patterns", mode: "text" }, value } });
+  add(" Foo_* ");
+  assert.deepEqual(p._draft.device_exclude_patterns, ["alpha_ess_*", "foo_*"]);
+  add("no spaces");
+  assert.deepEqual(p._draft.device_exclude_patterns, ["alpha_ess_*", "foo_*"]);
+  assert.ok(p._fieldError.device_exclude_patterns);
+  p._onClick({ target: { closest: () => null } }); // any other action clears the message
+  assert.deepEqual(p._fieldError, {});
+});
