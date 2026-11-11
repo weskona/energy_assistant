@@ -64,6 +64,16 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .dev .track{height:6px;border-radius:3px;background:var(--eb-line);margin:6px 0 12px;overflow:hidden}
 .dev .fill{height:100%;border-radius:3px;background:var(--eb-green);transition:width .6s}
 .dev .fill.other{background:var(--eb-dim)}
+.dev .line.open{cursor:pointer}
+.dev .line.open:hover .nt{color:var(--eb-green)}
+.dev .chev{--mdc-icon-size:18px;flex:none;margin-right:4px;margin-left:-4px;color:var(--eb-dim);font-size:11px;transition:transform .2s;display:inline-block}
+.dev .chev.on{transform:rotate(90deg)}
+.dev .subs{margin:0 0 12px 26px;border-left:2px solid var(--eb-line);padding-left:12px}
+.dev .subs .s{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;color:var(--eb-muted)}
+.dev .subs .s.idle{color:var(--eb-dim)}
+.dev .subs .s .sn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .subs .s b{font-weight:600;color:var(--eb-text);white-space:nowrap}
+.dev .subs .s.idle b{color:var(--eb-dim)}
 .tab{white-space:nowrap}
 .set .sec{margin-bottom:var(--eb-gap)}
 .fld{margin-top:16px}
@@ -564,6 +574,12 @@ class EnergyboardPanel extends HTMLElement {
       if (group === "state") this._fState = value;
       else this._fSel = value;
       this._edited();
+    } else if (e.target.closest("[data-open]")) {
+      // Click on an area or label row: show or hide the sensors it sums up.
+      const key = e.target.closest("[data-open]").dataset.open;
+      this._open = this._open || new Set();
+      if (!this._open.delete(key)) this._open.add(key);
+      this._render();
     } else if (e.target.closest("[data-devtoggle]")) {
       this._devExpanded = !this._devExpanded;
       this._render();
@@ -1256,23 +1272,23 @@ class EnergyboardPanel extends HTMLElement {
   _areas() {
     const selected = this._cfg.area_ids || [];
     const known = this._hass?.areas || {};
-    const group = (name, icon, ids, none = false) => {
+    const group = (key, name, icon, ids, none = false) => {
       const members = ids.map((id) => ({ name: this._deviceName(id), w: this._watts(id) })).filter((m) => m.w != null);
       const n = members.length;
       return {
-        name, icon, none, n,
+        name, icon, none, n, key: `area:${key}`, members,
         w: members.reduce((a, m) => a + m.w, 0),
         sub: this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }),
         tip: members.slice(0, 12).map((m) => `${m.name} ${fmtPower(m.w).join(" ")}`).join(", ") + (n > 12 ? " …" : ""),
       };
     };
-    const areaGroup = (id) => group(known[id].name || id, known[id].icon || "mdi:texture-box", this._areaMembers(id));
+    const areaGroup = (id) => group(id, known[id].name || id, known[id].icon || "mdi:texture-box", this._areaMembers(id));
     if (selected.length) return selected.filter((id) => known[id]).map(areaGroup);
     const groups = Object.keys(known).map(areaGroup).filter((g) => g.n > 0);
     // Without any area assigned the list would only repeat the device list.
     if (!groups.length) return [];
     const none = this._noAreaMembers();
-    return none.length ? [...groups, group(this._t("noArea"), "mdi:help-circle-outline", none, true)] : groups;
+    return none.length ? [...groups, group("none", this._t("noArea"), "mdi:help-circle-outline", none, true)] : groups;
   }
 
   _renderAreas(house, limit = MAX_ROWS) {
@@ -1320,6 +1336,8 @@ class EnergyboardPanel extends HTMLElement {
           icon: byId[id].icon || "mdi:label",
           w: members.reduce((a, m) => a + m.w, 0),
           n,
+          key: `label:${id}`,
+          members,
           sub: this._t(n === 1 ? "labelSensors1" : "labelSensorsN", { n }),
           tip: members.slice(0, 12).map((m) => `${m.name} ${fmtPower(m.w).join(" ")}`).join(", ") + (n > 12 ? " …" : ""),
         };
@@ -1358,9 +1376,19 @@ class EnergyboardPanel extends HTMLElement {
         const nameHtml = editing
           ? `<input class="rename" type="text" data-rename-input="${esc(d.id)}" value="${esc(renamed ? d.name : "")}" placeholder="${esc(d.original)}" maxlength="80" aria-label="${esc(this._t("rename"))}">`
           : `<span class="nt">${esc(d.name)}</span>${d.sub ? ` <small class="cnt">${esc(d.sub)}</small>` : ""}${d.id && d.editable ? `<button type="button" class="edit" data-rename="${esc(d.id)}" title="${esc(this._t("rename"))}" aria-label="${esc(this._t("rename"))}">${pencil}</button>` : ""}`;
-        return `<div class="dev"><div class="line"><span class="name" title="${esc(tip)}">${this._iconHtml(d.icon, d.color)}${nameHtml}</span>
+        const expandable = d.key && d.members?.length;
+        const isOpen = expandable && this._open?.has(d.key);
+        const chev = expandable ? `<span class="chev${isOpen ? " on" : ""}" aria-hidden="true">▶</span>` : "";
+        const openAttr = expandable ? ` data-open="${esc(d.key)}" role="button" tabindex="0" aria-expanded="${isOpen ? "true" : "false"}"` : "";
+        const subs = isOpen
+          ? `<div class="subs">${[...d.members].sort((a, b) => b.w - a.w).map((m) => {
+            const [mv, mu] = fmtPower(m.w);
+            return `<div class="s${m.w < IDLE_W ? " idle" : ""}"><span class="sn" title="${esc(m.name)}">${esc(m.name)}</span><b>${mv} ${mu}</b></div>`;
+          }).join("")}</div>`
+          : "";
+        return `<div class="dev"><div class="line${expandable ? " open" : ""}"${openAttr}><span class="name" title="${esc(tip)}">${chev}${this._iconHtml(d.icon, d.color)}${nameHtml}</span>
           <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
-          <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div></div>`;
+          <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div>${subs}</div>`;
       })
       .join("");
     return `<div class="eb-card">
@@ -1390,6 +1418,12 @@ class EnergyboardPanel extends HTMLElement {
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
       content.addEventListener("keydown", (e) => {
+        const row = e.target.closest?.("[data-open]");
+        if (row && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          row.click();
+          return;
+        }
         const input = e.target.closest?.("[data-rename-input]");
         if (!input) return;
         if (e.key === "Enter") {

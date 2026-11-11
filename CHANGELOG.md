@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+
+### Added
+
+- Area and label rows can be opened with a click (or Enter / Space): the sensors that were summed up are listed below the row with their power, strongest first. Each row opens and closes on its own.
+
 ## [0.5.1] - 2026-11-11
 
 ### Fixed

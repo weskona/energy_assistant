@@ -996,7 +996,7 @@ test("icons: invalid icon names and colors are not put into the page", () => {
     const html = p._renderLabels(2000);
     assert.doesNotMatch(html, /onmouseover/);
     assert.doesNotMatch(html, /url\(x\)/);
-    assert.match(html, /<span class="name"[^>]*><span class="nt">Klima/); // neither icon nor dot
+    assert.match(html, /<span class="name"[^>]*><span class="chev"[^>]*>▶<\/span><span class="nt">Klima/); // neither icon nor dot
   });
 });
 
@@ -1492,4 +1492,49 @@ test("display: sensors in kW are converted and shown in watts", () => {
   const c = p._current();
   assert.equal(c.house, 1900);
   assert.doesNotMatch(p._renderHouse.call(Object.assign(p, { _ready: true, _labelData: null })), /kW/);
+});
+
+// Clicking an area or label row opens the list of the sensors that were summed up.
+function clickOpen(p, key) {
+  const el = { dataset: { open: key } };
+  p._onClick({ target: { closest: (sel) => (sel === "[data-open]" ? el : null) } });
+}
+
+test("drill-down: area rows can be opened and show every sensor of the area, strongest first", () => {
+  const p = limitPanel({ devices: 4, areas: 1 });
+  p._render = () => {};
+  let html = p._renderAreas(null);
+  assert.match(html, /data-open="area:a0"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /class="subs"/);
+  clickOpen(p, "area:a0");
+  html = p._renderAreas(null);
+  assert.match(html, /aria-expanded="true"/);
+  const subs = html.slice(html.indexOf('class="subs"'));
+  assert.equal((subs.match(/class="s( idle)?"/g) || []).length, 4);
+  assert.ok(subs.indexOf("D3") < subs.indexOf("D0")); // strongest first
+  clickOpen(p, "area:a0");
+  assert.doesNotMatch(p._renderAreas(null), /class="subs"/);
+});
+
+test("drill-down: label rows open too, and the open state is per row", () => {
+  const p = limitPanel({ devices: 3, areas: 1, labels: 2 });
+  p._render = () => {};
+  clickOpen(p, "label:l0");
+  const labels = p._renderLabels(null);
+  assert.equal((labels.match(/aria-expanded="true"/g) || []).length, 1);
+  assert.equal((labels.match(/aria-expanded="false"/g) || []).length, 1);
+  assert.match(labels, /class="subs"/);
+  assert.doesNotMatch(p._renderAreas(null), /class="subs"/);
+});
+
+test("drill-down: sensor names in the opened list are HTML-escaped; devices and rest rows are not expandable", () => {
+  const p = limitPanel({ devices: 2, areas: 1 });
+  p._render = () => {};
+  p._hass.states["sensor.d0_leistung"].attributes.friendly_name = "<b>x</b>";
+  clickOpen(p, "area:a0");
+  const html = p._renderAreas(null);
+  assert.doesNotMatch(html, /<b>x<\/b>/);
+  assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
+  assert.doesNotMatch(p._renderDevices(9000), /data-open/);
 });
