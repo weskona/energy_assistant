@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Energyboard Design</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="../frontend/energyboard-tokens.css">
+<style>
+body{margin:0;background:var(--eb-bg);font-family:var(--eb-font);color:var(--eb-text);padding:24px}
+.grid{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fit,minmax(300px,1fr));max-width:1100px;margin:auto}
+.row{display:flex;justify-content:space-between;align-items:center}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.big{font-size:56px;font-weight:800;line-height:1;margin:14px 0 4px}
+.sw{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.sw span{width:52px;height:36px;border-radius:10px;border:1px solid var(--eb-tile-border)}
+</style></head><body><div class="grid">
+<div class="eb-card eb-card--glow">
+ <div class="row"><span class="eb-title">Energie jetzt</span><span class="eb-chip">⚡ Lädt</span></div>
+ <div class="big">5,8<small style="font-size:20px;color:var(--eb-muted);font-weight:500"> kW</small></div>
+ <div class="eb-bar" style="margin:14px 0 8px"><div class="eb-solar" style="width:64%"></div><div class="eb-grid" style="width:36%"></div></div>
+ <div class="row" style="font-size:13px;color:var(--eb-muted)"><span>PV <b style="color:var(--eb-text)">6,1 kWh</b></span><span>Netz <b style="color:var(--eb-text)">3,5 kWh</b></span></div>
+</div>
+<div class="eb-card">
+ <div class="row"><span class="eb-title">Kennzahlen</span></div>
+ <div class="tiles">
+  <div class="eb-tile"><div class="eb-label">Autarkie</div><div class="eb-value">64<small>%</small></div></div>
+  <div class="eb-tile"><div class="eb-label">Kosten</div><div class="eb-value">1,38<small>€</small></div></div>
+  <div class="eb-tile"><div class="eb-label">Einspeisung</div><div class="eb-value">2,1<small>kWh</small></div></div>
+  <div class="eb-tile"><div class="eb-label">Bezug</div><div class="eb-value">3,5<small>kWh</small></div></div>
+ </div>
+ <div class="eb-action" style="margin-top:14px">Plan setzen</div>
+ <div class="sw">
+  <span style="background:var(--eb-green)"></span><span style="background:var(--eb-solar)"></span><span style="background:var(--eb-grid)"></span><span style="background:var(--eb-gold)"></span><span style="background:var(--eb-orange)"></span><span style="background:var(--eb-red)"></span><span style="background:var(--eb-violet)"></span>
+ </div>
+</div></div></body></html>

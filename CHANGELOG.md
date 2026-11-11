@@ -11,5 +11,6 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/lang/d
 
 - Initiales Projekt-Repository für ha-energyboard.
 - GitHub-Workflows für CI (Hassfest, HACS, Ruff, Pytest), Changelog-Check und Release sowie Dependabot-Konfiguration.
+- Design-Grundlage im dunklen Kartenstil: CSS-Tokens (`frontend/energyboard-tokens.css`), Doku (`docs/DESIGN.md`) und Vorschau (`docs/design-preview.html`).
 
 [Unreleased]: https://github.com/weskona/ha-energyboard/commits/main
