@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-12
+
+### Added
+
+- The config flow (and the options flow) asks first whether to take over the sensors when PV Assistant is installed. With "yes" the fields of the following steps are pre-filled (solar production, storage, grid) and can still be changed. Without PV Assistant the flow starts as before.
+- WebSocket command `energy_assistant/pv_suggestion`: what PV Assistant offers (settings, notes, plants), or `null`. PV Assistant is only read.
+
+### Changed
+
+- The mapping from PV Assistant to the settings now lives in the backend (`pv_assistant.py`), one rule for the config flow and the panel. The panel no longer asks PV Assistant directly, it asks the backend.
+- The fields **Grid import separate** and **Grid export separate** of the config flow accept several sensors, like the Settings tab. Entries that stored a single sensor keep working.
+
 ## [0.8.0] - 2026-11-12
 
 ### Changed

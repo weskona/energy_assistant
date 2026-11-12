@@ -31,6 +31,7 @@ from .const import (
     DOMAIN,
     TEXT_KEYS,
 )
+from .pv_assistant import suggestion
 from .settings import clean_ids, clean_patterns, has_source, valid_patterns
 
 _SINGLE = selector.EntitySelector(
@@ -44,9 +45,14 @@ _MULTI = selector.EntitySelector(
 )
 
 
-def _optional(defaults: dict[str, Any], key: str) -> vol.Optional:
-    if defaults.get(key):
-        return vol.Optional(key, description={"suggested_value": defaults[key]})
+def _optional(
+    defaults: dict[str, Any], key: str, multiple: bool = False
+) -> vol.Optional:
+    value = defaults.get(key)
+    if value:
+        if multiple and isinstance(value, str):
+            value = [value]  # older entries stored a single sensor as text
+        return vol.Optional(key, description={"suggested_value": value})
     return vol.Optional(key)
 
 
@@ -58,8 +64,8 @@ def _grid_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_INVERT_GRID, default=bool(defaults.get(CONF_INVERT_GRID))
             ): bool,
-            _optional(defaults, CONF_GRID_IMPORT): _SINGLE,
-            _optional(defaults, CONF_GRID_EXPORT): _SINGLE,
+            _optional(defaults, CONF_GRID_IMPORT, multiple=True): _MULTI,
+            _optional(defaults, CONF_GRID_EXPORT, multiple=True): _MULTI,
             _optional(defaults, CONF_HOUSE_POWER): _SINGLE,
         }
     )
@@ -112,6 +118,29 @@ def _clean_devices(
     return cleaned, errors
 
 
+def _pv_schema() -> vol.Schema:
+    """Question asked first when PV Assistant is installed."""
+    return vol.Schema({vol.Required("use_pv", default=True): bool})
+
+
+def _pv_summary(offer: dict[str, Any]) -> str:
+    """Short list of what would be taken over."""
+    labels = (
+        (CONF_SOLAR_POWER, "solar"),
+        (CONF_BATTERY_POWER, "storage combined"),
+        (CONF_BATTERY_CHARGE, "storage charging"),
+        (CONF_BATTERY_DISCHARGE, "storage discharging"),
+        (CONF_GRID_IMPORT, "grid import"),
+        (CONF_GRID_EXPORT, "grid export"),
+        (CONF_GRID_POWER, "grid combined"),
+    )
+    return ", ".join(
+        f"{label} {len(offer['targets'][key])}"
+        for key, label in labels
+        if key in offer["targets"]
+    )
+
+
 def _validate(user_input: dict[str, Any]) -> dict[str, str]:
     """Require house consumption or a grid sensor to calculate it."""
     if not has_source(user_input):
@@ -126,10 +155,30 @@ class EnergyAssistantConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._pv_asked = False
+
+    async def async_step_pv(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """PV Assistant is installed: take over its sensors as defaults?"""
+        offer = suggestion(self.hass)
+        if user_input is not None:
+            if user_input["use_pv"] and offer:
+                self._data.update(offer["targets"])
+            return await self.async_step_user()
+        return self.async_show_form(
+            step_id="pv",
+            data_schema=_pv_schema(),
+            description_placeholders={"summary": _pv_summary(offer) if offer else ""},
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        if user_input is None and not self._pv_asked:
+            self._pv_asked = True
+            if suggestion(self.hass):
+                return await self.async_step_pv()
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = _validate(user_input)
@@ -179,14 +228,34 @@ class EnergyAssistantOptionsFlow(OptionsFlow):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._pv_asked = False
 
     @property
     def _current(self) -> dict[str, Any]:
         return {**self.config_entry.data, **self.config_entry.options, **self._data}
 
+    async def async_step_pv(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """PV Assistant is installed: replace the sensors with its sensors?"""
+        offer = suggestion(self.hass)
+        if user_input is not None:
+            if user_input["use_pv"] and offer:
+                self._data.update(offer["targets"])
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="pv",
+            data_schema=_pv_schema(),
+            description_placeholders={"summary": _pv_summary(offer) if offer else ""},
+        )
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        if user_input is None and not self._pv_asked:
+            self._pv_asked = True
+            if suggestion(self.hass):
+                return await self.async_step_pv()
         errors: dict[str, str] = {}
         if user_input is not None:
             errors = _validate(user_input)

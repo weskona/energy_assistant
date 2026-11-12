@@ -460,19 +460,21 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * Optional link to the PV Assistant integration (weskona/pv-assistant): when it is installed, its
-   * configuration tells which sensors measure the PV production and how they group into plants.
-   * Without it, or when anything fails, nothing changes.
+   * Optional link to the PV Assistant integration (weskona/pv-assistant). The backend reads its
+   * configuration (never changes it) and says which sensors fit which settings, and how the PV sensors
+   * group into plants. Without PV Assistant the answer is null and nothing changes.
    */
   async _loadPv() {
-    const present = Object.values(this._hass?.entities || {}).some((e) => e?.platform === "pv_assistant");
-    if (!present || this._pvLoading) return;
+    if (this._pvLoading || !this._hass) return;
     this._pvLoading = true;
     try {
-      const res = await this._hass.callWS({ type: "pv_assistant/config" });
-      this._pv = this._normalizePv(res);
+      const res = await this._hass.callWS({ type: "energy_assistant/pv_suggestion" });
+      const targets = res?.targets && typeof res.targets === "object" ? res.targets : {};
+      this._pv = Object.keys(targets).length
+        ? { targets, notes: res.notes || {}, plants: Array.isArray(res.plants) ? res.plants : [] }
+        : null;
     } catch (e) {
-      console.info("Energy Assistant: PV Assistant is installed but its configuration is not available", e);
+      console.info("Energy Assistant: could not ask for PV Assistant", e);
       this._pv = null;
     } finally {
       this._pvLoading = false;
@@ -481,63 +483,9 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 
-  /** Production sensors and plants of PV Assistant, in a small fixed shape (null if nothing usable). */
-  _normalizePv(res) {
-    const list = (v) => (typeof v === "string" ? [v] : Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
-    const sensors = list(res?.production_power_sensors);
-    if (!sensors.length) return null;
-    const cfg = res?.settings || {};
-    const named = (id) => cfg.strings?.[id]?.name || this._hass?.states?.[id]?.attributes?.friendly_name || id;
-    const plants = [];
-    const taken = new Set();
-    for (const inv of Array.isArray(cfg.inverters) ? cfg.inverters : []) {
-      const ids = list(inv?.sensors).filter((id) => sensors.includes(id) && !taken.has(id));
-      if (!ids.length) continue;
-      ids.forEach((id) => taken.add(id));
-      plants.push({ name: inv.name || named(ids[0]), sensors: ids });
-    }
-    for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
-    // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on
-    // request. Separate in/out sensors may report negative values (abs_storage_power); Energy Assistant counts
-    // the magnitude of those sensors anyway.
-    const battery = {
-      combined: list(res?.storage_combined_power_sensors),
-      invert: !!res?.invert_storage_combined_power,
-      charge: list(res?.storage_in_power_sensors),
-      discharge: list(res?.storage_out_power_sensors),
-      absolute: !!res?.abs_storage_power,
-    };
-    // Grid: the import sensors fit as they are. A feed-in sensor that reports feed-in as negative values is
-    // a combined meter (import +, feed-in −): it goes into the combined grid field, and is not counted twice
-    // when it is also one of the import sensors.
-    const feedIn = list(res?.feed_in_power_sensor);
-    const negative = !!res?.invert_feed_in_power && feedIn.length > 0;
-    const grid = {
-      import: list(res?.grid_import_power_sensors).filter((id) => !(negative && feedIn.includes(id))),
-      export: negative ? [] : feedIn,
-      combined: negative ? feedIn : [],
-    };
-    return { sensors, plants, battery, grid };
-  }
-
   /** What "take over" puts into the settings form (only fields PV Assistant has an answer for). */
   _pvTargets() {
-    const b = this._pv.battery;
-    const t = { solar_power: [...this._pv.sensors] };
-    if (b.combined.length) {
-      t.battery_power = [...b.combined];
-      t.invert_battery = b.invert;
-    }
-    const g = this._pv.grid;
-    if (g.import.length) t.grid_import = [...g.import];
-    if (g.export.length) t.grid_export = [...g.export];
-    if (g.combined.length) {
-      t.grid_power = [...g.combined];
-      t.invert_grid = false;
-    }
-    if (b.charge.length) t.battery_charge = [...b.charge];
-    if (b.discharge.length) t.battery_discharge = [...b.discharge];
-    return t;
+    return this._pv.targets;
   }
 
   _pvApplied() {
@@ -1006,18 +954,18 @@ class EnergyAssistantPanel extends HTMLElement {
   /** Notice at the top of the settings: PV Assistant is installed, take over its sensors? */
   _renderPvNotice(ro) {
     if (!this._pv) return "";
-    const b = this._pv.battery;
+    const t = this._pv.targets;
+    const n = (key) => (t[key] || []).length;
     const parts = [];
-    if (b.combined.length) parts.push(this._t("pvCombined", { n: b.combined.length }));
-    if (b.charge.length) parts.push(this._t("pvCharge", { n: b.charge.length }));
-    if (b.discharge.length) parts.push(this._t("pvDischarge", { n: b.discharge.length }));
-    const g = this._pv.grid;
+    if (n("battery_power")) parts.push(this._t("pvCombined", { n: n("battery_power") }));
+    if (n("battery_charge")) parts.push(this._t("pvCharge", { n: n("battery_charge") }));
+    if (n("battery_discharge")) parts.push(this._t("pvDischarge", { n: n("battery_discharge") }));
     const gridParts = [];
-    if (g.import.length) gridParts.push(this._t("pvImport", { n: g.import.length }));
-    if (g.export.length) gridParts.push(this._t("pvExport", { n: g.export.length }));
-    if (g.combined.length) gridParts.push(this._t("pvCombined", { n: g.combined.length }));
+    if (n("grid_import")) gridParts.push(this._t("pvImport", { n: n("grid_import") }));
+    if (n("grid_export")) gridParts.push(this._t("pvExport", { n: n("grid_export") }));
+    if (n("grid_power")) gridParts.push(this._t("pvCombined", { n: n("grid_power") }));
     const lines = [
-      this._t("pvSolar", { n: this._pv.sensors.length }),
+      n("solar_power") ? this._t("pvSolar", { n: n("solar_power") }) : "",
       parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : "",
       gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
     ].filter(Boolean);
@@ -1025,8 +973,8 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
       <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${g.combined.length ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
-      ${b.absolute && (b.charge.length || b.discharge.length) ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
+      ${this._pv.notes.feed_in_negative ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
+      ${this._pv.notes.storage_absolute ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
       ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
     </div>`;
   }

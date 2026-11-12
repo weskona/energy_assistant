@@ -1540,15 +1540,23 @@ test("drill-down: sensor names in the opened list are HTML-escaped; devices and 
 });
 
 // --- optional link to the PV Assistant integration ---------------------------------------------
-const PV_CONFIG = {
-  production_power_sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2", "sensor.wr2_pv"],
-  settings: {
-    strings: { "sensor.wr2_pv": { name: "Garage" } },
-    inverters: [{ name: "Wechselrichter Haus", sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2"] }],
+// The backend reads PV Assistant and answers with the settings that fit, notes and the plants.
+const PV_OFFER = {
+  targets: {
+    solar_power: ["sensor.wr1_pv1", "sensor.wr1_pv2", "sensor.wr2_pv"],
+    battery_power: ["sensor.batt"],
+    invert_battery: false,
+    grid_import: ["sensor.bezug"],
+    grid_export: ["sensor.einsp"],
   },
+  notes: { feed_in_negative: false, storage_absolute: false },
+  plants: [
+    { name: "Wechselrichter Haus", sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2"] },
+    { name: "Garage", sensors: ["sensor.wr2_pv"] },
+  ],
 };
 
-function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true } = {}) {
+function pvPanel({ solar = [], reply = PV_OFFER, admin = true } = {}) {
   const p = new Panel();
   p._config = { solar_power: solar, grid_import: ["sensor.netz"] };
   p._draft = p._normalize(p._config);
@@ -1556,10 +1564,7 @@ function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true
   p._render = () => {};
   p._hass = {
     user: { is_admin: admin },
-    entities: installed ? { "sensor.pv_assistant_pv_power": { platform: "pv_assistant" } } : { "sensor.x": { platform: "other" } },
-    states: {
-      "sensor.wr1_pv1": st(1200), "sensor.wr1_pv2": st(800), "sensor.wr2_pv": st(300), "sensor.netz": st(100),
-    },
+    states: { "sensor.wr1_pv1": st(1200), "sensor.wr1_pv2": st(800), "sensor.wr2_pv": st(300), "sensor.netz": st(100) },
     calls: [],
     callWS: async (msg) => {
       p._hass.calls.push(msg.type);
@@ -1570,71 +1575,62 @@ function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true
   return p;
 }
 
-test("pv assistant: production sensors and plants are read from its configuration", async () => {
+test("pv assistant: the panel asks the backend, never PV Assistant itself", async () => {
   const p = pvPanel();
   await p._loadPv();
-  assert.deepEqual(p._pv.sensors, PV_CONFIG.production_power_sensors);
-  assert.deepEqual(p._pv.plants.map((x) => x.name), ["Wechselrichter Haus", "Garage"]); // inverter first, then the sensor on its own
-  assert.deepEqual(p._pv.plants[0].sensors, ["sensor.wr1_pv1", "sensor.wr1_pv2"]);
+  assert.deepEqual(p._hass.calls, ["energy_assistant/pv_suggestion"]);
+  assert.deepEqual(p._pv.targets, PV_OFFER.targets);
+  assert.equal(p._pv.plants.length, 2);
 });
 
-test("pv assistant: nothing is requested when the integration is not installed", async () => {
-  const p = pvPanel({ installed: false });
-  await p._loadPv();
-  assert.deepEqual(p._hass.calls, []);
-  assert.equal(p._pv, undefined);
-});
-
-test("pv assistant: a failing or empty answer changes nothing", async () => {
-  const failing = pvPanel({ reply: new Error("unknown command") });
-  await failing._loadPv();
-  assert.equal(failing._pv, null);
-  const empty = pvPanel({ reply: {} });
-  await empty._loadPv();
-  assert.equal(empty._pv, null);
-  assert.equal(empty._renderPvPlants(null), "");
+test("pv assistant: no offer, an empty answer or an error change nothing", async () => {
+  for (const reply of [null, {}, { targets: {} }, new Error("unknown command")]) {
+    const p = pvPanel({ reply });
+    await p._loadPv();
+    assert.equal(p._pv, null);
+    assert.equal(p._renderPvNotice(false), "");
+    assert.equal(p._renderPvPlants(null), "");
+  }
 });
 
 test("pv assistant: the settings ask whether to take over the sensors, admins can do it", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"] } });
+  const p = pvPanel();
   await p._loadPv();
   let html = p._renderSettings();
   assert.match(html, /PV Assistant is installed\. Do you want to take over its sensors\?/);
   assert.match(html, /Solar production: 3 sensors/);
-  assert.match(html, /Storage: combined 1, charging 1, discharging 1/);
+  assert.match(html, /Storage: combined 1/);
+  assert.match(html, /Grid: import 1, feed-in 1/);
   assert.match(html, /data-pvapply/);
   p._edited = () => {};
   p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
-  assert.deepEqual(p._draft.solar_power, PV_CONFIG.production_power_sensors);
+  assert.deepEqual(p._draft.solar_power, PV_OFFER.targets.solar_power);
   assert.deepEqual(p._draft.battery_power, ["sensor.batt"]);
-  assert.deepEqual(p._draft.battery_charge, ["sensor.in"]);
-  assert.deepEqual(p._draft.battery_discharge, ["sensor.out"]);
+  assert.deepEqual(p._draft.grid_import, ["sensor.bezug"]); // replaces the sensor that was there
+  assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
   assert.equal(p._draft.invert_battery, false);
   html = p._renderSettings();
   assert.match(html, /sensors of PV Assistant are in use/);
   assert.doesNotMatch(html, /data-pvapply/);
 });
 
-test("pv assistant: the sign of a combined storage sensor follows PV Assistant", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], invert_storage_combined_power: true } });
+test("pv assistant: the sign settings of the offer are applied too", async () => {
+  const p = pvPanel({ reply: { ...PV_OFFER, targets: { ...PV_OFFER.targets, invert_battery: true, grid_power: ["sensor.zaehler"], invert_grid: false } } });
   await p._loadPv();
   p._edited = () => {};
+  p._draft.invert_grid = true;
   p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
   assert.equal(p._draft.invert_battery, true);
+  assert.equal(p._draft.invert_grid, false);
+  assert.deepEqual(p._draft.grid_power, ["sensor.zaehler"]);
 });
 
-test("pv assistant: separate storage sensors that report negative values are taken over and count with their magnitude", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"], abs_storage_power: true } });
+test("pv assistant: the notes of the backend show as hints", async () => {
+  const p = pvPanel({ reply: { ...PV_OFFER, notes: { feed_in_negative: true, storage_absolute: true } } });
   await p._loadPv();
-  assert.deepEqual(p._pvTargets().battery_charge, ["sensor.in"]);
-  assert.deepEqual(p._pvTargets().battery_discharge, ["sensor.out"]);
-  assert.match(p._renderSettings(), /count with their magnitude/);
-  p._hass.states["sensor.in"] = st(-700);
-  p._hass.states["sensor.out"] = st(-300);
-  p._config = { ...p._config, battery_charge: ["sensor.in"], battery_discharge: ["sensor.out"] };
-  const c = p._current();
-  assert.equal(c.charge, 700);
-  assert.equal(c.discharge, 300);
+  const html = p._renderSettings();
+  assert.match(html, /used as the combined grid sensor/);
+  assert.match(html, /count with their magnitude/);
 });
 
 test("pv assistant: read-only users get the information but no button", async () => {
@@ -1646,7 +1642,7 @@ test("pv assistant: read-only users get the information but no button", async ()
 });
 
 test("pv assistant: the Power tab lists the plants in a row that opens, strongest first", async () => {
-  const p = pvPanel({ solar: PV_CONFIG.production_power_sensors });
+  const p = pvPanel({ solar: PV_OFFER.targets.solar_power });
   await p._loadPv();
   let html = p._renderPvPlants(null);
   assert.match(html, /PV by plant/);
@@ -1660,44 +1656,9 @@ test("pv assistant: the Power tab lists the plants in a row that opens, stronges
 });
 
 test("pv assistant: a single plant adds no row", async () => {
-  const p = pvPanel({ reply: { production_power_sensors: ["sensor.wr2_pv"] } });
+  const p = pvPanel({ reply: { ...PV_OFFER, plants: [{ name: "Garage", sensors: ["sensor.wr2_pv"] }] } });
   await p._loadPv();
   assert.equal(p._renderPvPlants(null), "");
-});
-
-test("pv assistant: grid import and feed-in sensors are taken over", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp" } });
-  await p._loadPv();
-  assert.match(p._renderSettings(), /Grid: import 1, feed-in 1/);
-  p._edited = () => {};
-  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
-  assert.deepEqual(p._draft.grid_import, ["sensor.bezug"]); // replaces the sensor that was there
-  assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
-});
-
-test("pv assistant: a feed-in sensor with negative values becomes the combined grid sensor", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp", invert_feed_in_power: true } });
-  await p._loadPv();
-  const t = p._pvTargets();
-  assert.deepEqual(t.grid_power, ["sensor.einsp"]);
-  assert.equal(t.invert_grid, false);
-  assert.deepEqual(t.grid_import, ["sensor.bezug"]);
-  assert.equal(t.grid_export, undefined);
-  assert.match(p._renderSettings(), /used as the combined grid sensor/);
-  p._config = { ...p._config, grid_power: ["sensor.einsp"], grid_import: ["sensor.bezug"] };
-  p._hass.states["sensor.einsp"] = st(-400);
-  p._hass.states["sensor.bezug"] = st(0);
-  const c = p._current();
-  assert.equal(c.gridOut, 400);
-  assert.equal(c.gridIn, 0);
-});
-
-test("pv assistant: a combined meter that is also an import sensor is not counted twice", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.zaehler"], feed_in_power_sensor: "sensor.zaehler", invert_feed_in_power: true } });
-  await p._loadPv();
-  const t = p._pvTargets();
-  assert.deepEqual(t.grid_power, ["sensor.zaehler"]);
-  assert.equal(t.grid_import, undefined); // the meter already covers the import
 });
 
 test("display: separate charging and discharging sensors count with their magnitude", () => {
@@ -1705,4 +1666,11 @@ test("display: separate charging and discharging sensors count with their magnit
   const cur = p._current();
   assert.equal(cur.charge, 250);
   assert.equal(cur.discharge, 100);
+});
+
+test("display: a feed-in sensor with negative values as combined grid sensor counts as export", () => {
+  const p = panel({ grid_power: ["e"], grid_import: ["b"] }, { e: st(-400), b: st(0) });
+  const c = p._current();
+  assert.equal(c.gridOut, 400);
+  assert.equal(c.gridIn, 0);
 });

@@ -24,6 +24,7 @@ from .const import (
     PATTERN_REGEX,
     TEXT_KEYS,
 )
+from .pv_assistant import suggestion
 from .settings import has_source, normalize, to_storage
 
 _CONFIG_SCHEMA = vol.Schema(
@@ -56,6 +57,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_config)
     websocket_api.async_register_command(hass, ws_update_config)
     websocket_api.async_register_command(hass, ws_labels)
+    websocket_api.async_register_command(hass, ws_pv_suggestion)
 
 
 def _entry(hass: HomeAssistant):
@@ -106,6 +108,20 @@ def ws_labels(
         if ids:
             entities[entry.entity_id] = sorted(ids)
     connection.send_result(msg["id"], {"labels": labels, "entities": entities})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "energy_assistant/pv_suggestion"}
+)
+@callback
+def ws_pv_suggestion(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return what the PV Assistant integration offers (settings, notes, plants), or null.
+
+    PV Assistant is only read. Nothing is returned without it or without production sensors.
+    """
+    connection.send_result(msg["id"], suggestion(hass))
 
 
 @websocket_api.require_admin
