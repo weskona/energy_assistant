@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-12
+
+### Changed
+
+- The data of the sibling integrations moved from the Power tab to their own tabs, which only exist when the integration was found: **PV** (PV Assistant: day figures, forecast, storage, plant fault and the new card **PV by plant**), **EV** (EV Assistant: wallbox), **Costs** (Tariffy) and **Payback** (Amortix). The Power tab shows the house, the history and the lists of devices, areas and labels again. A tab that vanishes (integration removed) leads back to Power.
+- **PV by plant** is a card with the plants, their power, share and a bar instead of a row that had to be opened.
+
+### Added
+
+- The Costs tab also shows the contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end.
+
 ## [0.13.1] - 2026-11-12
 
 ### Changed
