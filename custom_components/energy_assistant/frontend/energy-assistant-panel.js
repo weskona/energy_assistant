@@ -40,6 +40,7 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.stack{display:grid;gap:var(--eb-gap)}
 .amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
 .alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
@@ -85,6 +86,7 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .pvnote .pvq{font-size:16px;font-weight:600;margin:10px 0 6px}
 .pvnote ul{margin:0 0 4px;padding-left:20px;color:var(--eb-muted);font-size:14px}
 .pvnote .bar2{margin-top:12px}
+.pvnote ul.ints{margin:10px 0 0;padding-left:20px;color:var(--eb-muted);font-size:14px}
 .fld{margin-top:16px}
 .fld>label,.sw{display:block;font-size:12.5px;color:var(--eb-muted);margin-bottom:6px}
 .sw{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--eb-text);font-size:14px;cursor:pointer}
@@ -130,6 +132,14 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    tabPv: "PV",
+    tabEv: "EV",
+    tabCosts: "Costs",
+    tabAmortix: "Payback",
+    tContract: "Contract",
+    tCostSoFar: "Cost so far",
+    tBalance: "Balance so far",
+    tForecast: "Balance at contract end",
     rename: "Rename",
     originalName: "Original: {name}",
     live: "Live consumption",
@@ -240,6 +250,12 @@ const STRINGS = {
     tFeedIn: "Feed-in earns",
     tPvSaves: "Solar saves",
     pvPlants: "PV by plant",
+    intTitle: "Detected integrations",
+    intPv: "PV Assistant",
+    intPvData: "PV Assistant: day figures, forecast and plant fault in the PV tab",
+    intTariffy: "Tariffy: electricity price, costs and contract in the Costs tab",
+    intEv: "EV Assistant: wallbox and today's charging in the EV tab ({n})",
+    intAmortix: "Amortix: savings and payback in the Payback tab",
     pvTitle: "PV Assistant detected",
     pvAsk: "PV Assistant is installed. Do you want to take over its sensors?",
     pvSolar: "Solar production: {n} sensors",
@@ -286,6 +302,14 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    tabPv: "PV",
+    tabEv: "EV",
+    tabCosts: "Kosten",
+    tabAmortix: "Amortisation",
+    tContract: "Vertrag",
+    tCostSoFar: "Kosten bisher",
+    tBalance: "Guthaben bisher",
+    tForecast: "Prognose Vertragsende",
     rename: "Umbenennen",
     originalName: "Original: {name}",
     live: "Verbrauch live",
@@ -396,6 +420,12 @@ const STRINGS = {
     tFeedIn: "Einspeisung bringt",
     tPvSaves: "PV spart",
     pvPlants: "PV je Anlage",
+    intTitle: "Erkannte Integrationen",
+    intPv: "PV Assistant",
+    intPvData: "PV Assistant: Tagesbilanz, Prognose und Anlagenstörung im Tab PV",
+    intTariffy: "Tariffy: Strompreis, Kosten und Vertrag im Tab Kosten",
+    intEv: "EV Assistant: Wallbox und heutiges Laden im Tab EV ({n})",
+    intAmortix: "Amortix: Einsparung und Amortisation im Tab Amortisation",
     pvTitle: "PV Assistant erkannt",
     pvAsk: "PV Assistant ist installiert. Sollen die Sensoren übernommen werden?",
     pvSolar: "PV-Erzeugung: {n} Sensoren",
@@ -556,6 +586,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._int = {};
     } finally {
       this._intLoading = false;
+      this._settingsDirty = true;
       this._render();
     }
   }
@@ -615,6 +646,37 @@ class EnergyAssistantPanel extends HTMLElement {
       return `<div class="eb-label costs">${esc(entry.title || "Amortix")}</div><div class="tiles">${tiles.join("")}</div>`;
     }).join("");
     return blocks ? `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("amTitle"))}</span></div>${blocks}</div>` : "";
+  }
+
+  /**
+   * The tabs that exist: Power always, the others only when the matching integration was found
+   * (PV Assistant, EV Assistant, Tariffy, Amortix).
+   */
+  _tabs() {
+    const found = this._int || {};
+    const tabs = ["house"];
+    if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
+    if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
+    if (found.tariffy) tabs.push("costs");
+    if (found.amortix?.entries?.length) tabs.push("amortix");
+    return tabs;
+  }
+
+  _tabLabel(tab) {
+    return this._t({ house: "tabPower", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+  }
+
+  /** Markup of the page of the current tab (not the settings). */
+  _renderPage() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
+    switch (this._tab) {
+      case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
+      case "ev": return stack(this._renderEv());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderContract());
+      case "amortix": return stack(this._renderAmortix());
+      default: return this._renderHouse();
+    }
   }
 
   /** Time of an ISO timestamp state as hh:mm in the local format (null if it is not a time). */
@@ -720,7 +782,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const advice = v.recommend && this._hass?.states?.[v.recommend]?.state === "on" ? `<div class="hint">☀ ${esc(this._t("evAdvice"))}</div>` : "";
       return `<div class="tiles">${tiles.join("")}</div>${advice}`;
     }).join("");
-    return blocks ? `<div class="eb-label costs">${esc(this._t("evWallbox"))}</div>${blocks}` : "";
+    return blocks ? `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("evWallbox"))}</span></div>${blocks}</div>` : "";
   }
 
   /** [number, symbol] of an amount, with the currency symbol of the locale where known. */
@@ -757,7 +819,21 @@ class EnergyAssistantPanel extends HTMLElement {
     money(this._t("tGridCost"), perHour(cur.gridIn, price.value));
     money(this._t("tFeedIn"), perHour(cur.gridOut, feedIn));
     money(this._t("tPvSaves"), perHour(cur.direct, price.value));
-    return `<div class="eb-label costs">${esc(this._t("costsNow"))}</div><div class="tiles">${tiles.join("")}</div>`;
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("costsNow"))}</span></div><div class="tiles">${tiles.join("")}</div></div>`;
+  }
+
+  /** Contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end. */
+  _renderContract() {
+    const t = this._int?.tariffy;
+    if (!t) return "";
+    const tiles = [];
+    for (const [label, key] of [["tCostSoFar", "cost_so_far"], ["tBalance", "balance"], ["tForecast", "forecast"]]) {
+      const v = this._num(t[key]);
+      if (v == null) continue;
+      const [n, sym] = this._money(v, this._hass?.states?.[t[key]]?.attributes?.unit_of_measurement || "EUR");
+      tiles.push(`<div class="eb-tile"><div class="eb-label">${esc(this._t(label))}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div></div>`);
+    }
+    return tiles.length ? `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("tContract"))}</span></div><div class="tiles">${tiles.join("")}</div></div>` : "";
   }
 
   /**
@@ -1246,15 +1322,33 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
     else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
     return `<datalist id="eb-sensors">${options}</datalist>
-      <div class="set">${this._renderPvNotice(ro)}<div class="grid">${sections}</div>
+      <div class="set">${this._renderIntegrations(ro)}<div class="grid">${sections}</div>
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
   }
 
-  /** Notice at the top of the settings: PV Assistant is installed, take over its sensors? */
-  _renderPvNotice(ro) {
-    if (!this._pv) return "";
+  /**
+   * Notice at the top of the settings: which sibling integrations were found (PV Assistant, Tariffy,
+   * EV Assistant, Amortix) and what Energy Assistant uses from them. For PV Assistant it also asks
+   * whether to take over its sensors. Empty if none was found.
+   */
+  _renderIntegrations(ro) {
+    const found = this._int || {};
+    const others = [];
+    if (found.pv_assistant) others.push(this._t("intPvData"));
+    if (found.tariffy) others.push(this._t("intTariffy"));
+    const vehicles = found.ev_assistant?.vehicles;
+    if (Array.isArray(vehicles) && vehicles.length) others.push(this._t("intEv", { n: vehicles.map((v) => v.name).join(", ") }));
+    if (Array.isArray(found.amortix?.entries) && found.amortix.entries.length) others.push(this._t("intAmortix"));
+    const pvPart = this._pv ? this._renderPvOffer(ro) : "";
+    if (!pvPart && !others.length) return "";
+    return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("intTitle"))}</div>${pvPart}
+      ${others.length ? `<ul class="ints">${others.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>`;
+  }
+
+  /** The PV Assistant part of the notice: the question, what would be taken over and the button. */
+  _renderPvOffer(ro) {
     const t = this._pv.targets;
     const n = (key) => (t[key] || []).length;
     const parts = [];
@@ -1271,13 +1365,11 @@ class EnergyAssistantPanel extends HTMLElement {
       gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
     ].filter(Boolean);
     const done = this._pvApplied();
-    return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
-      <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
+    return `<p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
       ${this._pv.notes.feed_in_negative ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
       ${this._pv.notes.storage_absolute ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
-      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
-    </div>`;
+      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}`;
   }
 
   /** Translate a key using the Home Assistant UI language (de, otherwise en). */
@@ -1594,40 +1686,35 @@ class EnergyAssistantPanel extends HTMLElement {
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
-        ${this._renderCosts(cur)}
-        ${this._renderEv()}
-        ${this._renderPvPlants(cur.house)}
       </div>
       <div class="eb-card">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${this._renderPvDay()}
-      ${this._renderAmortix()}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 
   /**
-   * PV by plant (from PV Assistant): one row that opens to the plants with their power. Only shown
-   * when there are at least two plants; otherwise the solar tile already says everything.
+   * PV by plant (from PV Assistant): the plants (inverters with their strings) with their power, strongest
+   * first, with their share of the PV power. Only shown when there are at least two plants.
    */
-  _renderPvPlants(house) {
+  _renderPvPlants() {
     const plants = (this._pv?.plants || [])
       .map((p) => ({ name: p.name, w: this._sum(p.sensors) }))
-      .filter((p) => p.w != null);
+      .filter((p) => p.w != null)
+      .sort((a, b) => b.w - a.w);
     if (plants.length < 2) return "";
     const total = plants.reduce((a, p) => a + Math.max(0, p.w), 0);
-    const isOpen = this._open?.has("pv:plants");
+    const scale = Math.max(1, ...plants.map((p) => p.w));
     const [tv, tu] = fmtPower(total);
-    const subs = isOpen
-      ? `<div class="subs">${[...plants].sort((a, b) => b.w - a.w).map((p) => {
-        const [v, u] = fmtPower(p.w);
-        return `<div class="s${p.w < IDLE_W ? " idle" : ""}"><span class="sn" title="${esc(p.name)}">${esc(p.name)}</span><b>${v} ${u}</b></div>`;
-      }).join("")}</div>`
-      : "";
-    return `<div class="dev pvdev"><div class="line open" data-open="pv:plants" role="button" tabindex="0" aria-expanded="${isOpen ? "true" : "false"}">
-      <span class="name"><span class="chev${isOpen ? " on" : ""}" aria-hidden="true">▶</span><span class="nt">${esc(this._t("pvPlants"))}</span> <small class="cnt">${plants.length}</small></span>
-      <span class="val">${tv}<small>${tu}</small></span></div>${subs}</div>`;
+    const rows = plants.map((p) => {
+      const [v, u] = fmtPower(p.w);
+      const share = total > 0 ? `<small class="pct">${Math.round((Math.max(0, p.w) / total) * 100)} %</small>` : "";
+      return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(p.name)}">${esc(p.name)}</span></span><span class="val">${v}<small>${u}</small>${share}</span></div>
+        <div class="track"><div class="fill" style="width:${Math.min(100, (Math.max(0, p.w) / scale) * 100)}%"></div></div></div>`;
+    }).join("");
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("pvPlants"))}</span><span class="eb-label">${tv} ${tu}</span></div>
+      <div class="devgrid">${rows}</div></div>`;
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */
@@ -1892,9 +1979,19 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     this.shadowRoot.querySelector(".menu").hidden = !this._narrow;
     this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
-    for (const tab of this.shadowRoot.querySelectorAll(".tab")) {
-      // The first tab shows the power overview. Its card inside is still titled "House".
-      tab.textContent = this._t(tab.dataset.tab === "house" ? "tabPower" : tab.dataset.tab);
+    // Tabs come and go with the integrations that were found; a tab that vanished leads back to Power.
+    const tabs = this._tabs();
+    if (this._tab !== "settings" && !tabs.includes(this._tab)) {
+      this._tab = "house";
+      this._html = null;
+    }
+    const bar = this.shadowRoot.querySelector(".tabs");
+    const signature = `${this._hass?.language}|${tabs.join(",")}`;
+    if (bar.dataset.sig !== signature) {
+      bar.dataset.sig = signature;
+      bar.innerHTML = tabs.map((tab) => `<button class="tab" data-tab="${tab}">${esc(this._tabLabel(tab))}</button>`).join("");
+    }
+    for (const tab of bar.querySelectorAll(".tab")) {
       tab.classList.toggle("active", tab.dataset.tab === this._tab);
     }
     const gear = this.shadowRoot.querySelector(".gear");
@@ -1915,7 +2012,7 @@ class EnergyAssistantPanel extends HTMLElement {
     // While a name is being typed the page is not redrawn, live updates would wipe the text field.
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
-    const html = this._renderHouse();
+    const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);

@@ -1588,8 +1588,8 @@ test("pv assistant: no offer, an empty answer or an error change nothing", async
     const p = pvPanel({ reply });
     await p._loadPv();
     assert.equal(p._pv, null);
-    assert.equal(p._renderPvNotice(false), "");
-    assert.equal(p._renderPvPlants(null), "");
+    assert.equal(p._renderIntegrations(false), "");
+    assert.equal(p._renderPvPlants(), "");
   }
 });
 
@@ -1637,28 +1637,26 @@ test("pv assistant: read-only users get the information but no button", async ()
   const p = pvPanel({ admin: false });
   await p._loadPv();
   const html = p._renderSettings();
-  assert.match(html, /PV Assistant detected/);
+  assert.match(html, /Detected integrations/);
   assert.doesNotMatch(html, /data-pvapply/);
 });
 
-test("pv assistant: the Power tab lists the plants in a row that opens, strongest first", async () => {
+test("pv assistant: the PV tab lists the plants with power and share, strongest first", async () => {
   const p = pvPanel({ solar: PV_OFFER.targets.solar_power });
   await p._loadPv();
-  let html = p._renderPvPlants(null);
+  const html = p._renderPvPlants();
   assert.match(html, /PV by plant/);
-  assert.match(html, /data-open="pv:plants"/);
-  assert.match(html, /aria-expanded="false"/);
-  assert.doesNotMatch(html, /class="subs"/);
-  clickOpen(p, "pv:plants");
-  html = p._renderPvPlants(null);
   assert.ok(html.indexOf("Wechselrichter Haus") < html.indexOf("Garage"));
-  assert.match(html, /2,000 W|2\.000 W|2000 W/); // 1200 + 800
+  assert.match(html, /Wechselrichter Haus<\/span>[\s\S]*2[.,\s]?000<small>W<\/small><small class="pct">87 %/); // 2000 of 2300 W
+  assert.match(html, /Garage<\/span>[\s\S]*300<small>W<\/small><small class="pct">13 %/);
+  assert.match(html, /2[.,\s]?300 W/); // total in the header
+  assert.doesNotMatch(html, /data-open/);
 });
 
 test("pv assistant: a single plant adds no row", async () => {
   const p = pvPanel({ reply: { ...PV_OFFER, plants: [{ name: "Garage", sensors: ["sensor.wr2_pv"] }] } });
   await p._loadPv();
-  assert.equal(p._renderPvPlants(null), "");
+  assert.equal(p._renderPvPlants(), "");
 });
 
 test("display: separate charging and discharging sensors count with their magnitude", () => {
@@ -1719,10 +1717,23 @@ test("tariffy: other currencies show the price with their unit", () => {
   assert.match(html, /0\.3<small>CHF\/kWh/);
 });
 
-test("tariffy: the costs are part of the Power tab", () => {
+test("tariffy: the costs are the Costs tab, with the contract figures", () => {
   const p = costPanel();
   p._ready = true;
-  assert.match(p._renderHouse(), /Costs right now/);
+  p._tab = "costs";
+  p._int.tariffy.cost_so_far = "sensor.t_cost";
+  p._int.tariffy.balance = "sensor.t_bal";
+  p._int.tariffy.forecast = "sensor.t_fc";
+  p._hass.states["sensor.t_cost"] = { state: "812.4", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.t_bal"] = { state: "-261", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.t_fc"] = { state: "unknown", attributes: {} };
+  const html = p._renderPage();
+  assert.match(html, /Costs right now/);
+  assert.match(html, /<span class="eb-title">Contract<\/span>/);
+  assert.match(html, /Cost so far<\/div><div class="eb-value">812\.40/);
+  assert.match(html, /Balance so far<\/div><div class="eb-value">-261\.00/);
+  assert.doesNotMatch(html, /Balance at contract end/); // unknown values are left out
+  assert.doesNotMatch(p._renderHouse(), /Costs right now/);
 });
 
 test("integrations: the panel asks the backend and an error leaves nothing to show", async () => {
@@ -1787,10 +1798,12 @@ test("ev assistant: nothing without the integration, without values or with unus
   assert.equal(none._renderEv(), "");
 });
 
-test("ev assistant: the Power tab contains the wallbox block", () => {
+test("ev assistant: the EV tab contains the wallbox block, the Power tab does not", () => {
   const p = evPanel({ live: { charge_power: 7.4, charging: true, connected: true } });
   p._ready = true;
-  assert.match(p._renderHouse(), /Wallbox/);
+  p._tab = "ev";
+  assert.match(p._renderPage(), /<span class="eb-title">Wallbox<\/span>/);
+  assert.doesNotMatch(p._renderHouse(), /Wallbox/);
 });
 
 // --- optional data from PV Assistant (day figures, forecast, plant fault) -----------------------
@@ -1859,10 +1872,12 @@ test("pv assistant day: unknown values and missing entities leave tiles out, not
   assert.equal(unavailable._renderPvDay(), "");
 });
 
-test("pv assistant day: the card is part of the Power tab", () => {
+test("pv assistant day: the card is the PV tab, the Power tab does not have it", () => {
   const p = pvDayPanel();
   p._ready = true;
-  assert.match(p._renderHouse(), /PV today and tomorrow/);
+  p._tab = "pv";
+  assert.match(p._renderPage(), /PV today and tomorrow/);
+  assert.doesNotMatch(p._renderHouse(), /PV today and tomorrow/);
 });
 
 // --- optional data from Amortix (savings and payback) -------------------------------------------
@@ -1922,7 +1937,7 @@ test("amortix: unknown values are left out, nothing without values or without Am
   assert.equal(none._renderAmortix(), "");
 });
 
-test("amortix: several entries show one block each; the card is part of the Power tab", () => {
+test("amortix: several entries show one block each; the card is the Payback tab", () => {
   const entries = [
     { title: "Balkon", entities: { einsparung: "sensor.am_sav" } },
     { title: "Wallbox", entities: { einsparung: "sensor.am_inv" } },
@@ -1931,5 +1946,83 @@ test("amortix: several entries show one block each; the card is part of the Powe
   const html = p._renderAmortix();
   assert.ok(html.indexOf("Balkon") < html.indexOf("Wallbox"));
   p._ready = true;
-  assert.match(p._renderHouse(), /<span class="eb-title">Payback<\/span>/);
+  p._tab = "amortix";
+  assert.match(p._renderPage(), /<span class="eb-title">Payback<\/span>/);
+  assert.doesNotMatch(p._renderHouse(), /Payback/);
+});
+
+
+// --- the notice lists every sibling integration that was found ----------------------------------
+test("integrations notice: lists PV Assistant, Tariffy, EV Assistant and Amortix when they are found", () => {
+  const p = pvPanel();
+  p._pv = { targets: { solar_power: ["a"] }, notes: {}, plants: [] };
+  p._int = {
+    pv_assistant: { entities: { production_today: "sensor.x" } },
+    tariffy: { price: "sensor.p" },
+    ev_assistant: { vehicles: [{ name: "ID.3" }, { name: "Zoe" }] },
+    amortix: { entries: [{ title: "Anlage", entities: {} }] },
+  };
+  const html = p._renderIntegrations(false);
+  assert.match(html, /Detected integrations/);
+  assert.match(html, /Do you want to take over its sensors/);
+  assert.match(html, /PV Assistant: day figures, forecast and plant fault/);
+  assert.match(html, /Tariffy: electricity price/);
+  assert.match(html, /EV Assistant: wallbox and today.s charging in the EV tab \(ID\.3, Zoe\)/);
+  assert.match(html, /Amortix: savings and payback/);
+});
+
+test("integrations notice: shows without a PV Assistant offer, and says nothing when nothing was found", () => {
+  const p = pvPanel();
+  p._pv = null;
+  p._int = { tariffy: { price: "sensor.p" }, amortix: { entries: [{ title: "x", entities: {} }] } };
+  const html = p._renderIntegrations(false);
+  assert.match(html, /Tariffy/);
+  assert.match(html, /Amortix/);
+  assert.doesNotMatch(html, /data-pvapply|PV Assistant/);
+  p._int = {};
+  assert.equal(p._renderIntegrations(false), "");
+  p._int = { pv_assistant: { entities: { production_today: "sensor.x" } } };
+  assert.match(p._renderIntegrations(false), /PV Assistant: day figures/);
+});
+
+
+// --- tabs come with the integrations --------------------------------------------------------------
+test("tabs: Power is always there, the others only for the integrations that were found, in a fixed order", () => {
+  const p = panel({ house_power: "h" }, { h: st(1) });
+  assert.deepEqual(p._tabs(), ["house"]);
+  p._int = { amortix: { entries: [{}] }, tariffy: { price: "x" }, ev_assistant: { vehicles: [{}] }, pv_assistant: { entities: {} } };
+  assert.deepEqual(p._tabs(), ["house", "pv", "ev", "costs", "amortix"]);
+  p._int = { ev_assistant: { vehicles: [] }, amortix: { entries: [] } };
+  assert.deepEqual(p._tabs(), ["house"]);
+});
+
+test("tabs: the PV tab also exists when PV Assistant offers at least two plants", () => {
+  const p = panel({ house_power: "h" }, { h: st(1) });
+  p._int = {};
+  p._pv = { targets: {}, notes: {}, plants: [{ name: "a", sensors: [] }, { name: "b", sensors: [] }] };
+  assert.deepEqual(p._tabs(), ["house", "pv"]);
+  p._pv.plants = [{ name: "a", sensors: [] }];
+  assert.deepEqual(p._tabs(), ["house"]);
+});
+
+test("tabs: labels follow the language, an empty tab says so", () => {
+  const p = panel({ house_power: "h" }, { h: st(1) });
+  p._hass.language = "de";
+  assert.deepEqual(["house", "pv", "ev", "costs", "amortix"].map((t) => p._tabLabel(t)), ["Leistung", "PV", "EV", "Kosten", "Amortisation"]);
+  p._ready = true;
+  p._int = {};
+  p._tab = "ev";
+  assert.match(p._renderPage(), /class="stack"><div class="eb-card"><div class="empty">–/);
+});
+
+test("tabs: the Power tab holds the house, history and lists only", () => {
+  const p = limitPanel({ devices: 6, areas: 2, labels: 2 });
+  p._int = {
+    tariffy: { price: "sensor.netz_leistung" },
+    ev_assistant: { vehicles: [{ name: "x", live: "sensor.netz_leistung" }] },
+    amortix: { entries: [{ title: "a", entities: { einsparung: "sensor.netz_leistung" } }] },
+  };
+  const html = p._renderHouse();
+  assert.doesNotMatch(html, /Costs right now|Wallbox|Payback|PV today and tomorrow|PV by plant/);
+  assert.match(html, /Devices/);
 });
