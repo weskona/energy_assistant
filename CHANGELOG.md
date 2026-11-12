@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-12
+
+### Added
+
+- The PV Assistant notice also takes over the **grid** sensors: the grid import power sensors and the feed-in power sensor. A feed-in sensor that PV Assistant reports as negative values is not taken over; the notice says so.
+
 ## [0.7.1] - 2026-11-12
 
 ### Changed

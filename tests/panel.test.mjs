@@ -1657,3 +1657,21 @@ test("pv assistant: a single plant adds no row", async () => {
   await p._loadPv();
   assert.equal(p._renderPvPlants(null), "");
 });
+
+test("pv assistant: grid import and feed-in sensors are taken over", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp" } });
+  await p._loadPv();
+  assert.match(p._renderSettings(), /Grid: import 1, feed-in 1/);
+  p._edited = () => {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
+  assert.deepEqual(p._draft.grid_import, ["sensor.bezug"]); // replaces the sensor that was there
+  assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
+});
+
+test("pv assistant: a feed-in sensor with negative values is not taken over", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp", invert_feed_in_power: true } });
+  await p._loadPv();
+  assert.deepEqual(p._pvTargets().grid_import, ["sensor.bezug"]);
+  assert.equal(p._pvTargets().grid_export, undefined);
+  assert.match(p._renderSettings(), /feed-in sensor of PV Assistant reports feed-in as negative values/);
+});
