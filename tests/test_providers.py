@@ -4,6 +4,7 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.energy_assistant.providers import (
+    amortix,
     available,
     ev_assistant,
     pv_assistant,
@@ -200,3 +201,76 @@ async def test_pv_assistant_day_entities_by_translation_key(hass) -> None:
         }
     }
     assert available(hass)["pv_assistant"] == offer
+
+
+def _amortix_entry(
+    hass, title, mode, keys=("einsparung", "fortschritt"), extra_unique=()
+):
+    entry = MockConfigEntry(domain="amortix", title=title, data={"mode": mode})
+    entry.add_to_hass(hass)
+    ids = {}
+    for key in (*keys, *extra_unique):
+        entity = er.async_get(
+            hass
+        ).async_get_or_create(
+            "sensor",
+            "amortix",
+            f"{entry.entry_id}_{key}",  # unique id like Amortix builds it: <entry id>_<key>[_device]
+            suggested_object_id=f"{title}_{key}",
+            config_entry=entry,
+        )
+        hass.states.async_set(entity.entity_id, "1")
+        ids[key] = entity.entity_id
+    return ids
+
+
+async def test_no_amortix_no_offer(hass) -> None:
+    assert amortix(hass) is None
+
+
+async def test_amortix_entry_gives_savings_and_payback_sensors(hass) -> None:
+    ids = _amortix_entry(
+        hass,
+        "balkon",
+        "direct",
+        keys=(
+            "einsparung",
+            "fortschritt",
+            "verbleibend",
+            "tagesschnitt",
+            "resttage",
+            "datum",
+        ),
+    )
+    assert amortix(hass) == {
+        "entries": [{"title": "balkon", "mode": "direct", "entities": ids}]
+    }
+    assert available(hass)["amortix"] == amortix(hass)
+
+
+async def test_the_overview_replaces_the_single_entries(hass) -> None:
+    _amortix_entry(hass, "balkon", "direct")
+    _amortix_entry(hass, "wallbox", "wallbox")
+    overview = _amortix_entry(
+        hass, "gesamt", "overview", keys=("einsparung", "investition", "fortschritt")
+    )
+    offer = amortix(hass)
+    assert [e["title"] for e in offer["entries"]] == ["gesamt"]
+    assert offer["entries"][0]["entities"] == overview
+
+
+async def test_device_sensors_and_foreign_keys_are_not_taken(hass) -> None:
+    ids = _amortix_entry(
+        hass,
+        "anlage",
+        "plant",
+        keys=("einsparung",),
+        extra_unique=("einsparung_wechselrichter", "erzeugung"),
+    )
+    entry = amortix(hass)["entries"][0]
+    assert entry["entities"] == {"einsparung": ids["einsparung"]}
+
+
+async def test_entries_without_savings_or_progress_are_skipped(hass) -> None:
+    _amortix_entry(hass, "heizung", "heatpump", keys=("erzeugung",))
+    assert amortix(hass) is None

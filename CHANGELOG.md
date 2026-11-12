@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-12
+
+### Added
+
+- Optional link to [Amortix](https://github.com/weskona/amortix): when it is installed, the Power tab shows a card **Payback** with the total savings, the investment, the progress (with a bar), the remaining amount, the savings per day, the time left and the expected payback date. The overview entry of Amortix replaces the single entries; without an overview every entry gets its own block. Amortix has no translation keys, so its sensors are found over the unique ids of the entity registry (`<entry id>_<key>`); sensors of single devices are not taken. Tiles without a value are left out and without Amortix nothing is shown.
+
 ## [0.12.0] - 2026-11-12
 
 ### Added

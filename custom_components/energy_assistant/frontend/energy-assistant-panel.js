@@ -40,6 +40,8 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
+.amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
 .alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
@@ -199,6 +201,15 @@ const STRINGS = {
     noAreaMatches: "No area matches the filters",
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    amTitle: "Payback",
+    aSavings: "Savings total",
+    aInvest: "Investment",
+    aProgress: "Progress",
+    aRemaining: "Remaining",
+    aPerDay: "Savings per day",
+    aDays: "Time left",
+    aDaysUnit: "days",
+    aDate: "Payback date",
     pvDayTitle: "PV today and tomorrow",
     pvToday: "Today",
     pvTomorrow: "Tomorrow",
@@ -346,6 +357,15 @@ const STRINGS = {
     noAreaMatches: "Kein Bereich passt zu den Filtern",
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    amTitle: "Amortisation",
+    aSavings: "Einsparung gesamt",
+    aInvest: "Investition",
+    aProgress: "Fortschritt",
+    aRemaining: "Verbleibend",
+    aPerDay: "Ersparnis pro Tag",
+    aDays: "Restzeit",
+    aDaysUnit: "Tage",
+    aDate: "Amortisation am",
     pvDayTitle: "PV heute und morgen",
     pvToday: "Heute",
     pvTomorrow: "Morgen",
@@ -556,6 +576,45 @@ class EnergyAssistantPanel extends HTMLElement {
     const id = this._int?.tariffy?.feed_in;
     const v = id && this._hass?.states?.[id] ? parseFloat(this._hass.states[id].state) : NaN;
     return Number.isNaN(v) ? null : v;
+  }
+
+  /**
+   * Savings and payback of Amortix (read only): total savings, investment, progress, what remains, the
+   * daily savings and the expected payback date, per entry (the overview entry replaces the others).
+   * Tiles without a value are left out; empty without Amortix.
+   */
+  _renderAmortix() {
+    const entries = this._int?.amortix?.entries;
+    if (!Array.isArray(entries) || !entries.length) return "";
+    const lang = this._hass?.language || "en";
+    const tile = (label, value, unit = "", extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${extra}</div>`;
+    const blocks = entries.map((entry) => {
+      const ids = entry.entities || {};
+      const tiles = [];
+      const money = (label, key) => {
+        const v = this._num(ids[key]);
+        if (v == null) return;
+        const [n, sym] = this._money(v, this._hass?.states?.[ids[key]]?.attributes?.unit_of_measurement || "EUR");
+        tiles.push(tile(label, n, sym));
+      };
+      money(this._t("aSavings"), "einsparung");
+      money(this._t("aInvest"), "investition");
+      const progress = this._num(ids.fortschritt);
+      if (progress != null) {
+        const pct = Math.max(0, Math.min(100, progress));
+        tiles.push(tile(this._t("aProgress"), pct.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "%", `<div class="amo-bar"><div style="width:${pct}%"></div></div>`));
+      }
+      money(this._t("aRemaining"), "verbleibend");
+      money(this._t("aPerDay"), "tagesschnitt");
+      const days = this._num(ids.resttage);
+      if (days != null) tiles.push(tile(this._t("aDays"), Math.round(days).toLocaleString(lang), this._t("aDaysUnit")));
+      const dateState = ids.datum && this._hass?.states?.[ids.datum]?.state;
+      const date = dateState && !["unknown", "unavailable"].includes(dateState) ? new Date(dateState) : null;
+      if (date && !Number.isNaN(date.getTime())) tiles.push(tile(this._t("aDate"), esc(date.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" }))));
+      if (!tiles.length) return "";
+      return `<div class="eb-label costs">${esc(entry.title || "Amortix")}</div><div class="tiles">${tiles.join("")}</div>`;
+    }).join("");
+    return blocks ? `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("amTitle"))}</span></div>${blocks}</div>` : "";
   }
 
   /** Time of an ISO timestamp state as hh:mm in the local format (null if it is not a time). */
@@ -1544,6 +1603,7 @@ class EnergyAssistantPanel extends HTMLElement {
         ${hist}
       </div>
       ${this._renderPvDay()}
+      ${this._renderAmortix()}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 

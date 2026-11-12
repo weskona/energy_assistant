@@ -135,6 +135,10 @@ If [Tariffy](https://github.com/weskona/tariffy) is installed, the Power tab sho
 
 If [EV Assistant](https://github.com/weskona/ev_assistant) is installed, the Power tab shows a **Wallbox** block for every vehicle: live status and charging power, charge level, solar share of the session, energy and cost of today, and the advice to charge before the PV production starts. Energy Assistant only reads EV Assistant (the sensors are found over the entity registry); without it nothing is shown and both run on their own.
 
+### Amortix (optional)
+
+If [Amortix](https://github.com/weskona/amortix) is installed, the Power tab shows a card **Payback**: total savings, investment, progress, remaining amount, savings per day, time left and the expected payback date. When Amortix has an overview entry it is shown alone (it combines all other entries), otherwise every entry gets its own block. Energy Assistant only reads Amortix; without it nothing is shown and both run on their own.
+
 ### Changing the settings
 
 After the first setup in the config flow you can change everything in the panel itself:

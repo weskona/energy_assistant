@@ -1864,3 +1864,72 @@ test("pv assistant day: the card is part of the Power tab", () => {
   p._ready = true;
   assert.match(p._renderHouse(), /PV today and tomorrow/);
 });
+
+// --- optional data from Amortix (savings and payback) -------------------------------------------
+function amortixPanel({ entries, states = {} } = {}) {
+  const e = (state, attributes = {}) => ({ state, attributes });
+  const p = panel({ house_power: "h" }, {
+    h: st(1),
+    "sensor.am_sav": e("1234.5", { unit_of_measurement: "EUR" }),
+    "sensor.am_inv": e("5000", { unit_of_measurement: "EUR" }),
+    "sensor.am_prog": e("24.7"),
+    "sensor.am_rem": e("3765.5", { unit_of_measurement: "EUR" }),
+    "sensor.am_day": e("3.2", { unit_of_measurement: "EUR" }),
+    "sensor.am_days": e("1177.4"),
+    "sensor.am_date": e("2029-12-31T12:00:00+00:00"),
+    ...states,
+  });
+  p._hass.language = "en";
+  p._int = {
+    amortix: {
+      entries: entries ?? [
+        { title: "Anlage", mode: "overview", entities: { einsparung: "sensor.am_sav", investition: "sensor.am_inv", fortschritt: "sensor.am_prog", verbleibend: "sensor.am_rem", tagesschnitt: "sensor.am_day", resttage: "sensor.am_days", datum: "sensor.am_date" } },
+      ],
+    },
+  };
+  return p;
+}
+
+test("amortix: savings, investment, progress, remaining, per day, days and date show as tiles", () => {
+  const html = amortixPanel()._renderAmortix();
+  assert.match(html, /<span class="eb-title">Payback<\/span>/);
+  assert.match(html, />Anlage<\/div>/);
+  assert.match(html, /Savings total<\/div><div class="eb-value">1,234\.50<small>[^<]*</);
+  assert.match(html, /Investment<\/div><div class="eb-value">5,000\.00<small>[^<]*</);
+  assert.match(html, /Progress<\/div><div class="eb-value">24\.7<small>%<\/small><\/div><div class="amo-bar"><div style="width:24\.7%">/);
+  assert.match(html, /Remaining<\/div><div class="eb-value">3,765\.50/);
+  assert.match(html, /Savings per day<\/div><div class="eb-value">3\.20/);
+  assert.match(html, /Time left<\/div><div class="eb-value">1,177<small>days/);
+  assert.match(html, /Payback date<\/div><div class="eb-value">[^<]*2029[^<]*</);
+});
+
+test("amortix: the progress bar stays between 0 and 100 percent", () => {
+  const over = amortixPanel({ states: { "sensor.am_prog": { state: "140", attributes: {} } } })._renderAmortix();
+  assert.match(over, /style="width:100%"/);
+  const under = amortixPanel({ states: { "sensor.am_prog": { state: "-5", attributes: {} } } })._renderAmortix();
+  assert.match(under, /style="width:0%"/);
+});
+
+test("amortix: unknown values are left out, nothing without values or without Amortix", () => {
+  const p = amortixPanel({ states: { "sensor.am_date": { state: "unknown", attributes: {} }, "sensor.am_days": { state: "unavailable", attributes: {} } } });
+  const html = p._renderAmortix();
+  assert.doesNotMatch(html, /Payback date|Time left/);
+  assert.match(html, /Savings total/);
+  const empty = amortixPanel({ entries: [{ title: "x", entities: { einsparung: "sensor.missing" } }] });
+  assert.equal(empty._renderAmortix(), "");
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderAmortix(), "");
+});
+
+test("amortix: several entries show one block each; the card is part of the Power tab", () => {
+  const entries = [
+    { title: "Balkon", entities: { einsparung: "sensor.am_sav" } },
+    { title: "Wallbox", entities: { einsparung: "sensor.am_inv" } },
+  ];
+  const p = amortixPanel({ entries });
+  const html = p._renderAmortix();
+  assert.ok(html.indexOf("Balkon") < html.indexOf("Wallbox"));
+  p._ready = true;
+  assert.match(p._renderHouse(), /<span class="eb-title">Payback<\/span>/);
+});

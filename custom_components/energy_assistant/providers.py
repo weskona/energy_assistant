@@ -15,6 +15,16 @@ from homeassistant.helpers import entity_registry as er
 
 TARIFFY = "tariffy"
 EV_ASSISTANT = "ev_assistant"
+AMORTIX = "amortix"
+_AMORTIX_KEYS = (
+    "einsparung",
+    "investition",
+    "fortschritt",
+    "verbleibend",
+    "tagesschnitt",
+    "resttage",
+    "datum",
+)
 PV_ASSISTANT = "pv_assistant"
 _PV_KEYS = (
     "production_today",
@@ -146,11 +156,54 @@ def pv_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
     return {"entities": found} if found else None
 
 
+def amortix(hass: HomeAssistant) -> dict[str, Any] | None:
+    """Savings and payback of Amortix: the overview if there is one, otherwise every entry.
+
+    Amortix has no translation keys, but its unique ids are `<entry id>_<key>`; the keys are in German
+    and do not depend on the language. Sensors of single devices carry a suffix and are not meant here.
+    The overview entry already combines all other entries, so it replaces them.
+    """
+    entries: dict[str, dict[str, str]] = {}
+    for entry in er.async_get(hass).entities.values():
+        if (
+            entry.platform != AMORTIX
+            or entry.domain != "sensor"
+            or entry.disabled_by
+            or not entry.config_entry_id
+            or not entry.unique_id
+        ):
+            continue
+        prefix = f"{entry.config_entry_id}_"
+        key = (
+            entry.unique_id[len(prefix) :]
+            if entry.unique_id.startswith(prefix)
+            else None
+        )
+        if key in _AMORTIX_KEYS:
+            entries.setdefault(entry.config_entry_id, {})[key] = entry.entity_id
+    found = []
+    for entry_id, keys in entries.items():
+        if "einsparung" not in keys and "fortschritt" not in keys:
+            continue
+        config_entry = hass.config_entries.async_get_entry(entry_id)
+        found.append(
+            {
+                "title": config_entry.title if config_entry else "Amortix",
+                "mode": config_entry.data.get("mode") if config_entry else None,
+                "entities": keys,
+            }
+        )
+    overview = [e for e in found if e["mode"] == "overview"]
+    chosen = sorted(overview or found, key=lambda e: e["title"])
+    return {"entries": chosen} if chosen else None
+
+
 def available(hass: HomeAssistant) -> dict[str, Any]:
     """Everything the sibling integrations offer right now (only what exists)."""
     found = {
         "tariffy": tariffy(hass),
         "ev_assistant": ev_assistant(hass),
         "pv_assistant": pv_assistant(hass),
+        "amortix": amortix(hass),
     }
     return {name: data for name, data in found.items() if data}
