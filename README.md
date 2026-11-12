@@ -121,7 +121,7 @@ The panel shows it as a tile with its share of production, in the source bar and
 
 If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energyboard reads its configuration (read-only, nothing is stored there):
 
-- At the top of the Settings tab a notice asks whether to take over its sensors: the production power sensors (**Solar production**), the storage sensors (combined with its sign, charging, discharging) and the grid sensors (import, feed-in). The button (administrators) fills the fields; save as usual. Separate charging and discharging sensors and a feed-in sensor that PV Assistant reports as negative values are not taken over.
+- At the top of the Settings tab a notice asks whether to take over its sensors: the production power sensors (**Solar production**), the storage sensors (combined with its sign, charging, discharging) and the grid sensors (import, feed-in). The button (administrators) fills the fields; save as usual. Nothing is left out: a feed-in sensor that PV Assistant reports as negative values becomes the combined grid sensor, and separate charging and discharging sensors that report negative values count with their magnitude.
 - On the Power tab a row **PV by plant** opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
 
 Without PV Assistant nothing changes.

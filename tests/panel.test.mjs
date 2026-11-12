@@ -1623,11 +1623,18 @@ test("pv assistant: the sign of a combined storage sensor follows PV Assistant",
   assert.equal(p._draft.invert_battery, true);
 });
 
-test("pv assistant: separate storage sensors with negative directions are not taken over", async () => {
+test("pv assistant: separate storage sensors that report negative values are taken over and count with their magnitude", async () => {
   const p = pvPanel({ reply: { ...PV_CONFIG, storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"], abs_storage_power: true } });
   await p._loadPv();
-  assert.deepEqual(p._pvTargets(), { solar_power: PV_CONFIG.production_power_sensors });
-  assert.match(p._renderSettings(), /not taken over/);
+  assert.deepEqual(p._pvTargets().battery_charge, ["sensor.in"]);
+  assert.deepEqual(p._pvTargets().battery_discharge, ["sensor.out"]);
+  assert.match(p._renderSettings(), /count with their magnitude/);
+  p._hass.states["sensor.in"] = st(-700);
+  p._hass.states["sensor.out"] = st(-300);
+  p._config = { ...p._config, battery_charge: ["sensor.in"], battery_discharge: ["sensor.out"] };
+  const c = p._current();
+  assert.equal(c.charge, 700);
+  assert.equal(c.discharge, 300);
 });
 
 test("pv assistant: read-only users get the information but no button", async () => {
@@ -1668,10 +1675,34 @@ test("pv assistant: grid import and feed-in sensors are taken over", async () =>
   assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
 });
 
-test("pv assistant: a feed-in sensor with negative values is not taken over", async () => {
+test("pv assistant: a feed-in sensor with negative values becomes the combined grid sensor", async () => {
   const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp", invert_feed_in_power: true } });
   await p._loadPv();
-  assert.deepEqual(p._pvTargets().grid_import, ["sensor.bezug"]);
-  assert.equal(p._pvTargets().grid_export, undefined);
-  assert.match(p._renderSettings(), /feed-in sensor of PV Assistant reports feed-in as negative values/);
+  const t = p._pvTargets();
+  assert.deepEqual(t.grid_power, ["sensor.einsp"]);
+  assert.equal(t.invert_grid, false);
+  assert.deepEqual(t.grid_import, ["sensor.bezug"]);
+  assert.equal(t.grid_export, undefined);
+  assert.match(p._renderSettings(), /used as the combined grid sensor/);
+  p._config = { ...p._config, grid_power: ["sensor.einsp"], grid_import: ["sensor.bezug"] };
+  p._hass.states["sensor.einsp"] = st(-400);
+  p._hass.states["sensor.bezug"] = st(0);
+  const c = p._current();
+  assert.equal(c.gridOut, 400);
+  assert.equal(c.gridIn, 0);
+});
+
+test("pv assistant: a combined meter that is also an import sensor is not counted twice", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.zaehler"], feed_in_power_sensor: "sensor.zaehler", invert_feed_in_power: true } });
+  await p._loadPv();
+  const t = p._pvTargets();
+  assert.deepEqual(t.grid_power, ["sensor.zaehler"]);
+  assert.equal(t.grid_import, undefined); // the meter already covers the import
+});
+
+test("display: separate charging and discharging sensors count with their magnitude", () => {
+  const p = panel({ battery_charge: ["c"], battery_discharge: ["d"] }, { c: st(-250), d: st(-100) });
+  const cur = p._current();
+  assert.equal(cur.charge, 250);
+  assert.equal(cur.discharge, 100);
 });
