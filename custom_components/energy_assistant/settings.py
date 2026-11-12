@@ -1,4 +1,4 @@
-"""Helpers to read, validate and store the Energyboard settings."""
+"""Helpers to read, validate and store the Energy Assistant settings."""
 
 from __future__ import annotations
 

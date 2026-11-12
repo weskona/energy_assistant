@@ -1,8 +1,8 @@
-"""Constants for Energyboard."""
+"""Constants for Energy Assistant."""
 
-DOMAIN = "energyboard"
-PANEL_URL_PATH = "energyboard"
-STATIC_URL = "/energyboard_static"
+DOMAIN = "energy_assistant"
+PANEL_URL_PATH = "energy-assistant"
+STATIC_URL = "/energy_assistant_static"
 
 # Separate sensors report positive values (W or kW).
 CONF_HOUSE_POWER = "house_power"  # optional, one sensor

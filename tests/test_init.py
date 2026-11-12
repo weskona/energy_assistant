@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energyboard.const import DOMAIN
+from custom_components.energy_assistant.const import DOMAIN
 
 
 def _entry(**kw) -> MockConfigEntry:
@@ -40,11 +40,11 @@ async def test_setup_registers_panel_with_normalized_config(
 
     hass.http.async_register_static_paths.assert_awaited_once()
     kwargs = register.await_args.kwargs
-    assert kwargs["webcomponent_name"] == "energyboard-panel"
-    assert kwargs["frontend_url_path"] == "energyboard"
+    assert kwargs["webcomponent_name"] == "energy-assistant-panel"
+    assert kwargs["frontend_url_path"] == "energy-assistant"
     assert kwargs["require_admin"] is False
     assert kwargs["module_url"].startswith(
-        "/energyboard_static/energyboard-panel.js?v="
+        "/energy_assistant_static/energy-assistant-panel.js?v="
     )
     assert kwargs["config"] == {
         "house_power": "sensor.house",
@@ -68,7 +68,7 @@ async def test_setup_registers_panel_with_normalized_config(
     }
 
     assert await hass.config_entries.async_unload(entry.entry_id)
-    remove.assert_called_once_with(hass, "energyboard")
+    remove.assert_called_once_with(hass, "energy-assistant")
 
 
 async def test_options_override_data(hass: HomeAssistant, mock_panel) -> None:

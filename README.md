@@ -1,4 +1,4 @@
-# Energyboard
+# Energy Assistant
 
 Home Assistant integration (HACS) with its own sidebar panel. Dark, card-based design, see [docs/DESIGN.md](docs/DESIGN.md).
 The UI is English with a German translation (follows your Home Assistant language).
@@ -18,7 +18,7 @@ they stack. Areas and labels show their Home Assistant icon in front of the name
 
 1. Add this repository to HACS as a custom repository (category *Integration*) and install it.
 2. Restart Home Assistant.
-3. Add **Energyboard** under *Settings → Devices & services*.
+3. Add **Energy Assistant** under *Settings → Devices & services*.
 
 ## Configuration
 
@@ -86,7 +86,7 @@ not selected, plus a text filter) keep long lists manageable. The **Labels** car
 with the summed power of all its power sensors, plus share of the house power, bar, folding and idle count. A sensor
 carries the labels of its entity and of its device. Unlike the devices **no name pattern is needed**, the label decides.
 The exclusions still apply: sensors of the energy balance (grid, solar, storage, house), the exclude list and the exclude
-patterns. A sensor with several selected labels counts in each of them. The labels are read over the `energyboard/labels`
+patterns. A sensor with several selected labels counts in each of them. The labels are read over the `energy_assistant/labels`
 WebSocket command, available to every user.
 
 **Areas:** the **Areas** card sums up the power of the power sensors per Home Assistant area. The area is taken from the
@@ -105,7 +105,7 @@ If your sensor counts the other way round (e.g. charging positive), enable "Inve
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.
 Required: grid import, grid combined or house consumption.
 
-Without a house consumption sensor Energyboard calculates:
+Without a house consumption sensor Energy Assistant calculates:
 
 **House = solar + grid import + from storage − grid export − to storage**
 
@@ -119,9 +119,9 @@ The panel shows it as a tile with its share of production, in the source bar and
 
 ### PV Assistant (optional)
 
-If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energyboard reads its configuration (read-only, nothing is stored there):
+If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energy Assistant reads its configuration (read-only, nothing is stored there):
 
-- At the top of the Settings tab a notice asks whether to take over its sensors: the production power sensors (**Solar production**), the storage sensors (combined with its sign, charging, discharging) and the grid sensors (import, feed-in). The button (administrators) fills the fields; save as usual. Separate charging and discharging sensors and a feed-in sensor that PV Assistant reports as negative values are not taken over.
+- At the top of the Settings tab a notice asks whether to take over its sensors: the production power sensors (**Solar production**), the storage sensors (combined with its sign, charging, discharging) and the grid sensors (import, feed-in). The button (administrators) fills the fields; save as usual. Nothing is left out: a feed-in sensor that PV Assistant reports as negative values becomes the combined grid sensor, and separate charging and discharging sensors that report negative values count with their magnitude.
 - On the Power tab a row **PV by plant** opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
 
 Without PV Assistant nothing changes.
@@ -136,12 +136,12 @@ and press **Save**. The changes apply immediately, no restart or reload is neede
 - Saving is blocked while neither grid import, grid combined nor house consumption is set.
 - The same settings are still available via *Configure* on the integration.
 
-The panel talks to the integration over two WebSocket commands, `energyboard/get_config` and
-`energyboard/update_config` (admin only), and stores the result in the options of the config entry.
+The panel talks to the integration over two WebSocket commands, `energy_assistant/get_config` and
+`energy_assistant/update_config` (admin only), and stores the result in the options of the config entry.
 
 ## Development
 
-The panel is a single web component without a build step: `custom_components/energyboard/frontend/energyboard-panel.js`.
+The panel is a single web component without a build step: `custom_components/energy_assistant/frontend/energy-assistant-panel.js`.
 
 ```bash
 pip install -r requirements_test.txt && pytest
@@ -150,10 +150,10 @@ npm test
 
 ## Releases
 
-Every merge to `main` that contains a new `version` in `custom_components/energyboard/manifest.json`
+Every merge to `main` that contains a new `version` in `custom_components/energy_assistant/manifest.json`
 creates the tag `v<version>` and a GitHub release. The release notes come from the matching
 `## [<version>]` section of `CHANGELOG.md`, which therefore must exist before merging.
 
 ## License
 
-[MIT](LICENSE). The bundled font Outfit is licensed under the SIL Open Font License 1.1, see `custom_components/energyboard/frontend/fonts/OFL-Outfit.txt`.
+[MIT](LICENSE). The bundled font Outfit is licensed under the SIL Open Font License 1.1, see `custom_components/energy_assistant/frontend/fonts/OFL-Outfit.txt`.

@@ -3,8 +3,8 @@
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energyboard.const import DOMAIN
-from custom_components.energyboard.websocket import async_register
+from custom_components.energy_assistant.const import DOMAIN
+from custom_components.energy_assistant.websocket import async_register
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ async def entry(hass):
 
 async def test_get_config(hass, hass_ws_client, entry) -> None:
     client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": "energyboard/get_config"})
+    await client.send_json_auto_id({"type": "energy_assistant/get_config"})
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"]["grid_import"] == ["sensor.gi"]
@@ -31,7 +31,7 @@ async def test_get_config(hass, hass_ws_client, entry) -> None:
 async def test_get_config_without_entry(hass, hass_ws_client) -> None:
     async_register(hass)
     client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": "energyboard/get_config"})
+    await client.send_json_auto_id({"type": "energy_assistant/get_config"})
     msg = await client.receive_json()
     assert not msg["success"]
     assert msg["error"]["code"] == "not_found"
@@ -43,7 +43,7 @@ async def test_update_config_stores_options_and_keeps_other_values(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {
                 "device_power": ["sensor.oven"],
                 "battery_charge": ["sensor.bc"],
@@ -63,7 +63,7 @@ async def test_update_config_stores_options_and_keeps_other_values(
 async def test_update_config_can_clear_a_list(hass, hass_ws_client, entry) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"solar_power": []}}
+        {"type": "energy_assistant/update_config", "config": {"solar_power": []}}
     )
     msg = await client.receive_json()
     assert msg["success"]
@@ -73,7 +73,7 @@ async def test_update_config_can_clear_a_list(hass, hass_ws_client, entry) -> No
 async def test_update_config_requires_a_source(hass, hass_ws_client, entry) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"grid_import": []}}
+        {"type": "energy_assistant/update_config", "config": {"grid_import": []}}
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -86,7 +86,7 @@ async def test_update_config_rejects_invalid_entity_ids(
 ) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"solar_power": ["nope"]}}
+        {"type": "energy_assistant/update_config", "config": {"solar_power": ["nope"]}}
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -98,7 +98,7 @@ async def test_update_config_is_admin_only(
 ) -> None:
     client = await hass_ws_client(hass, hass_read_only_access_token)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"solar_power": []}}
+        {"type": "energy_assistant/update_config", "config": {"solar_power": []}}
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -112,7 +112,7 @@ async def test_update_config_stores_cleaned_patterns(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_patterns": ["*_Leistung", "sensor.k*"]},
         }
     )
@@ -127,7 +127,10 @@ async def test_update_config_rejects_invalid_patterns(
 ) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"device_patterns": ["a b"]}}
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"device_patterns": ["a b"]},
+        }
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -139,7 +142,7 @@ async def test_update_config_stores_device_exclude(hass, hass_ws_client, entry) 
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_exclude": ["sensor.a_leistung", "sensor.b_leistung"]},
         }
     )
@@ -154,7 +157,10 @@ async def test_update_config_rejects_invalid_exclude(
 ) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"device_exclude": ["nope"]}}
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"device_exclude": ["nope"]},
+        }
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -167,7 +173,7 @@ async def test_update_config_stores_cleaned_exclude_patterns(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_exclude_patterns": ["Alpha_ESS_*", "*_string_*"]},
         }
     )
@@ -183,7 +189,7 @@ async def test_update_config_rejects_invalid_exclude_patterns(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_exclude_patterns": ["a b"]},
         }
     )
@@ -197,7 +203,7 @@ async def test_update_config_stores_label_ids(hass, hass_ws_client, entry) -> No
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"label_ids": [" klima ", "klima", "licht"]},
         }
     )
@@ -207,7 +213,7 @@ async def test_update_config_stores_label_ids(hass, hass_ws_client, entry) -> No
 
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"label_ids": ["klima", "licht"]},
         }
     )
@@ -222,7 +228,10 @@ async def test_update_config_rejects_invalid_label_ids(
 ) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"label_ids": ["Klima Anlage"]}}
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"label_ids": ["Klima Anlage"]},
+        }
     )
     msg = await client.receive_json()
     assert not msg["success"]
@@ -269,7 +278,7 @@ async def test_labels_lists_labels_and_labelled_sensors(
     entities.async_update_entity(other_domain.entity_id, labels={klima.label_id})
 
     client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": "energyboard/labels"})
+    await client.send_json_auto_id({"type": "energy_assistant/labels"})
     msg = await client.receive_json()
     assert msg["success"]
     result = msg["result"]
@@ -288,7 +297,7 @@ async def test_labels_is_available_to_non_admins(
     hass, hass_ws_client, hass_read_only_access_token, entry
 ) -> None:
     client = await hass_ws_client(hass, hass_read_only_access_token)
-    await client.send_json_auto_id({"type": "energyboard/labels"})
+    await client.send_json_auto_id({"type": "energy_assistant/labels"})
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"] == {"labels": [], "entities": {}}
@@ -298,7 +307,7 @@ async def test_update_config_stores_device_names(hass, hass_ws_client, entry) ->
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {
                 "device_names": {
                     "sensor.wallbox_leistung": " Wallbox ",
@@ -327,7 +336,10 @@ async def test_device_names_are_replaced_as_a_whole_and_can_be_emptied(
         ({}, 0),
     ):
         await client.send_json_auto_id(
-            {"type": "energyboard/update_config", "config": {"device_names": names}}
+            {
+                "type": "energy_assistant/update_config",
+                "config": {"device_names": names},
+            }
         )
         msg = await client.receive_json()
         assert msg["success"]
@@ -344,7 +356,10 @@ async def test_update_config_rejects_bad_device_names(
         {"sensor.a_leistung": "x" * 81},  # too long
     ):
         await client.send_json_auto_id(
-            {"type": "energyboard/update_config", "config": {"device_names": names}}
+            {
+                "type": "energy_assistant/update_config",
+                "config": {"device_names": names},
+            }
         )
         msg = await client.receive_json()
         assert not msg["success"]
@@ -358,14 +373,14 @@ async def test_renaming_keeps_names_when_other_settings_change(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_names": {"sensor.a_leistung": "A"}},
         }
     )
     await client.receive_json()
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_patterns": ["*_leistung"]},
         }
     )
@@ -377,7 +392,7 @@ async def test_update_config_stores_area_ids(hass, hass_ws_client, entry) -> Non
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"area_ids": ["kueche", "wz_2"]},
         }
     )
@@ -387,7 +402,7 @@ async def test_update_config_stores_area_ids(hass, hass_ws_client, entry) -> Non
     assert entry.options["area_ids"] == ["kueche", "wz_2"]
     # an empty selection is stored too and means "all areas"
     await client.send_json_auto_id(
-        {"type": "energyboard/update_config", "config": {"area_ids": []}}
+        {"type": "energy_assistant/update_config", "config": {"area_ids": []}}
     )
     msg = await client.receive_json()
     assert msg["success"]
@@ -400,7 +415,7 @@ async def test_update_config_rejects_invalid_area_ids(
     client = await hass_ws_client(hass)
     for ids in (["Küche"], ["a b"], ["Wohnzimmer"], [""]):
         await client.send_json_auto_id(
-            {"type": "energyboard/update_config", "config": {"area_ids": ids}}
+            {"type": "energy_assistant/update_config", "config": {"area_ids": ids}}
         )
         msg = await client.receive_json()
         assert not msg["success"], ids

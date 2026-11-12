@@ -7,9 +7,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energyboard.const import DOMAIN
+from custom_components.energy_assistant.const import DOMAIN
 
-SETUP = "custom_components.energyboard.async_setup_entry"
+SETUP = "custom_components.energy_assistant.async_setup_entry"
 
 
 async def _start(hass: HomeAssistant):
@@ -83,7 +83,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
             },
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Energyboard"
+    assert result["title"] == "Energy Assistant"
     assert result["data"] == {
         "grid_power": ["sensor.grid"],
         "invert_grid": True,

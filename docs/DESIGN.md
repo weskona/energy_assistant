@@ -1,12 +1,12 @@
 # Design
 
-The design of ha-energyboard follows the style of
+The design of energy_assistant follows the style of
 [glow-dashboard](https://github.com/deepblue120/glow-dashboard): dark, modern, card-based.
 Own values and code, no source taken from it.
 
 ![Preview](design-preview.png)
 
-Tokens: [`energyboard-tokens.css`](../custom_components/energyboard/frontend/energyboard-tokens.css) · Live preview: [`design-preview.html`](design-preview.html)
+Tokens: [`energy-assistant-tokens.css`](../custom_components/energy_assistant/frontend/energy-assistant-tokens.css) · Live preview: [`design-preview.html`](design-preview.html)
 
 ## Principles
 
@@ -22,7 +22,7 @@ Tokens: [`energyboard-tokens.css`](../custom_components/energyboard/frontend/ene
 ## Typography
 
 [Outfit](https://fonts.google.com/specimen/Outfit) (OFL), weights 500/600/700/800.
-The font is bundled locally (`custom_components/energyboard/frontend/fonts/`, variable font as WOFF2 for Latin and Latin Extended, license in `OFL-Outfit.txt`) and included via `@font-face` in the tokens. No CDN, no connection to Google.
+The font is bundled locally (`custom_components/energy_assistant/frontend/fonts/`, variable font as WOFF2 for Latin and Latin Extended, license in `OFL-Outfit.txt`) and included via `@font-face` in the tokens. No CDN, no connection to Google.
 
 ## Components
 

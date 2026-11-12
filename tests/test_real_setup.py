@@ -12,9 +12,9 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energyboard.const import DOMAIN
+from custom_components.energy_assistant.const import DOMAIN
 
-FRONTEND = Path(__file__).parent.parent / "custom_components/energyboard/frontend"
+FRONTEND = Path(__file__).parent.parent / "custom_components/energy_assistant/frontend"
 
 
 @pytest.fixture
@@ -38,24 +38,26 @@ async def _panels(hass, hass_ws_client) -> dict:
 
 async def test_setup_registers_the_panel(hass, hass_ws_client, entry) -> None:
     assert entry.state is ConfigEntryState.LOADED
-    panel = (await _panels(hass, hass_ws_client))["energyboard"]
+    panel = (await _panels(hass, hass_ws_client))["energy-assistant"]
     assert panel["component_name"] == "custom"
-    assert panel["title"] == "Energyboard"
+    assert panel["title"] == "Energy Assistant"
     assert panel["require_admin"] is False
     custom = panel["config"]["_panel_custom"]
-    assert custom["name"] == "energyboard-panel"
-    assert custom["module_url"].startswith("/energyboard_static/energyboard-panel.js")
+    assert custom["name"] == "energy-assistant-panel"
+    assert custom["module_url"].startswith(
+        "/energy_assistant_static/energy-assistant-panel.js"
+    )
     assert panel["config"]["grid_import"] == ["sensor.gi"]
 
 
 async def test_panel_files_are_served(hass, hass_client, entry) -> None:
     client = await hass_client()
     for name in (
-        "energyboard-panel.js",
-        "energyboard-tokens.css",
+        "energy-assistant-panel.js",
+        "energy-assistant-tokens.css",
         "fonts/outfit-latin-wght-normal.woff2",
     ):
-        resp = await client.get(f"/energyboard_static/{name}")
+        resp = await client.get(f"/energy_assistant_static/{name}")
         assert resp.status == 200, name
         assert await resp.read() == (FRONTEND / name).read_bytes(), name
 
@@ -64,25 +66,25 @@ async def test_reload_and_unload(hass, hass_ws_client, entry) -> None:
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
-    assert "energyboard" in await _panels(hass, hass_ws_client)
+    assert "energy-assistant" in await _panels(hass, hass_ws_client)
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-    assert "energyboard" not in await _panels(hass, hass_ws_client)
+    assert "energy-assistant" not in await _panels(hass, hass_ws_client)
 
 
 async def test_panel_settings_over_the_real_websocket(
     hass, hass_ws_client, entry
 ) -> None:
     ws = await hass_ws_client(hass)
-    await ws.send_json_auto_id({"type": "energyboard/get_config"})
+    await ws.send_json_auto_id({"type": "energy_assistant/get_config"})
     msg = await ws.receive_json()
     assert msg["success"]
     assert msg["result"]["solar_power"] == ["sensor.pv"]
 
     await ws.send_json_auto_id(
         {
-            "type": "energyboard/update_config",
+            "type": "energy_assistant/update_config",
             "config": {"device_patterns": ["*_power"]},
         }
     )

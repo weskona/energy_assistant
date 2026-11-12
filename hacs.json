@@ -1,7 +1,7 @@
 {
-  "name": "Energyboard",
+  "name": "Energy Assistant",
   "homeassistant": "2024.7.0",
   "render_readme": true,
   "zip_release": true,
-  "filename": "energyboard.zip"
+  "filename": "energy_assistant.zip"
 }

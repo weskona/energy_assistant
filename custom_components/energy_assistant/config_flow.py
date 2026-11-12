@@ -1,4 +1,4 @@
-"""Config flow for Energyboard."""
+"""Config flow for Energy Assistant."""
 
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def _validate(user_input: dict[str, Any]) -> dict[str, str]:
     return {}
 
 
-class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
+class EnergyAssistantConfigFlow(ConfigFlow, domain=DOMAIN):
     """Setup in three steps: grid/house, solar/storage, devices."""
 
     VERSION = 1
@@ -160,7 +160,7 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
             user_input, errors = _clean_devices(user_input)
             if not errors:
                 return self.async_create_entry(
-                    title="Energyboard", data={**self._data, **user_input}
+                    title="Energy Assistant", data={**self._data, **user_input}
                 )
         return self.async_show_form(
             step_id="devices",
@@ -171,10 +171,10 @@ class EnergyboardConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return EnergyboardOptionsFlow()
+        return EnergyAssistantOptionsFlow()
 
 
-class EnergyboardOptionsFlow(OptionsFlow):
+class EnergyAssistantOptionsFlow(OptionsFlow):
     """Change sensors later, also in three steps."""
 
     def __init__(self) -> None:

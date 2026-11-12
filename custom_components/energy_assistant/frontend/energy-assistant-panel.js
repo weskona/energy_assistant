@@ -1,12 +1,12 @@
-/* Energyboard sidebar panel. Tab 1: household power. */
+/* Energy Assistant sidebar panel. Tab 1: household power. */
 const BASE = new URL(import.meta.url).pathname.replace(/\/[^/]*$/, "");
 
 // @font-face must live in the document, not in the shadow DOM.
-if (!document.getElementById("energyboard-fonts")) {
+if (!document.getElementById("energy-assistant-fonts")) {
   const l = document.createElement("link");
-  l.id = "energyboard-fonts";
+  l.id = "energy-assistant-fonts";
   l.rel = "stylesheet";
-  l.href = `${BASE}/energyboard-tokens.css`;
+  l.href = `${BASE}/energy-assistant-tokens.css`;
   document.head.appendChild(l);
 }
 
@@ -134,7 +134,7 @@ const STRINGS = {
     noHistory: "No history available yet",
     chartLabel: "House power over the last 24 hours",
     notConfigured:
-      "No sensors configured. Open Settings → Devices & services → Energyboard.",
+      "No sensors configured. Open Settings → Devices & services → Energy Assistant.",
     menu: "Menu",
     solar: "Solar",
     solarDirect: "Solar used directly",
@@ -207,8 +207,8 @@ const STRINGS = {
     pvGrid: "Grid: {parts}",
     pvImport: "import {n}",
     pvExport: "feed-in {n}",
-    pvFeedNote: "The feed-in sensor of PV Assistant reports feed-in as negative values and is not taken over.",
-    pvAbsNote: "The separate charging and discharging sensors of PV Assistant report their direction as negative values and are not taken over.",
+    pvFeedInfo: "The feed-in sensor of PV Assistant reports feed-in as negative values. It is used as the combined grid sensor (import +, feed-in −).",
+    pvAbsInfo: "Charging and discharging sensors that report negative values count with their magnitude.",
     pvApply: "Take over sensors",
     pvOverwrite: "This replaces the sensors in these fields. Save afterwards to keep them.",
     pvDone: "The sensors of PV Assistant are in use.",
@@ -252,7 +252,7 @@ const STRINGS = {
     noHistory: "Noch kein Verlauf verfügbar",
     chartLabel: "Hausleistung der letzten 24 Stunden",
     notConfigured:
-      "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energyboard auswählen.",
+      "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energy Assistant auswählen.",
     menu: "Menü",
     solar: "PV",
     solarDirect: "PV direkt verbraucht",
@@ -325,8 +325,8 @@ const STRINGS = {
     pvGrid: "Netz: {parts}",
     pvImport: "Bezug {n}",
     pvExport: "Einspeisung {n}",
-    pvFeedNote: "Der Einspeise-Sensor von PV Assistant meldet die Einspeisung als negative Werte und wird nicht übernommen.",
-    pvAbsNote: "Die getrennten Lade- und Entlade-Sensoren von PV Assistant melden die Richtung als negative Werte und werden nicht übernommen.",
+    pvFeedInfo: "Der Einspeise-Sensor von PV Assistant meldet die Einspeisung als negative Werte. Er wird als kombinierter Netzsensor genutzt (Bezug +, Einspeisung −).",
+    pvAbsInfo: "Lade- und Entlade-Sensoren mit negativen Werten zählen mit ihrem Betrag.",
     pvApply: "Sensoren übernehmen",
     pvOverwrite: "Dadurch werden die Sensoren in diesen Feldern ersetzt. Danach speichern, damit sie bleiben.",
     pvDone: "Die Sensoren von PV Assistant sind übernommen.",
@@ -413,7 +413,7 @@ const fmtPower = (w) => {
   return [Math.round(w).toLocaleString(), "W"];
 };
 
-class EnergyboardPanel extends HTMLElement {
+class EnergyAssistantPanel extends HTMLElement {
   constructor() {
     super();
     this._tab = "house";
@@ -443,9 +443,9 @@ class EnergyboardPanel extends HTMLElement {
     if (this._ready || this._loadingCfg || !this._hass) return;
     this._loadingCfg = true;
     try {
-      this._config = await this._hass.callWS({ type: "energyboard/get_config" });
+      this._config = await this._hass.callWS({ type: "energy_assistant/get_config" });
     } catch (e) {
-      console.warn("Energyboard: could not load settings, using the registration copy", e);
+      console.warn("Energy Assistant: could not load settings, using the registration copy", e);
       this._config = this._fallback || {};
     } finally {
       this._draft = this._normalize(this._config);
@@ -472,7 +472,7 @@ class EnergyboardPanel extends HTMLElement {
       const res = await this._hass.callWS({ type: "pv_assistant/config" });
       this._pv = this._normalizePv(res);
     } catch (e) {
-      console.info("Energyboard: PV Assistant is installed but its configuration is not available", e);
+      console.info("Energy Assistant: PV Assistant is installed but its configuration is not available", e);
       this._pv = null;
     } finally {
       this._pvLoading = false;
@@ -497,23 +497,25 @@ class EnergyboardPanel extends HTMLElement {
       plants.push({ name: inv.name || named(ids[0]), sensors: ids });
     }
     for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
-    // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on request.
-    // Separate in/out sensors that report their direction as negative values (abs_storage_power) do not fit.
-    const abs = !!res?.abs_storage_power;
+    // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on
+    // request. Separate in/out sensors may report negative values (abs_storage_power); Energy Assistant counts
+    // the magnitude of those sensors anyway.
     const battery = {
       combined: list(res?.storage_combined_power_sensors),
       invert: !!res?.invert_storage_combined_power,
-      charge: abs ? [] : list(res?.storage_in_power_sensors),
-      discharge: abs ? [] : list(res?.storage_out_power_sensors),
-      skipped: abs && (list(res?.storage_in_power_sensors).length > 0 || list(res?.storage_out_power_sensors).length > 0),
+      charge: list(res?.storage_in_power_sensors),
+      discharge: list(res?.storage_out_power_sensors),
+      absolute: !!res?.abs_storage_power,
     };
-    // Grid: the import sensors fit as they are. A feed-in sensor that reports negative values does not
-    // (the separate feed-in field expects positive values), so it stays out.
+    // Grid: the import sensors fit as they are. A feed-in sensor that reports feed-in as negative values is
+    // a combined meter (import +, feed-in −): it goes into the combined grid field, and is not counted twice
+    // when it is also one of the import sensors.
     const feedIn = list(res?.feed_in_power_sensor);
+    const negative = !!res?.invert_feed_in_power && feedIn.length > 0;
     const grid = {
-      import: list(res?.grid_import_power_sensors),
-      export: res?.invert_feed_in_power ? [] : feedIn,
-      skipped: !!res?.invert_feed_in_power && feedIn.length > 0,
+      import: list(res?.grid_import_power_sensors).filter((id) => !(negative && feedIn.includes(id))),
+      export: negative ? [] : feedIn,
+      combined: negative ? feedIn : [],
     };
     return { sensors, plants, battery, grid };
   }
@@ -529,6 +531,10 @@ class EnergyboardPanel extends HTMLElement {
     const g = this._pv.grid;
     if (g.import.length) t.grid_import = [...g.import];
     if (g.export.length) t.grid_export = [...g.export];
+    if (g.combined.length) {
+      t.grid_power = [...g.combined];
+      t.invert_grid = false;
+    }
     if (b.charge.length) t.battery_charge = [...b.charge];
     if (b.discharge.length) t.battery_discharge = [...b.discharge];
     return t;
@@ -544,11 +550,11 @@ class EnergyboardPanel extends HTMLElement {
     if (this._labelsLoading || !this._hass) return;
     this._labelsLoading = true;
     try {
-      const res = await this._hass.callWS({ type: "energyboard/labels" });
+      const res = await this._hass.callWS({ type: "energy_assistant/labels" });
       // Never let an incomplete answer break the settings form.
       this._labelData = { labels: Array.isArray(res?.labels) ? res.labels : [], entities: res?.entities || {} };
     } catch (e) {
-      console.warn("Energyboard: could not load labels", e);
+      console.warn("Energy Assistant: could not load labels", e);
       this._labelData = this._labelData || { labels: [], entities: {} };
     } finally {
       this._labelsLoading = false;
@@ -604,7 +610,7 @@ class EnergyboardPanel extends HTMLElement {
     this._settingsDirty = true;
     this._render();
     try {
-      this._config = await this._hass.callWS({ type: "energyboard/update_config", config: this._draft });
+      this._config = await this._hass.callWS({ type: "energy_assistant/update_config", config: this._draft });
       this._draft = this._normalize(this._config);
       this._history = null;
       this._lastHistory = 0;
@@ -655,11 +661,11 @@ class EnergyboardPanel extends HTMLElement {
     if (this._draft) this._draft.device_names = { ...names };
     this._endRename();
     try {
-      const res = await this._hass.callWS({ type: "energyboard/update_config", config: { device_names: names } });
+      const res = await this._hass.callWS({ type: "energy_assistant/update_config", config: { device_names: names } });
       this._config = res;
       if (this._draft) this._draft.device_names = { ...(res.device_names || {}) };
     } catch (e) {
-      console.warn("Energyboard: could not save the name", e);
+      console.warn("Energy Assistant: could not save the name", e);
       this._config = { ...this._cfg, device_names: before };
       if (this._draft) this._draft.device_names = { ...before };
     }
@@ -1009,6 +1015,7 @@ class EnergyboardPanel extends HTMLElement {
     const gridParts = [];
     if (g.import.length) gridParts.push(this._t("pvImport", { n: g.import.length }));
     if (g.export.length) gridParts.push(this._t("pvExport", { n: g.export.length }));
+    if (g.combined.length) gridParts.push(this._t("pvCombined", { n: g.combined.length }));
     const lines = [
       this._t("pvSolar", { n: this._pv.sensors.length }),
       parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : "",
@@ -1018,8 +1025,8 @@ class EnergyboardPanel extends HTMLElement {
     return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
       <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${b.skipped ? `<div class="hint">${esc(this._t("pvAbsNote"))}</div>` : ""}
-      ${g.skipped ? `<div class="hint">${esc(this._t("pvFeedNote"))}</div>` : ""}
+      ${g.combined.length ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
+      ${b.absolute && (b.charge.length || b.discharge.length) ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
       ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
     </div>`;
   }
@@ -1046,6 +1053,12 @@ class EnergyboardPanel extends HTMLElement {
   _sum(ids) {
     const vals = (ids || []).map((id) => this._watts(id)).filter((v) => v != null);
     return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+  }
+
+  /** Sum of the magnitudes: separate charging/discharging sensors may report their direction as negative values. */
+  _sumAbs(ids) {
+    const vals = (ids || []).map((id) => this._watts(id)).filter((v) => v != null);
+    return vals.length ? vals.reduce((a, b) => a + Math.abs(b), 0) : null;
   }
 
   /** Sum with optional sign inversion (for combined sensors). */
@@ -1076,8 +1089,8 @@ class EnergyboardPanel extends HTMLElement {
       solar: this._sum(c.solar_power),
       gridIn: this._sum(c.grid_import),
       gridOut: this._sum(c.grid_export),
-      discharge: this._sum(c.battery_discharge),
-      charge: this._sum(c.battery_charge),
+      discharge: this._sumAbs(c.battery_discharge),
+      charge: this._sumAbs(c.battery_charge),
       gridCharge: this._sum(c.battery_grid_charge),
       grid: this._signed(c.grid_power, c.invert_grid),
       battery: this._signed(c.battery_power, c.invert_battery),
@@ -1192,7 +1205,7 @@ class EnergyboardPanel extends HTMLElement {
       this._history = this._buildSeries(res, start.getTime(), end.getTime());
       this._lastHistory = now;
     } catch (e) {
-      console.warn("Energyboard: could not load history", e);
+      console.warn("Energy Assistant: could not load history", e);
       this._history = [];
       this._lastHistory = now - 4 * 60 * 1000; // retry after one minute
     } finally {
@@ -1223,18 +1236,18 @@ class EnergyboardPanel extends HTMLElement {
       return out;
     };
     // Add up several sensors per category (null if there is no value at that time).
-    const group = (ids, invert = false) => {
+    const group = (ids, invert = false, magnitude = false) => {
       const list = (ids || []).map(sample).filter(Boolean);
       if (!list.length) return null;
       return Array.from({ length: n + 1 }, (_, k) => {
-        const v = list.map((l) => l[k]).filter((x) => x != null);
+        const v = list.map((l) => l[k]).filter((x) => x != null).map((x) => (magnitude ? Math.abs(x) : x));
         return v.length ? (invert ? -1 : 1) * v.reduce((a, b) => a + b, 0) : null;
       });
     };
     const house = c.house_power ? sample(c.house_power) : null;
     const g = {
       solar: group(c.solar_power), gridIn: group(c.grid_import), gridOut: group(c.grid_export),
-      discharge: group(c.battery_discharge), charge: group(c.battery_charge),
+      discharge: group(c.battery_discharge, false, true), charge: group(c.battery_charge, false, true),
       gridCharge: group(c.battery_grid_charge),
       grid: group(c.grid_power, c.invert_grid), battery: group(c.battery_power, c.invert_battery),
     };
@@ -1574,7 +1587,7 @@ class EnergyboardPanel extends HTMLElement {
     if (!this.shadowRoot) return;
     if (!this._built) {
       this.shadowRoot.innerHTML = `<style>${STYLE}</style>
-        <link rel="stylesheet" href="${BASE}/energyboard-tokens.css">
+        <link rel="stylesheet" href="${BASE}/energy-assistant-tokens.css">
         <div class="wrap">
           <div class="top">
             <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
@@ -1672,4 +1685,4 @@ class EnergyboardPanel extends HTMLElement {
   }
 }
 
-customElements.define("energyboard-panel", EnergyboardPanel);
+customElements.define("energy-assistant-panel", EnergyAssistantPanel);

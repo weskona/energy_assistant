@@ -1,6 +1,6 @@
 """Tests for the settings helpers."""
 
-from custom_components.energyboard.settings import (
+from custom_components.energy_assistant.settings import (
     as_list,
     clean_ids,
     clean_names,
