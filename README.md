@@ -117,6 +117,15 @@ Without the optional "storage charged from grid" sensor the storage is assumed t
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile with its share of production, in the source bar and as a second line in the history.
 
+### PV Assistant (optional)
+
+If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energyboard reads its configuration (read-only, nothing is stored there):
+
+- In the Settings tab, **Solar production** shows a note with the number of production power sensors that PV Assistant uses and a button **Use as solar production** (administrators) that fills in the field. Save as usual.
+- On the Power tab a row **PV by plant** opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
+
+Without PV Assistant nothing changes.
+
 ### Changing the settings
 
 After the first setup in the config flow you can change everything in the panel itself:
