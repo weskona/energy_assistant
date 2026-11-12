@@ -1540,15 +1540,23 @@ test("drill-down: sensor names in the opened list are HTML-escaped; devices and 
 });
 
 // --- optional link to the PV Assistant integration ---------------------------------------------
-const PV_CONFIG = {
-  production_power_sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2", "sensor.wr2_pv"],
-  settings: {
-    strings: { "sensor.wr2_pv": { name: "Garage" } },
-    inverters: [{ name: "Wechselrichter Haus", sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2"] }],
+// The backend reads PV Assistant and answers with the settings that fit, notes and the plants.
+const PV_OFFER = {
+  targets: {
+    solar_power: ["sensor.wr1_pv1", "sensor.wr1_pv2", "sensor.wr2_pv"],
+    battery_power: ["sensor.batt"],
+    invert_battery: false,
+    grid_import: ["sensor.bezug"],
+    grid_export: ["sensor.einsp"],
   },
+  notes: { feed_in_negative: false, storage_absolute: false },
+  plants: [
+    { name: "Wechselrichter Haus", sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2"] },
+    { name: "Garage", sensors: ["sensor.wr2_pv"] },
+  ],
 };
 
-function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true } = {}) {
+function pvPanel({ solar = [], reply = PV_OFFER, admin = true } = {}) {
   const p = new Panel();
   p._config = { solar_power: solar, grid_import: ["sensor.netz"] };
   p._draft = p._normalize(p._config);
@@ -1556,10 +1564,7 @@ function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true
   p._render = () => {};
   p._hass = {
     user: { is_admin: admin },
-    entities: installed ? { "sensor.pv_assistant_pv_power": { platform: "pv_assistant" } } : { "sensor.x": { platform: "other" } },
-    states: {
-      "sensor.wr1_pv1": st(1200), "sensor.wr1_pv2": st(800), "sensor.wr2_pv": st(300), "sensor.netz": st(100),
-    },
+    states: { "sensor.wr1_pv1": st(1200), "sensor.wr1_pv2": st(800), "sensor.wr2_pv": st(300), "sensor.netz": st(100) },
     calls: [],
     callWS: async (msg) => {
       p._hass.calls.push(msg.type);
@@ -1570,71 +1575,62 @@ function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true
   return p;
 }
 
-test("pv assistant: production sensors and plants are read from its configuration", async () => {
+test("pv assistant: the panel asks the backend, never PV Assistant itself", async () => {
   const p = pvPanel();
   await p._loadPv();
-  assert.deepEqual(p._pv.sensors, PV_CONFIG.production_power_sensors);
-  assert.deepEqual(p._pv.plants.map((x) => x.name), ["Wechselrichter Haus", "Garage"]); // inverter first, then the sensor on its own
-  assert.deepEqual(p._pv.plants[0].sensors, ["sensor.wr1_pv1", "sensor.wr1_pv2"]);
+  assert.deepEqual(p._hass.calls, ["energy_assistant/pv_suggestion"]);
+  assert.deepEqual(p._pv.targets, PV_OFFER.targets);
+  assert.equal(p._pv.plants.length, 2);
 });
 
-test("pv assistant: nothing is requested when the integration is not installed", async () => {
-  const p = pvPanel({ installed: false });
-  await p._loadPv();
-  assert.deepEqual(p._hass.calls, []);
-  assert.equal(p._pv, undefined);
-});
-
-test("pv assistant: a failing or empty answer changes nothing", async () => {
-  const failing = pvPanel({ reply: new Error("unknown command") });
-  await failing._loadPv();
-  assert.equal(failing._pv, null);
-  const empty = pvPanel({ reply: {} });
-  await empty._loadPv();
-  assert.equal(empty._pv, null);
-  assert.equal(empty._renderPvPlants(null), "");
+test("pv assistant: no offer, an empty answer or an error change nothing", async () => {
+  for (const reply of [null, {}, { targets: {} }, new Error("unknown command")]) {
+    const p = pvPanel({ reply });
+    await p._loadPv();
+    assert.equal(p._pv, null);
+    assert.equal(p._renderPvNotice(false), "");
+    assert.equal(p._renderPvPlants(null), "");
+  }
 });
 
 test("pv assistant: the settings ask whether to take over the sensors, admins can do it", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"] } });
+  const p = pvPanel();
   await p._loadPv();
   let html = p._renderSettings();
   assert.match(html, /PV Assistant is installed\. Do you want to take over its sensors\?/);
   assert.match(html, /Solar production: 3 sensors/);
-  assert.match(html, /Storage: combined 1, charging 1, discharging 1/);
+  assert.match(html, /Storage: combined 1/);
+  assert.match(html, /Grid: import 1, feed-in 1/);
   assert.match(html, /data-pvapply/);
   p._edited = () => {};
   p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
-  assert.deepEqual(p._draft.solar_power, PV_CONFIG.production_power_sensors);
+  assert.deepEqual(p._draft.solar_power, PV_OFFER.targets.solar_power);
   assert.deepEqual(p._draft.battery_power, ["sensor.batt"]);
-  assert.deepEqual(p._draft.battery_charge, ["sensor.in"]);
-  assert.deepEqual(p._draft.battery_discharge, ["sensor.out"]);
+  assert.deepEqual(p._draft.grid_import, ["sensor.bezug"]); // replaces the sensor that was there
+  assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
   assert.equal(p._draft.invert_battery, false);
   html = p._renderSettings();
   assert.match(html, /sensors of PV Assistant are in use/);
   assert.doesNotMatch(html, /data-pvapply/);
 });
 
-test("pv assistant: the sign of a combined storage sensor follows PV Assistant", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], invert_storage_combined_power: true } });
+test("pv assistant: the sign settings of the offer are applied too", async () => {
+  const p = pvPanel({ reply: { ...PV_OFFER, targets: { ...PV_OFFER.targets, invert_battery: true, grid_power: ["sensor.zaehler"], invert_grid: false } } });
   await p._loadPv();
   p._edited = () => {};
+  p._draft.invert_grid = true;
   p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
   assert.equal(p._draft.invert_battery, true);
+  assert.equal(p._draft.invert_grid, false);
+  assert.deepEqual(p._draft.grid_power, ["sensor.zaehler"]);
 });
 
-test("pv assistant: separate storage sensors that report negative values are taken over and count with their magnitude", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"], abs_storage_power: true } });
+test("pv assistant: the notes of the backend show as hints", async () => {
+  const p = pvPanel({ reply: { ...PV_OFFER, notes: { feed_in_negative: true, storage_absolute: true } } });
   await p._loadPv();
-  assert.deepEqual(p._pvTargets().battery_charge, ["sensor.in"]);
-  assert.deepEqual(p._pvTargets().battery_discharge, ["sensor.out"]);
-  assert.match(p._renderSettings(), /count with their magnitude/);
-  p._hass.states["sensor.in"] = st(-700);
-  p._hass.states["sensor.out"] = st(-300);
-  p._config = { ...p._config, battery_charge: ["sensor.in"], battery_discharge: ["sensor.out"] };
-  const c = p._current();
-  assert.equal(c.charge, 700);
-  assert.equal(c.discharge, 300);
+  const html = p._renderSettings();
+  assert.match(html, /used as the combined grid sensor/);
+  assert.match(html, /count with their magnitude/);
 });
 
 test("pv assistant: read-only users get the information but no button", async () => {
@@ -1646,7 +1642,7 @@ test("pv assistant: read-only users get the information but no button", async ()
 });
 
 test("pv assistant: the Power tab lists the plants in a row that opens, strongest first", async () => {
-  const p = pvPanel({ solar: PV_CONFIG.production_power_sensors });
+  const p = pvPanel({ solar: PV_OFFER.targets.solar_power });
   await p._loadPv();
   let html = p._renderPvPlants(null);
   assert.match(html, /PV by plant/);
@@ -1660,44 +1656,9 @@ test("pv assistant: the Power tab lists the plants in a row that opens, stronges
 });
 
 test("pv assistant: a single plant adds no row", async () => {
-  const p = pvPanel({ reply: { production_power_sensors: ["sensor.wr2_pv"] } });
+  const p = pvPanel({ reply: { ...PV_OFFER, plants: [{ name: "Garage", sensors: ["sensor.wr2_pv"] }] } });
   await p._loadPv();
   assert.equal(p._renderPvPlants(null), "");
-});
-
-test("pv assistant: grid import and feed-in sensors are taken over", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp" } });
-  await p._loadPv();
-  assert.match(p._renderSettings(), /Grid: import 1, feed-in 1/);
-  p._edited = () => {};
-  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
-  assert.deepEqual(p._draft.grid_import, ["sensor.bezug"]); // replaces the sensor that was there
-  assert.deepEqual(p._draft.grid_export, ["sensor.einsp"]);
-});
-
-test("pv assistant: a feed-in sensor with negative values becomes the combined grid sensor", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.bezug"], feed_in_power_sensor: "sensor.einsp", invert_feed_in_power: true } });
-  await p._loadPv();
-  const t = p._pvTargets();
-  assert.deepEqual(t.grid_power, ["sensor.einsp"]);
-  assert.equal(t.invert_grid, false);
-  assert.deepEqual(t.grid_import, ["sensor.bezug"]);
-  assert.equal(t.grid_export, undefined);
-  assert.match(p._renderSettings(), /used as the combined grid sensor/);
-  p._config = { ...p._config, grid_power: ["sensor.einsp"], grid_import: ["sensor.bezug"] };
-  p._hass.states["sensor.einsp"] = st(-400);
-  p._hass.states["sensor.bezug"] = st(0);
-  const c = p._current();
-  assert.equal(c.gridOut, 400);
-  assert.equal(c.gridIn, 0);
-});
-
-test("pv assistant: a combined meter that is also an import sensor is not counted twice", async () => {
-  const p = pvPanel({ reply: { ...PV_CONFIG, grid_import_power_sensors: ["sensor.zaehler"], feed_in_power_sensor: "sensor.zaehler", invert_feed_in_power: true } });
-  await p._loadPv();
-  const t = p._pvTargets();
-  assert.deepEqual(t.grid_power, ["sensor.zaehler"]);
-  assert.equal(t.grid_import, undefined); // the meter already covers the import
 });
 
 test("display: separate charging and discharging sensors count with their magnitude", () => {
@@ -1705,4 +1666,270 @@ test("display: separate charging and discharging sensors count with their magnit
   const cur = p._current();
   assert.equal(cur.charge, 250);
   assert.equal(cur.discharge, 100);
+});
+
+test("display: a feed-in sensor with negative values as combined grid sensor counts as export", () => {
+  const p = panel({ grid_power: ["e"], grid_import: ["b"] }, { e: st(-400), b: st(0) });
+  const c = p._current();
+  assert.equal(c.gridOut, 400);
+  assert.equal(c.gridIn, 0);
+});
+
+// --- optional data from Tariffy (prices) -------------------------------------------------------
+function costPanel({ price = "0.298", unit = "EUR/kWh", attrs = {}, feedIn = "0.08", tariffy = true, grid = {} } = {}) {
+  const states = {
+    "sensor.t_preis": { state: price, attributes: { unit_of_measurement: unit, ...attrs } },
+    "sensor.t_einsp": { state: feedIn, attributes: { unit_of_measurement: unit } },
+    pv: st(3000), gi: st(grid.gi ?? 2000), ge: st(grid.ge ?? 500), h: st(4500),
+  };
+  const p = panel({ solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], house_power: "h" }, states);
+  p._hass.language = "en";
+  p._int = tariffy ? { tariffy: { price: "sensor.t_preis", feed_in: feedIn === null ? null : "sensor.t_einsp" } } : {};
+  return p;
+}
+
+test("tariffy: money flows per hour from the price, the feed-in tariff and the live power", () => {
+  const p = costPanel();
+  const html = p._renderCosts(p._current());
+  assert.match(html, /Costs right now/);
+  assert.match(html, /Electricity price<\/div><div class="eb-value">29\.8<small>ct\/kWh/);
+  assert.match(html, /Grid import costs<\/div><div class="eb-value">0\.60<small>[^<]*\/h/); // 2 kW x 0.298
+  assert.match(html, /Feed-in earns<\/div><div class="eb-value">0\.04<small>[^<]*\/h/); // 0.5 kW x 0.08
+  assert.match(html, /Solar saves<\/div><div class="eb-value">0\.75<small>[^<]*\/h/); // direct 2.5 kW x 0.298
+});
+
+test("tariffy: the live price of a dynamic tariff wins over the average", () => {
+  const p = costPanel({ price: "0.25", attrs: { arbeitspreis_aktuell: 0.4 } });
+  assert.equal(p._price().value, 0.4);
+  assert.match(p._renderCosts(p._current()), /40\.0<small>ct\/kWh/);
+});
+
+test("tariffy: without a feed-in sensor there is no feed-in tile; without Tariffy nothing is shown", () => {
+  const p = costPanel({ feedIn: null });
+  assert.doesNotMatch(p._renderCosts(p._current()), /Feed-in earns/);
+  const none = costPanel({ tariffy: false });
+  assert.equal(none._renderCosts(none._current()), "");
+  const unknown = costPanel({ price: "unavailable" });
+  assert.equal(unknown._renderCosts(unknown._current()), "");
+});
+
+test("tariffy: other currencies show the price with their unit", () => {
+  const p = costPanel({ unit: "CHF/kWh", price: "0.3" });
+  const html = p._renderCosts(p._current());
+  assert.match(html, /0\.3<small>CHF\/kWh/);
+});
+
+test("tariffy: the costs are part of the Power tab", () => {
+  const p = costPanel();
+  p._ready = true;
+  assert.match(p._renderHouse(), /Costs right now/);
+});
+
+test("integrations: the panel asks the backend and an error leaves nothing to show", async () => {
+  const p = costPanel({ tariffy: false });
+  p._render = () => {};
+  p._hass.callWS = async (msg) => ({ type: msg.type, tariffy: { price: "sensor.t_preis" } });
+  await p._loadIntegrations();
+  assert.equal(p._int.tariffy.price, "sensor.t_preis");
+  const broken = costPanel();
+  broken._render = () => {};
+  broken._hass.callWS = async () => { throw new Error("nope"); };
+  await broken._loadIntegrations();
+  assert.deepEqual(broken._int, {});
+});
+
+// --- optional data from EV Assistant (wallbox and vehicle) --------------------------------------
+function evPanel({ live = {}, key = "evcc_live", kwh = "12.4", cost = "3.1", recommend = "off", vehicles } = {}) {
+  const states = {
+    "sensor.ev_home": { state: "812", attributes: { [key]: live, solaranteil_pct: 55 } },
+    "sensor.ev_kwh_day": { state: kwh, attributes: { unit_of_measurement: "kWh" } },
+    "sensor.ev_cost_day": { state: cost, attributes: { unit_of_measurement: "EUR" } },
+    "binary_sensor.ev_vor_pv": { state: recommend, attributes: {} },
+  };
+  const p = panel({ house_power: "h" }, { ...states, h: st(4000) });
+  p._hass.language = "en";
+  p._int = {
+    ev_assistant: {
+      vehicles: vehicles ?? [{ name: "ID.3", live: "sensor.ev_home", kwh_today: "sensor.ev_kwh_day", cost_today: "sensor.ev_cost_day", recommend: "binary_sensor.ev_vor_pv" }],
+    },
+  };
+  return p;
+}
+
+test("ev assistant: a charging vehicle shows its power in W, charge level, solar share and today's figures", () => {
+  const html = evPanel({ live: { charge_power: 7.4, charging: true, connected: true, vehicle_soc: 61.4, session_solar_pct: 72 } })._renderEv();
+  assert.match(html, />Wallbox</);
+  assert.match(html, /ID\.3<\/div><div class="eb-value">7[.,\s]?400<small>W/); // 7.4 kW in whole watts
+  assert.match(html, /Charge level<\/div><div class="eb-value">61<small>%/);
+  assert.match(html, /Solar share<\/div><div class="eb-value">72<small>%/);
+  assert.match(html, /Charged today<\/div><div class="eb-value">12\.4<small>kWh/);
+  assert.match(html, /Charging cost today<\/div><div class="eb-value">3\.10<small>[^<]*</);
+});
+
+test("ev assistant: without evcc the generic live data is used; idle states say connected or not connected", () => {
+  assert.match(evPanel({ key: "home_generic_live", live: { charge_power: 3.7, charging: true, connected: true } })._renderEv(), /ID\.3<\/div><div class="eb-value">3[.,\s]?700<small>W/);
+  assert.match(evPanel({ live: { charge_power: 0, charging: false, connected: true } })._renderEv(), /ID\.3<\/div><div class="eb-value">Connected</);
+  assert.match(evPanel({ live: { charge_power: 0, charging: false, connected: false } })._renderEv(), /ID\.3<\/div><div class="eb-value">Not connected</);
+});
+
+test("ev assistant: the advice to charge before PV shows only when it is on", () => {
+  assert.doesNotMatch(evPanel({ live: {} })._renderEv(), /Charge before PV/);
+  assert.match(evPanel({ live: {}, recommend: "on" })._renderEv(), /Charge before PV is recommended/);
+});
+
+test("ev assistant: nothing without the integration, without values or with unusable states", () => {
+  assert.equal(evPanel({ vehicles: [] })._renderEv(), "");
+  const p = evPanel({ kwh: "unavailable", cost: "unknown" });
+  p._hass.states["sensor.ev_home"].attributes = {};
+  assert.equal(p._renderEv(), "");
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderEv(), "");
+});
+
+test("ev assistant: the Power tab contains the wallbox block", () => {
+  const p = evPanel({ live: { charge_power: 7.4, charging: true, connected: true } });
+  p._ready = true;
+  assert.match(p._renderHouse(), /Wallbox/);
+});
+
+// --- optional data from PV Assistant (day figures, forecast, plant fault) -----------------------
+const PV_DAY = {
+  production_today: "sensor.pv_prod",
+  feed_in_today: "sensor.pv_feed",
+  self_consumption_rate_today: "sensor.pv_self",
+  autarky_today: "sensor.pv_autarky",
+  forecast_reached_today: "sensor.pv_fc",
+  benefit_today: "sensor.pv_benefit",
+  expected_feed_in_tomorrow: "sensor.pv_exp",
+  best_window_tomorrow: "sensor.pv_window",
+  storage_usable: "sensor.pv_stor",
+  storage_empty_at: "sensor.pv_empty",
+  string_fault: "binary_sensor.pv_fault",
+};
+
+function pvDayPanel({ entities = PV_DAY, fault = "off", empty = "2026-11-12T22:30:00+00:00" } = {}) {
+  const e = (state, attributes = {}) => ({ state, attributes });
+  const p = panel({ house_power: "h" }, {
+    h: st(1),
+    "sensor.pv_prod": e("18.46"), "sensor.pv_feed": e("7.2"), "sensor.pv_self": e("61.2"), "sensor.pv_autarky": e("74.6"),
+    "sensor.pv_fc": e("92.3"), "sensor.pv_benefit": e("4.2", { unit_of_measurement: "EUR" }),
+    "sensor.pv_exp": e("9.8"), "sensor.pv_window": e("2026-11-13T10:00:00+00:00", { end: "2026-11-13T13:00:00+00:00", energy: 8.1 }),
+    "sensor.pv_stor": e("5.4"), "sensor.pv_empty": e(empty),
+    "binary_sensor.pv_fault": e(fault, { plants: ["Garage", "Carport"] }),
+  });
+  p._hass.language = "en";
+  p._int = { pv_assistant: { entities } };
+  return p;
+}
+
+test("pv assistant day: today's figures, tomorrow's forecast and the storage show as tiles", () => {
+  const html = pvDayPanel()._renderPvDay();
+  assert.match(html, /PV today and tomorrow/);
+  assert.match(html, /Production<\/div><div class="eb-value">18\.5<small>kWh/);
+  assert.match(html, /Feed-in<\/div><div class="eb-value">7\.2<small>kWh/);
+  assert.match(html, /Self-consumption<\/div><div class="eb-value">61<small>%/);
+  assert.match(html, /Self-sufficiency<\/div><div class="eb-value">75<small>%/);
+  assert.match(html, /Forecast reached<\/div><div class="eb-value">92<small>%/);
+  assert.match(html, /Benefit<\/div><div class="eb-value">4\.20<small>[^<]*</);
+  assert.match(html, /Expected feed-in<\/div><div class="eb-value">9\.8<small>kWh/);
+  assert.match(html, /Best window<\/div><div class="eb-value">[^<]*\d[^<]*–[^<]*\d/);
+  assert.match(html, />Storage<\/div>/); // own group, not part of tomorrow
+  assert.ok(html.indexOf("Storage usable") < html.indexOf(">Tomorrow<"));
+  assert.match(html, /Storage usable<\/div><div class="eb-value">5\.4<small>kWh/);
+  assert.match(html, /Storage empty at<\/div><div class="eb-value">[^<]*\d/);
+  assert.doesNotMatch(html, /class="alert"/);
+});
+
+test("pv assistant day: a plant fault shows a warning with the plants", () => {
+  const html = pvDayPanel({ fault: "on" })._renderPvDay();
+  assert.match(html, /class="alert">⚠ Plant fault: Garage, Carport/);
+});
+
+test("pv assistant day: unknown values and missing entities leave tiles out, nothing without any", () => {
+  const p = pvDayPanel({ entities: { production_today: "sensor.pv_prod" }, empty: "unknown" });
+  const html = p._renderPvDay();
+  assert.match(html, /Production/);
+  assert.doesNotMatch(html, /Tomorrow|Storage|Feed-in/);
+  assert.equal(pvDayPanel({ entities: {} })._renderPvDay().includes("tile"), false);
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderPvDay(), "");
+  const unavailable = pvDayPanel({ entities: { storage_empty_at: "sensor.pv_empty" }, empty: "unavailable" });
+  assert.equal(unavailable._renderPvDay(), "");
+});
+
+test("pv assistant day: the card is part of the Power tab", () => {
+  const p = pvDayPanel();
+  p._ready = true;
+  assert.match(p._renderHouse(), /PV today and tomorrow/);
+});
+
+// --- optional data from Amortix (savings and payback) -------------------------------------------
+function amortixPanel({ entries, states = {} } = {}) {
+  const e = (state, attributes = {}) => ({ state, attributes });
+  const p = panel({ house_power: "h" }, {
+    h: st(1),
+    "sensor.am_sav": e("1234.5", { unit_of_measurement: "EUR" }),
+    "sensor.am_inv": e("5000", { unit_of_measurement: "EUR" }),
+    "sensor.am_prog": e("24.7"),
+    "sensor.am_rem": e("3765.5", { unit_of_measurement: "EUR" }),
+    "sensor.am_day": e("3.2", { unit_of_measurement: "EUR" }),
+    "sensor.am_days": e("1177.4"),
+    "sensor.am_date": e("2029-12-31T12:00:00+00:00"),
+    ...states,
+  });
+  p._hass.language = "en";
+  p._int = {
+    amortix: {
+      entries: entries ?? [
+        { title: "Anlage", mode: "overview", entities: { einsparung: "sensor.am_sav", investition: "sensor.am_inv", fortschritt: "sensor.am_prog", verbleibend: "sensor.am_rem", tagesschnitt: "sensor.am_day", resttage: "sensor.am_days", datum: "sensor.am_date" } },
+      ],
+    },
+  };
+  return p;
+}
+
+test("amortix: savings, investment, progress, remaining, per day, days and date show as tiles", () => {
+  const html = amortixPanel()._renderAmortix();
+  assert.match(html, /<span class="eb-title">Payback<\/span>/);
+  assert.match(html, />Anlage<\/div>/);
+  assert.match(html, /Savings total<\/div><div class="eb-value">1,234\.50<small>[^<]*</);
+  assert.match(html, /Investment<\/div><div class="eb-value">5,000\.00<small>[^<]*</);
+  assert.match(html, /Progress<\/div><div class="eb-value">24\.7<small>%<\/small><\/div><div class="amo-bar"><div style="width:24\.7%">/);
+  assert.match(html, /Remaining<\/div><div class="eb-value">3,765\.50/);
+  assert.match(html, /Savings per day<\/div><div class="eb-value">3\.20/);
+  assert.match(html, /Time left<\/div><div class="eb-value">1,177<small>days/);
+  assert.match(html, /Payback date<\/div><div class="eb-value">[^<]*2029[^<]*</);
+});
+
+test("amortix: the progress bar stays between 0 and 100 percent", () => {
+  const over = amortixPanel({ states: { "sensor.am_prog": { state: "140", attributes: {} } } })._renderAmortix();
+  assert.match(over, /style="width:100%"/);
+  const under = amortixPanel({ states: { "sensor.am_prog": { state: "-5", attributes: {} } } })._renderAmortix();
+  assert.match(under, /style="width:0%"/);
+});
+
+test("amortix: unknown values are left out, nothing without values or without Amortix", () => {
+  const p = amortixPanel({ states: { "sensor.am_date": { state: "unknown", attributes: {} }, "sensor.am_days": { state: "unavailable", attributes: {} } } });
+  const html = p._renderAmortix();
+  assert.doesNotMatch(html, /Payback date|Time left/);
+  assert.match(html, /Savings total/);
+  const empty = amortixPanel({ entries: [{ title: "x", entities: { einsparung: "sensor.missing" } }] });
+  assert.equal(empty._renderAmortix(), "");
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderAmortix(), "");
+});
+
+test("amortix: several entries show one block each; the card is part of the Power tab", () => {
+  const entries = [
+    { title: "Balkon", entities: { einsparung: "sensor.am_sav" } },
+    { title: "Wallbox", entities: { einsparung: "sensor.am_inv" } },
+  ];
+  const p = amortixPanel({ entries });
+  const html = p._renderAmortix();
+  assert.ok(html.indexOf("Balkon") < html.indexOf("Wallbox"));
+  p._ready = true;
+  assert.match(p._renderHouse(), /<span class="eb-title">Payback<\/span>/);
 });

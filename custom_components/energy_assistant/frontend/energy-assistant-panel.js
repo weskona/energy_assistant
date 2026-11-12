@@ -38,6 +38,11 @@ const STYLE = `
 .big{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px}
 .big b{font-size:64px;font-weight:800;line-height:1}
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
+.eb-label.costs{margin-top:18px}
+.fullrow{grid-column:1/-1}
+.amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
+.amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
+.alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
@@ -196,6 +201,44 @@ const STRINGS = {
     noAreaMatches: "No area matches the filters",
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    amTitle: "Payback",
+    aSavings: "Savings total",
+    aInvest: "Investment",
+    aProgress: "Progress",
+    aRemaining: "Remaining",
+    aPerDay: "Savings per day",
+    aDays: "Time left",
+    aDaysUnit: "days",
+    aDate: "Payback date",
+    pvDayTitle: "PV today and tomorrow",
+    pvToday: "Today",
+    pvTomorrow: "Tomorrow",
+    dProduction: "Production",
+    dFeedIn: "Feed-in",
+    dSelf: "Self-consumption",
+    dAutarky: "Self-sufficiency",
+    dForecast: "Forecast reached",
+    dBenefit: "Benefit",
+    dExpected: "Expected feed-in",
+    dWindow: "Best window",
+    dStorageTitle: "Storage",
+    dStorage: "Storage usable",
+    dEmptyAt: "Storage empty at",
+    dFault: "Plant fault",
+    evWallbox: "Wallbox",
+    evCharging: "Charging",
+    evConnected: "Connected",
+    evIdle: "Not connected",
+    evSoc: "Charge level",
+    evSolar: "Solar share",
+    evToday: "Charged today",
+    evCostToday: "Charging cost today",
+    evAdvice: "Charge before PV is recommended",
+    costsNow: "Costs right now",
+    tPrice: "Electricity price",
+    tGridCost: "Grid import costs",
+    tFeedIn: "Feed-in earns",
+    tPvSaves: "Solar saves",
     pvPlants: "PV by plant",
     pvTitle: "PV Assistant detected",
     pvAsk: "PV Assistant is installed. Do you want to take over its sensors?",
@@ -314,6 +357,44 @@ const STRINGS = {
     noAreaMatches: "Kein Bereich passt zu den Filtern",
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    amTitle: "Amortisation",
+    aSavings: "Einsparung gesamt",
+    aInvest: "Investition",
+    aProgress: "Fortschritt",
+    aRemaining: "Verbleibend",
+    aPerDay: "Ersparnis pro Tag",
+    aDays: "Restzeit",
+    aDaysUnit: "Tage",
+    aDate: "Amortisation am",
+    pvDayTitle: "PV heute und morgen",
+    pvToday: "Heute",
+    pvTomorrow: "Morgen",
+    dProduction: "Erzeugung",
+    dFeedIn: "Einspeisung",
+    dSelf: "Eigenverbrauch",
+    dAutarky: "Autarkie",
+    dForecast: "Prognose erreicht",
+    dBenefit: "Nutzen",
+    dExpected: "Erwartete Einspeisung",
+    dWindow: "Bestes Fenster",
+    dStorageTitle: "Speicher",
+    dStorage: "Speicher nutzbar",
+    dEmptyAt: "Speicher leer um",
+    dFault: "Anlagenstörung",
+    evWallbox: "Wallbox",
+    evCharging: "Lädt",
+    evConnected: "Verbunden",
+    evIdle: "Nicht verbunden",
+    evSoc: "Ladestand",
+    evSolar: "Solaranteil",
+    evToday: "Heute geladen",
+    evCostToday: "Ladekosten heute",
+    evAdvice: "Laden vor PV empfehlenswert",
+    costsNow: "Kosten jetzt",
+    tPrice: "Strompreis",
+    tGridCost: "Netzbezug kostet",
+    tFeedIn: "Einspeisung bringt",
+    tPvSaves: "PV spart",
     pvPlants: "PV je Anlage",
     pvTitle: "PV Assistant erkannt",
     pvAsk: "PV Assistant ist installiert. Sollen die Sensoren übernommen werden?",
@@ -456,23 +537,245 @@ class EnergyAssistantPanel extends HTMLElement {
       this._maybeLoadHistory();
       this._loadLabels();
       this._loadPv();
+      this._loadIntegrations();
     }
   }
 
   /**
-   * Optional link to the PV Assistant integration (weskona/pv-assistant): when it is installed, its
-   * configuration tells which sensors measure the PV production and how they group into plants.
-   * Without it, or when anything fails, nothing changes.
+   * Entities of installed sibling integrations (Tariffy, ...). The backend only reads them; the values
+   * come live from the states. Without any of them the answer is empty and nothing is shown.
+   */
+  async _loadIntegrations() {
+    if (this._intLoading || !this._hass) return;
+    this._intLoading = true;
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/integrations" });
+      this._int = res && typeof res === "object" ? res : {};
+    } catch (e) {
+      console.info("Energy Assistant: could not ask for sibling integrations", e);
+      this._int = {};
+    } finally {
+      this._intLoading = false;
+      this._render();
+    }
+  }
+
+  /** Electricity price in currency/kWh (the live price of a dynamic tariff if Tariffy has one). */
+  _price() {
+    const t = this._int?.tariffy;
+    const state = t?.price && this._hass?.states?.[t.price];
+    if (!state) return null;
+    const live = parseFloat(state.attributes?.arbeitspreis_aktuell);
+    const value = Number.isNaN(live) ? parseFloat(state.state) : live;
+    if (Number.isNaN(value)) return null;
+    const unit = String(state.attributes?.unit_of_measurement || "EUR/kWh");
+    return { value, currency: unit.split("/")[0] || "EUR" };
+  }
+
+  _feedInTariff() {
+    const id = this._int?.tariffy?.feed_in;
+    const v = id && this._hass?.states?.[id] ? parseFloat(this._hass.states[id].state) : NaN;
+    return Number.isNaN(v) ? null : v;
+  }
+
+  /**
+   * Savings and payback of Amortix (read only): total savings, investment, progress, what remains, the
+   * daily savings and the expected payback date, per entry (the overview entry replaces the others).
+   * Tiles without a value are left out; empty without Amortix.
+   */
+  _renderAmortix() {
+    const entries = this._int?.amortix?.entries;
+    if (!Array.isArray(entries) || !entries.length) return "";
+    const lang = this._hass?.language || "en";
+    const tile = (label, value, unit = "", extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${extra}</div>`;
+    const blocks = entries.map((entry) => {
+      const ids = entry.entities || {};
+      const tiles = [];
+      const money = (label, key) => {
+        const v = this._num(ids[key]);
+        if (v == null) return;
+        const [n, sym] = this._money(v, this._hass?.states?.[ids[key]]?.attributes?.unit_of_measurement || "EUR");
+        tiles.push(tile(label, n, sym));
+      };
+      money(this._t("aSavings"), "einsparung");
+      money(this._t("aInvest"), "investition");
+      const progress = this._num(ids.fortschritt);
+      if (progress != null) {
+        const pct = Math.max(0, Math.min(100, progress));
+        tiles.push(tile(this._t("aProgress"), pct.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "%", `<div class="amo-bar"><div style="width:${pct}%"></div></div>`));
+      }
+      money(this._t("aRemaining"), "verbleibend");
+      money(this._t("aPerDay"), "tagesschnitt");
+      const days = this._num(ids.resttage);
+      if (days != null) tiles.push(tile(this._t("aDays"), Math.round(days).toLocaleString(lang), this._t("aDaysUnit")));
+      const dateState = ids.datum && this._hass?.states?.[ids.datum]?.state;
+      const date = dateState && !["unknown", "unavailable"].includes(dateState) ? new Date(dateState) : null;
+      if (date && !Number.isNaN(date.getTime())) tiles.push(tile(this._t("aDate"), esc(date.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" }))));
+      if (!tiles.length) return "";
+      return `<div class="eb-label costs">${esc(entry.title || "Amortix")}</div><div class="tiles">${tiles.join("")}</div>`;
+    }).join("");
+    return blocks ? `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("amTitle"))}</span></div>${blocks}</div>` : "";
+  }
+
+  /** Time of an ISO timestamp state as hh:mm in the local format (null if it is not a time). */
+  _time(value) {
+    const d = value && !["unknown", "unavailable"].includes(value) ? new Date(value) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString(this._hass?.language || "en", { hour: "2-digit", minute: "2-digit" }) : null;
+  }
+
+  /**
+   * PV day figures and forecast of PV Assistant (read only): production, feed-in, self-consumption,
+   * self-sufficiency, forecast reached and benefit of today; expected feed-in and best window of tomorrow;
+   * usable storage energy and when it is empty; a warning for a plant fault. Empty without PV Assistant
+   * or without any value.
+   */
+  _renderPvDay() {
+    const ids = this._int?.pv_assistant?.entities;
+    if (!ids) return "";
+    const lang = this._hass?.language || "en";
+    const state = (key) => (ids[key] ? this._hass?.states?.[ids[key]] : null);
+    const num = (key) => this._num(ids[key]);
+    const tile = (label, value, unit = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div></div>`;
+    const fixed = (v, d) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    const today = [];
+    const add = (list, label, key, unit, digits) => {
+      const v = num(key);
+      if (v != null) list.push(tile(label, fixed(v, digits), unit));
+    };
+    add(today, this._t("dProduction"), "production_today", "kWh", 1);
+    add(today, this._t("dFeedIn"), "feed_in_today", "kWh", 1);
+    add(today, this._t("dSelf"), "self_consumption_rate_today", "%", 0);
+    add(today, this._t("dAutarky"), "autarky_today", "%", 0);
+    add(today, this._t("dForecast"), "forecast_reached_today", "%", 0);
+    const benefit = num("benefit_today");
+    if (benefit != null) {
+      const [n, sym] = this._money(benefit, state("benefit_today")?.attributes?.unit_of_measurement || "EUR");
+      today.push(tile(this._t("dBenefit"), n, sym));
+    }
+    const tomorrow = [];
+    add(tomorrow, this._t("dExpected"), "expected_feed_in_tomorrow", "kWh", 1);
+    const start = this._time(state("best_window_tomorrow")?.state);
+    if (start) {
+      const end = this._time(state("best_window_tomorrow")?.attributes?.end);
+      tomorrow.push(tile(this._t("dWindow"), esc(end ? `${start}–${end}` : start)));
+    }
+    const storage = [];
+    add(storage, this._t("dStorage"), "storage_usable", "kWh", 1);
+    const empty = this._time(state("storage_empty_at")?.state);
+    if (empty) storage.push(tile(this._t("dEmptyAt"), esc(empty)));
+    const fault = state("string_fault");
+    const plants = Array.isArray(fault?.attributes?.plants) ? fault.attributes.plants.join(", ") : "";
+    const alert = fault?.state === "on" ? `<div class="alert">⚠ ${esc(this._t("dFault"))}${plants ? `: ${esc(plants)}` : ""}</div>` : "";
+    if (!today.length && !tomorrow.length && !storage.length && !alert) return "";
+    const block = (title, tiles) => (tiles.length ? `<div class="eb-label costs">${esc(title)}</div><div class="tiles">${tiles.join("")}</div>` : "");
+    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("pvDayTitle"))}</span></div>
+      ${alert}${block(this._t("pvToday"), today)}${block(this._t("dStorageTitle"), storage)}${block(this._t("pvTomorrow"), tomorrow)}</div>`;
+  }
+
+  /** Value of a state as number (null if missing, unknown or not a number). */
+  _num(entityId) {
+    const s = entityId && this._hass?.states?.[entityId];
+    const v = s ? parseFloat(s.state) : NaN;
+    return Number.isNaN(v) ? null : v;
+  }
+
+  /**
+   * Wallbox and vehicle of EV Assistant (read only): live status and power, charge level, solar share,
+   * what was charged today and the advice to charge before the PV production starts. One row of tiles
+   * per vehicle; empty without EV Assistant or without any value.
+   */
+  _renderEv() {
+    const vehicles = this._int?.ev_assistant?.vehicles;
+    if (!Array.isArray(vehicles) || !vehicles.length) return "";
+    const lang = this._hass?.language || "en";
+    const tile = (label, value, unit = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div></div>`;
+    const blocks = vehicles.map((v) => {
+      const attrs = this._hass?.states?.[v.live]?.attributes || {};
+      // Live data: with evcc "evcc_live", otherwise "home_generic_live". charge_power is in kW.
+      const live = attrs.evcc_live || attrs.home_generic_live || null;
+      const tiles = [];
+      if (live) {
+        const kw = Number(live.charge_power);
+        const charging = live.charging === true || (Number.isFinite(kw) && kw > 0.05);
+        if (charging && Number.isFinite(kw)) {
+          const [val, unit] = fmtPower(kw * 1000);
+          tiles.push(tile(v.name, val, unit));
+        } else {
+          tiles.push(tile(v.name, esc(this._t(live.connected ? "evConnected" : "evIdle"))));
+        }
+        const soc = Number(live.vehicle_soc);
+        if (live.vehicle_soc != null && Number.isFinite(soc)) tiles.push(tile(this._t("evSoc"), Math.round(soc), "%"));
+        const solar = Number(live.session_solar_pct ?? attrs.solaranteil_pct);
+        if (charging && (live.session_solar_pct != null || attrs.solaranteil_pct != null) && Number.isFinite(solar)) tiles.push(tile(this._t("evSolar"), Math.round(solar), "%"));
+      }
+      const kwh = this._num(v.kwh_today);
+      if (kwh != null) tiles.push(tile(this._t("evToday"), kwh.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "kWh"));
+      const cost = this._num(v.cost_today);
+      if (cost != null) {
+        const unit = this._hass?.states?.[v.cost_today]?.attributes?.unit_of_measurement || "EUR";
+        const [n, sym] = this._money(cost, unit);
+        tiles.push(tile(this._t("evCostToday"), n, sym));
+      }
+      if (!tiles.length) return "";
+      const advice = v.recommend && this._hass?.states?.[v.recommend]?.state === "on" ? `<div class="hint">☀ ${esc(this._t("evAdvice"))}</div>` : "";
+      return `<div class="tiles">${tiles.join("")}</div>${advice}`;
+    }).join("");
+    return blocks ? `<div class="eb-label costs">${esc(this._t("evWallbox"))}</div>${blocks}` : "";
+  }
+
+  /** [number, symbol] of an amount, with the currency symbol of the locale where known. */
+  _money(v, currency, digits = 2) {
+    const lang = this._hass?.language || "en";
+    let symbol = currency;
+    try {
+      symbol = new Intl.NumberFormat(lang, { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value || currency;
+    } catch (e) { /* unknown currency code: keep the code */ }
+    return [v.toLocaleString(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }), symbol];
+  }
+
+  /**
+   * Money flows right now (needs Tariffy): what the grid import costs, what the feed-in earns and what
+   * the directly used solar power saves, each per hour. Empty without Tariffy or without a price.
+   */
+  _renderCosts(cur) {
+    const price = this._price();
+    if (!price) return "";
+    const feedIn = this._feedInTariff();
+    const kw = (w) => (w == null ? null : w / 1000);
+    const perHour = (w, rate) => (w == null || rate == null ? null : kw(w) * rate);
+    const tiles = [];
+    const tile = (label, value, unit) => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div></div>`;
+    const priceDisplay = price.currency === "EUR"
+      ? [(price.value * 100).toLocaleString(this._hass?.language || "en", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "ct/kWh"]
+      : [price.value.toLocaleString(this._hass?.language || "en", { maximumFractionDigits: 4 }), `${price.currency}/kWh`];
+    tiles.push(tile(this._t("tPrice"), priceDisplay[0], priceDisplay[1]));
+    const money = (label, amount) => {
+      if (amount == null) return;
+      const [n, sym] = this._money(amount, price.currency);
+      tiles.push(tile(label, n, `${sym}/h`));
+    };
+    money(this._t("tGridCost"), perHour(cur.gridIn, price.value));
+    money(this._t("tFeedIn"), perHour(cur.gridOut, feedIn));
+    money(this._t("tPvSaves"), perHour(cur.direct, price.value));
+    return `<div class="eb-label costs">${esc(this._t("costsNow"))}</div><div class="tiles">${tiles.join("")}</div>`;
+  }
+
+  /**
+   * Optional link to the PV Assistant integration (weskona/pv-assistant). The backend reads its
+   * configuration (never changes it) and says which sensors fit which settings, and how the PV sensors
+   * group into plants. Without PV Assistant the answer is null and nothing changes.
    */
   async _loadPv() {
-    const present = Object.values(this._hass?.entities || {}).some((e) => e?.platform === "pv_assistant");
-    if (!present || this._pvLoading) return;
+    if (this._pvLoading || !this._hass) return;
     this._pvLoading = true;
     try {
-      const res = await this._hass.callWS({ type: "pv_assistant/config" });
-      this._pv = this._normalizePv(res);
+      const res = await this._hass.callWS({ type: "energy_assistant/pv_suggestion" });
+      const targets = res?.targets && typeof res.targets === "object" ? res.targets : {};
+      this._pv = Object.keys(targets).length
+        ? { targets, notes: res.notes || {}, plants: Array.isArray(res.plants) ? res.plants : [] }
+        : null;
     } catch (e) {
-      console.info("Energy Assistant: PV Assistant is installed but its configuration is not available", e);
+      console.info("Energy Assistant: could not ask for PV Assistant", e);
       this._pv = null;
     } finally {
       this._pvLoading = false;
@@ -481,63 +784,9 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 
-  /** Production sensors and plants of PV Assistant, in a small fixed shape (null if nothing usable). */
-  _normalizePv(res) {
-    const list = (v) => (typeof v === "string" ? [v] : Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
-    const sensors = list(res?.production_power_sensors);
-    if (!sensors.length) return null;
-    const cfg = res?.settings || {};
-    const named = (id) => cfg.strings?.[id]?.name || this._hass?.states?.[id]?.attributes?.friendly_name || id;
-    const plants = [];
-    const taken = new Set();
-    for (const inv of Array.isArray(cfg.inverters) ? cfg.inverters : []) {
-      const ids = list(inv?.sensors).filter((id) => sensors.includes(id) && !taken.has(id));
-      if (!ids.length) continue;
-      ids.forEach((id) => taken.add(id));
-      plants.push({ name: inv.name || named(ids[0]), sensors: ids });
-    }
-    for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
-    // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on
-    // request. Separate in/out sensors may report negative values (abs_storage_power); Energy Assistant counts
-    // the magnitude of those sensors anyway.
-    const battery = {
-      combined: list(res?.storage_combined_power_sensors),
-      invert: !!res?.invert_storage_combined_power,
-      charge: list(res?.storage_in_power_sensors),
-      discharge: list(res?.storage_out_power_sensors),
-      absolute: !!res?.abs_storage_power,
-    };
-    // Grid: the import sensors fit as they are. A feed-in sensor that reports feed-in as negative values is
-    // a combined meter (import +, feed-in −): it goes into the combined grid field, and is not counted twice
-    // when it is also one of the import sensors.
-    const feedIn = list(res?.feed_in_power_sensor);
-    const negative = !!res?.invert_feed_in_power && feedIn.length > 0;
-    const grid = {
-      import: list(res?.grid_import_power_sensors).filter((id) => !(negative && feedIn.includes(id))),
-      export: negative ? [] : feedIn,
-      combined: negative ? feedIn : [],
-    };
-    return { sensors, plants, battery, grid };
-  }
-
   /** What "take over" puts into the settings form (only fields PV Assistant has an answer for). */
   _pvTargets() {
-    const b = this._pv.battery;
-    const t = { solar_power: [...this._pv.sensors] };
-    if (b.combined.length) {
-      t.battery_power = [...b.combined];
-      t.invert_battery = b.invert;
-    }
-    const g = this._pv.grid;
-    if (g.import.length) t.grid_import = [...g.import];
-    if (g.export.length) t.grid_export = [...g.export];
-    if (g.combined.length) {
-      t.grid_power = [...g.combined];
-      t.invert_grid = false;
-    }
-    if (b.charge.length) t.battery_charge = [...b.charge];
-    if (b.discharge.length) t.battery_discharge = [...b.discharge];
-    return t;
+    return this._pv.targets;
   }
 
   _pvApplied() {
@@ -1006,18 +1255,18 @@ class EnergyAssistantPanel extends HTMLElement {
   /** Notice at the top of the settings: PV Assistant is installed, take over its sensors? */
   _renderPvNotice(ro) {
     if (!this._pv) return "";
-    const b = this._pv.battery;
+    const t = this._pv.targets;
+    const n = (key) => (t[key] || []).length;
     const parts = [];
-    if (b.combined.length) parts.push(this._t("pvCombined", { n: b.combined.length }));
-    if (b.charge.length) parts.push(this._t("pvCharge", { n: b.charge.length }));
-    if (b.discharge.length) parts.push(this._t("pvDischarge", { n: b.discharge.length }));
-    const g = this._pv.grid;
+    if (n("battery_power")) parts.push(this._t("pvCombined", { n: n("battery_power") }));
+    if (n("battery_charge")) parts.push(this._t("pvCharge", { n: n("battery_charge") }));
+    if (n("battery_discharge")) parts.push(this._t("pvDischarge", { n: n("battery_discharge") }));
     const gridParts = [];
-    if (g.import.length) gridParts.push(this._t("pvImport", { n: g.import.length }));
-    if (g.export.length) gridParts.push(this._t("pvExport", { n: g.export.length }));
-    if (g.combined.length) gridParts.push(this._t("pvCombined", { n: g.combined.length }));
+    if (n("grid_import")) gridParts.push(this._t("pvImport", { n: n("grid_import") }));
+    if (n("grid_export")) gridParts.push(this._t("pvExport", { n: n("grid_export") }));
+    if (n("grid_power")) gridParts.push(this._t("pvCombined", { n: n("grid_power") }));
     const lines = [
-      this._t("pvSolar", { n: this._pv.sensors.length }),
+      n("solar_power") ? this._t("pvSolar", { n: n("solar_power") }) : "",
       parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : "",
       gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
     ].filter(Boolean);
@@ -1025,8 +1274,8 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
       <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${g.combined.length ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
-      ${b.absolute && (b.charge.length || b.discharge.length) ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
+      ${this._pv.notes.feed_in_negative ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
+      ${this._pv.notes.storage_absolute ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
       ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
     </div>`;
   }
@@ -1345,12 +1594,16 @@ class EnergyAssistantPanel extends HTMLElement {
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
+        ${this._renderCosts(cur)}
+        ${this._renderEv()}
         ${this._renderPvPlants(cur.house)}
       </div>
       <div class="eb-card">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
+      ${this._renderPvDay()}
+      ${this._renderAmortix()}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 

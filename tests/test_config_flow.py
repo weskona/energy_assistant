@@ -103,13 +103,13 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
 async def test_flow_with_separate_import_only(hass: HomeAssistant) -> None:
     result = await _start(hass)
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"grid_import": "sensor.import"}
+        result["flow_id"], {"grid_import": ["sensor.import"]}
     )
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"]["grid_import"] == "sensor.import"
+    assert result["data"]["grid_import"] == ["sensor.import"]
 
 
 async def test_house_power_alone_is_enough(hass: HomeAssistant) -> None:
@@ -136,10 +136,12 @@ async def test_options_flow_prefills_and_saves(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["step_id"] == "init"
     schema = {str(k): k for k in result["data_schema"].schema}
-    assert schema["grid_import"].description == {"suggested_value": "sensor.import"}
+    assert schema["grid_import"].description == {
+        "suggested_value": ["sensor.import"]
+    }  # old text value shown as list
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"grid_import": "sensor.import2"}
+        result["flow_id"], {"grid_import": ["sensor.import2"]}
     )
     assert result["step_id"] == "storage"
     schema = {str(k): k for k in result["data_schema"].schema}
@@ -153,7 +155,7 @@ async def test_options_flow_prefills_and_saves(hass: HomeAssistant) -> None:
         result["flow_id"], {"device_power": ["sensor.oven"]}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"]["grid_import"] == "sensor.import2"
+    assert result["data"]["grid_import"] == ["sensor.import2"]
     assert result["data"]["solar_power"] == ["sensor.pv", "sensor.pv_2"]
     assert result["data"]["device_power"] == ["sensor.oven"]
 
@@ -198,14 +200,14 @@ async def test_devices_step_rejects_invalid_exclude_patterns(
 async def test_options_flow_keeps_the_display_names(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
-        data={"grid_import": "sensor.import"},
+        data={"grid_import": ["sensor.import"]},
         options={"device_names": {"sensor.wallbox_leistung": "Wallbox"}},
     )
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     # the form is prefilled in the UI, so the stored sensor comes back with the submit
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"grid_import": "sensor.import"}
+        result["flow_id"], {"grid_import": ["sensor.import"]}
     )
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})

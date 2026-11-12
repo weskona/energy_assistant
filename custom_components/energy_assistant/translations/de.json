@@ -36,6 +36,13 @@
           "area_ids": "Bereiche (ihre Leistungssensoren werden je Bereich zusammengefasst, keiner = alle Bereiche)",
           "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
         }
+      },
+      "pv": {
+        "title": "PV Assistant erkannt",
+        "description": "PV Assistant ist installiert. Sollen seine Sensoren ({summary}) als Vorgabe übernommen werden? Alles lässt sich in den nächsten Schritten noch ändern.",
+        "data": {
+          "use_pv": "Sensoren von PV Assistant übernehmen"
+        }
       }
     },
     "error": {
@@ -81,6 +88,13 @@
           "device_power": "Zusätzliche Geräte-Sensoren (optional)",
           "area_ids": "Bereiche (ihre Leistungssensoren werden je Bereich zusammengefasst, keiner = alle Bereiche)",
           "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
+        }
+      },
+      "pv": {
+        "title": "PV Assistant erkannt",
+        "description": "PV Assistant ist installiert. Sollen die Sensoren unten durch seine Sensoren ({summary}) ersetzt werden? Alles lässt sich in den nächsten Schritten noch ändern.",
+        "data": {
+          "use_pv": "Sensoren von PV Assistant übernehmen"
         }
       }
     },

@@ -36,6 +36,13 @@
           "area_ids": "Areas (their power sensors are summed up per area, none = all areas)",
           "label_ids": "Labels (their power sensors are summed up per label)"
         }
+      },
+      "pv": {
+        "title": "PV Assistant detected",
+        "description": "PV Assistant is installed. Take over its sensors ({summary}) as defaults? You can still change everything in the next steps.",
+        "data": {
+          "use_pv": "Take over the sensors of PV Assistant"
+        }
       }
     },
     "error": {
@@ -81,6 +88,13 @@
           "device_power": "Additional device sensors (optional)",
           "area_ids": "Areas (their power sensors are summed up per area, none = all areas)",
           "label_ids": "Labels (their power sensors are summed up per label)"
+        }
+      },
+      "pv": {
+        "title": "PV Assistant detected",
+        "description": "PV Assistant is installed. Replace the sensors below with its sensors ({summary})? You can still change everything in the next steps.",
+        "data": {
+          "use_pv": "Take over the sensors of PV Assistant"
         }
       }
     },

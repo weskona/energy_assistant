@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-12
+
+### Added
+
+- Optional link to [Amortix](https://github.com/weskona/amortix): when it is installed, the Power tab shows a card **Payback** with the total savings, the investment, the progress (with a bar), the remaining amount, the savings per day, the time left and the expected payback date. The overview entry of Amortix replaces the single entries; without an overview every entry gets its own block. Amortix has no translation keys, so its sensors are found over the unique ids of the entity registry (`<entry id>_<key>`); sensors of single devices are not taken. Tiles without a value are left out and without Amortix nothing is shown.
+
+## [0.12.0] - 2026-11-12
+
+### Added
+
+- Optional link to [PV Assistant](https://github.com/weskona/pv-assistant), part 2: when it is installed, the Power tab shows a card **PV today and tomorrow**. Today: production, feed-in, self-consumption, self-sufficiency, forecast reached and benefit. Storage: usable energy and when it is empty. Tomorrow: expected feed-in and the best three-hour window. A plant fault of PV Assistant shows as a warning with the affected plants. The values come live from its sensors, found over the entity registry (`energy_assistant/integrations`); tiles without a value are left out and without PV Assistant nothing is shown.
+
+## [0.11.0] - 2026-11-12
+
+### Added
+
+- Optional link to [EV Assistant](https://github.com/weskona/ev_assistant): when it is installed, the Power tab shows a **Wallbox** block per vehicle with the live status (charging with the power in W, connected, not connected), the charge level, the solar share of the session, what was charged today (kWh) and what it cost, and the note **Charge before PV is recommended** when EV Assistant advises it. The live data comes from the attributes of its `home_kwh` sensor (`evcc_live` with evcc, otherwise `home_generic_live`). Without EV Assistant nothing is shown.
+
+## [0.10.0] - 2026-11-12
+
+### Added
+
+- Optional link to [Tariffy](https://github.com/weskona/tariffy): when it is installed, the Power tab shows **Costs right now**: the electricity price (the live price of a dynamic tariff, otherwise the unit price of the contract), what the grid import costs per hour, what the feed-in earns per hour (feed-in tariff of Tariffy) and what the directly used solar power saves per hour. Without Tariffy nothing is shown.
+- Framework for sibling integrations: `providers.py` finds their sensors in the entity registry (platform and translation key, independent of the language) and the WebSocket command `energy_assistant/integrations` hands the entity ids to the panel, which reads the live values from the states. Everything is read only, a missing integration simply gives no answer.
+
+## [0.9.0] - 2026-11-12
+
+### Added
+
+- The config flow (and the options flow) asks first whether to take over the sensors when PV Assistant is installed. With "yes" the fields of the following steps are pre-filled (solar production, storage, grid) and can still be changed. Without PV Assistant the flow starts as before.
+- WebSocket command `energy_assistant/pv_suggestion`: what PV Assistant offers (settings, notes, plants), or `null`. PV Assistant is only read.
+
+### Changed
+
+- The mapping from PV Assistant to the settings now lives in the backend (`pv_assistant.py`), one rule for the config flow and the panel. The panel no longer asks PV Assistant directly, it asks the backend.
+- The fields **Grid import separate** and **Grid export separate** of the config flow accept several sensors, like the Settings tab. Entries that stored a single sensor keep working.
+
 ## [0.8.0] - 2026-11-12
 
 ### Changed

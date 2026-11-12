@@ -119,12 +119,25 @@ The panel shows it as a tile with its share of production, in the source bar and
 
 ### PV Assistant (optional)
 
-If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energy Assistant reads its configuration (read-only, nothing is stored there):
+If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energy Assistant reads its configuration (read-only, nothing is stored or changed there). One rule decides which sensor goes where, for the config flow and the panel:
 
-- At the top of the Settings tab a notice asks whether to take over its sensors: the production power sensors (**Solar production**), the storage sensors (combined with its sign, charging, discharging) and the grid sensors (import, feed-in). The button (administrators) fills the fields; save as usual. Nothing is left out: a feed-in sensor that PV Assistant reports as negative values becomes the combined grid sensor, and separate charging and discharging sensors that report negative values count with their magnitude.
-- On the Power tab a row **PV by plant** opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
+- **Config flow / options flow:** a first question asks whether to take over the sensors of PV Assistant. With "yes" the fields of the following steps are pre-filled and can still be changed.
+- **Settings tab:** a notice at the top asks the same. The button (administrators) fills the fields: production power sensors (**Solar production**), storage sensors (combined with its sign, charging, discharging) and grid sensors (import, feed-in). Save as usual. Nothing is left out: a feed-in sensor that PV Assistant reports as negative values becomes the combined grid sensor, and separate charging and discharging sensors that report negative values count with their magnitude.
+- **Power tab:** a card **PV today and tomorrow** (production, feed-in, self-consumption, self-sufficiency, forecast reached, benefit, storage, expected feed-in and best window of tomorrow, plant fault warning) and a row **PV by plant** that opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
 
 Without PV Assistant nothing changes.
+
+### Tariffy (optional)
+
+If [Tariffy](https://github.com/weskona/tariffy) is installed, the Power tab shows **Costs right now** below the tiles: the electricity price (live for a dynamic tariff), the cost of the grid import, the earnings of the feed-in and the savings of the directly used solar power, each per hour. The price comes from the first electricity contract, the feed-in tariff from any Tariffy contract that has one. Energy Assistant only reads Tariffy; without it nothing is shown and both run on their own.
+
+### EV Assistant (optional)
+
+If [EV Assistant](https://github.com/weskona/ev_assistant) is installed, the Power tab shows a **Wallbox** block for every vehicle: live status and charging power, charge level, solar share of the session, energy and cost of today, and the advice to charge before the PV production starts. Energy Assistant only reads EV Assistant (the sensors are found over the entity registry); without it nothing is shown and both run on their own.
+
+### Amortix (optional)
+
+If [Amortix](https://github.com/weskona/amortix) is installed, the Power tab shows a card **Payback**: total savings, investment, progress, remaining amount, savings per day, time left and the expected payback date. When Amortix has an overview entry it is shown alone (it combines all other entries), otherwise every entry gets its own block. Energy Assistant only reads Amortix; without it nothing is shown and both run on their own.
 
 ### Changing the settings
 
