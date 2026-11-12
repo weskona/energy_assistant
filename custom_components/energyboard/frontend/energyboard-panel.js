@@ -76,7 +76,7 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .dev .subs .s.idle b{color:var(--eb-dim)}
 .tab{white-space:nowrap}
 .set .sec{margin-bottom:var(--eb-gap)}
-.pvnote{border-color:var(--eb-green);margin-bottom:var(--eb-gap)}
+.eb-card.pvnote{border-color:var(--eb-green);background:radial-gradient(120% 90% at 0% 0%,rgba(52,211,153,.14),transparent 60%),var(--eb-panel);margin-bottom:var(--eb-gap)}
 .pvnote .pvq{font-size:16px;font-weight:600;margin:10px 0 6px}
 .pvnote ul{margin:0 0 4px;padding-left:20px;color:var(--eb-muted);font-size:14px}
 .pvnote .bar2{margin-top:12px}
