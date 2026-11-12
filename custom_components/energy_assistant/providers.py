@@ -14,6 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 TARIFFY = "tariffy"
+EV_ASSISTANT = "ev_assistant"
+_EV_KEYS = ("home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended")
 _ELECTRICITY = ("electricity", "strom", "electricity_ht_nt")
 _TARIFFY_KEYS = (
     "arbeitspreis",
@@ -74,7 +76,43 @@ def tariffy(hass: HomeAssistant) -> dict[str, Any] | None:
     }
 
 
+def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
+    """Vehicles of EV Assistant with the entities that tell about home charging.
+
+    The sensor `home_kwh` carries the live data of the wallbox in its attributes (`evcc_live` with evcc,
+    otherwise `home_generic_live`; `charge_power` is in kW), the others the energy and cost of today and
+    the recommendation to charge before the PV production starts.
+    """
+    vehicles: dict[str, dict[str, str]] = {}
+    for entry in er.async_get(hass).entities.values():
+        if (
+            entry.platform == EV_ASSISTANT
+            and not entry.disabled_by
+            and entry.config_entry_id
+            and entry.translation_key in _EV_KEYS
+        ):
+            vehicles.setdefault(entry.config_entry_id, {})[entry.translation_key] = (
+                entry.entity_id
+            )
+    result = []
+    for entry_id, keys in vehicles.items():
+        if "home_kwh" not in keys and "kwh_day" not in keys:
+            continue
+        config_entry = hass.config_entries.async_get_entry(entry_id)
+        result.append(
+            {
+                "name": config_entry.title if config_entry else "EV",
+                "live": keys.get("home_kwh"),
+                "kwh_today": keys.get("kwh_day"),
+                "cost_today": keys.get("cost_day"),
+                "recommend": keys.get("charge_before_pv_recommended"),
+            }
+        )
+    result.sort(key=lambda v: v["name"])
+    return {"vehicles": result} if result else None
+
+
 def available(hass: HomeAssistant) -> dict[str, Any]:
     """Everything the sibling integrations offer right now (only what exists)."""
-    found = {"tariffy": tariffy(hass)}
+    found = {"tariffy": tariffy(hass), "ev_assistant": ev_assistant(hass)}
     return {name: data for name, data in found.items() if data}

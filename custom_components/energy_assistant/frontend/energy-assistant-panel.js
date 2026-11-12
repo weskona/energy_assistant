@@ -197,6 +197,15 @@ const STRINGS = {
     noAreaMatches: "No area matches the filters",
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    evWallbox: "Wallbox",
+    evCharging: "Charging",
+    evConnected: "Connected",
+    evIdle: "Not connected",
+    evSoc: "Charge level",
+    evSolar: "Solar share",
+    evToday: "Charged today",
+    evCostToday: "Charging cost today",
+    evAdvice: "Charge before PV is recommended",
     costsNow: "Costs right now",
     tPrice: "Electricity price",
     tGridCost: "Grid import costs",
@@ -320,6 +329,15 @@ const STRINGS = {
     noAreaMatches: "Kein Bereich passt zu den Filtern",
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    evWallbox: "Wallbox",
+    evCharging: "Lädt",
+    evConnected: "Verbunden",
+    evIdle: "Nicht verbunden",
+    evSoc: "Ladestand",
+    evSolar: "Solaranteil",
+    evToday: "Heute geladen",
+    evCostToday: "Ladekosten heute",
+    evAdvice: "Laden vor PV empfehlenswert",
     costsNow: "Kosten jetzt",
     tPrice: "Strompreis",
     tGridCost: "Netzbezug kostet",
@@ -506,6 +524,57 @@ class EnergyAssistantPanel extends HTMLElement {
     const id = this._int?.tariffy?.feed_in;
     const v = id && this._hass?.states?.[id] ? parseFloat(this._hass.states[id].state) : NaN;
     return Number.isNaN(v) ? null : v;
+  }
+
+  /** Value of a state as number (null if missing, unknown or not a number). */
+  _num(entityId) {
+    const s = entityId && this._hass?.states?.[entityId];
+    const v = s ? parseFloat(s.state) : NaN;
+    return Number.isNaN(v) ? null : v;
+  }
+
+  /**
+   * Wallbox and vehicle of EV Assistant (read only): live status and power, charge level, solar share,
+   * what was charged today and the advice to charge before the PV production starts. One row of tiles
+   * per vehicle; empty without EV Assistant or without any value.
+   */
+  _renderEv() {
+    const vehicles = this._int?.ev_assistant?.vehicles;
+    if (!Array.isArray(vehicles) || !vehicles.length) return "";
+    const lang = this._hass?.language || "en";
+    const tile = (label, value, unit = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div></div>`;
+    const blocks = vehicles.map((v) => {
+      const attrs = this._hass?.states?.[v.live]?.attributes || {};
+      // Live data: with evcc "evcc_live", otherwise "home_generic_live". charge_power is in kW.
+      const live = attrs.evcc_live || attrs.home_generic_live || null;
+      const tiles = [];
+      if (live) {
+        const kw = Number(live.charge_power);
+        const charging = live.charging === true || (Number.isFinite(kw) && kw > 0.05);
+        if (charging && Number.isFinite(kw)) {
+          const [val, unit] = fmtPower(kw * 1000);
+          tiles.push(tile(v.name, val, unit));
+        } else {
+          tiles.push(tile(v.name, esc(this._t(live.connected ? "evConnected" : "evIdle"))));
+        }
+        const soc = Number(live.vehicle_soc);
+        if (live.vehicle_soc != null && Number.isFinite(soc)) tiles.push(tile(this._t("evSoc"), Math.round(soc), "%"));
+        const solar = Number(live.session_solar_pct ?? attrs.solaranteil_pct);
+        if (charging && (live.session_solar_pct != null || attrs.solaranteil_pct != null) && Number.isFinite(solar)) tiles.push(tile(this._t("evSolar"), Math.round(solar), "%"));
+      }
+      const kwh = this._num(v.kwh_today);
+      if (kwh != null) tiles.push(tile(this._t("evToday"), kwh.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "kWh"));
+      const cost = this._num(v.cost_today);
+      if (cost != null) {
+        const unit = this._hass?.states?.[v.cost_today]?.attributes?.unit_of_measurement || "EUR";
+        const [n, sym] = this._money(cost, unit);
+        tiles.push(tile(this._t("evCostToday"), n, sym));
+      }
+      if (!tiles.length) return "";
+      const advice = v.recommend && this._hass?.states?.[v.recommend]?.state === "on" ? `<div class="hint">☀ ${esc(this._t("evAdvice"))}</div>` : "";
+      return `<div class="tiles">${tiles.join("")}</div>${advice}`;
+    }).join("");
+    return blocks ? `<div class="eb-label costs">${esc(this._t("evWallbox"))}</div>${blocks}` : "";
   }
 
   /** [number, symbol] of an amount, with the currency symbol of the locale where known. */
@@ -1380,6 +1449,7 @@ class EnergyAssistantPanel extends HTMLElement {
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
         ${this._renderCosts(cur)}
+        ${this._renderEv()}
         ${this._renderPvPlants(cur.house)}
       </div>
       <div class="eb-card">

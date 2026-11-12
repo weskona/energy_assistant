@@ -1737,3 +1737,58 @@ test("integrations: the panel asks the backend and an error leaves nothing to sh
   await broken._loadIntegrations();
   assert.deepEqual(broken._int, {});
 });
+
+// --- optional data from EV Assistant (wallbox and vehicle) --------------------------------------
+function evPanel({ live = {}, key = "evcc_live", kwh = "12.4", cost = "3.1", recommend = "off", vehicles } = {}) {
+  const states = {
+    "sensor.ev_home": { state: "812", attributes: { [key]: live, solaranteil_pct: 55 } },
+    "sensor.ev_kwh_day": { state: kwh, attributes: { unit_of_measurement: "kWh" } },
+    "sensor.ev_cost_day": { state: cost, attributes: { unit_of_measurement: "EUR" } },
+    "binary_sensor.ev_vor_pv": { state: recommend, attributes: {} },
+  };
+  const p = panel({ house_power: "h" }, { ...states, h: st(4000) });
+  p._hass.language = "en";
+  p._int = {
+    ev_assistant: {
+      vehicles: vehicles ?? [{ name: "ID.3", live: "sensor.ev_home", kwh_today: "sensor.ev_kwh_day", cost_today: "sensor.ev_cost_day", recommend: "binary_sensor.ev_vor_pv" }],
+    },
+  };
+  return p;
+}
+
+test("ev assistant: a charging vehicle shows its power in W, charge level, solar share and today's figures", () => {
+  const html = evPanel({ live: { charge_power: 7.4, charging: true, connected: true, vehicle_soc: 61.4, session_solar_pct: 72 } })._renderEv();
+  assert.match(html, />Wallbox</);
+  assert.match(html, /ID\.3<\/div><div class="eb-value">7[.,\s]?400<small>W/); // 7.4 kW in whole watts
+  assert.match(html, /Charge level<\/div><div class="eb-value">61<small>%/);
+  assert.match(html, /Solar share<\/div><div class="eb-value">72<small>%/);
+  assert.match(html, /Charged today<\/div><div class="eb-value">12\.4<small>kWh/);
+  assert.match(html, /Charging cost today<\/div><div class="eb-value">3\.10<small>[^<]*</);
+});
+
+test("ev assistant: without evcc the generic live data is used; idle states say connected or not connected", () => {
+  assert.match(evPanel({ key: "home_generic_live", live: { charge_power: 3.7, charging: true, connected: true } })._renderEv(), /ID\.3<\/div><div class="eb-value">3[.,\s]?700<small>W/);
+  assert.match(evPanel({ live: { charge_power: 0, charging: false, connected: true } })._renderEv(), /ID\.3<\/div><div class="eb-value">Connected</);
+  assert.match(evPanel({ live: { charge_power: 0, charging: false, connected: false } })._renderEv(), /ID\.3<\/div><div class="eb-value">Not connected</);
+});
+
+test("ev assistant: the advice to charge before PV shows only when it is on", () => {
+  assert.doesNotMatch(evPanel({ live: {} })._renderEv(), /Charge before PV/);
+  assert.match(evPanel({ live: {}, recommend: "on" })._renderEv(), /Charge before PV is recommended/);
+});
+
+test("ev assistant: nothing without the integration, without values or with unusable states", () => {
+  assert.equal(evPanel({ vehicles: [] })._renderEv(), "");
+  const p = evPanel({ kwh: "unavailable", cost: "unknown" });
+  p._hass.states["sensor.ev_home"].attributes = {};
+  assert.equal(p._renderEv(), "");
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderEv(), "");
+});
+
+test("ev assistant: the Power tab contains the wallbox block", () => {
+  const p = evPanel({ live: { charge_power: 7.4, charging: true, connected: true } });
+  p._ready = true;
+  assert.match(p._renderHouse(), /Wallbox/);
+});

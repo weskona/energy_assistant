@@ -3,7 +3,11 @@
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.energy_assistant.providers import available, tariffy
+from custom_components.energy_assistant.providers import (
+    available,
+    ev_assistant,
+    tariffy,
+)
 from custom_components.energy_assistant.websocket import async_register
 
 
@@ -92,3 +96,69 @@ async def test_websocket_answers_with_the_entities_or_nothing(
     await client.send_json_auto_id({"type": "energy_assistant/integrations"})
     msg = await client.receive_json()
     assert msg["result"]["tariffy"]["price"] == ids["arbeitspreis"]
+
+
+def _ev_vehicle(
+    hass,
+    title,
+    keys=("home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended"),
+):
+    entry = MockConfigEntry(domain="ev_assistant", title=title)
+    entry.add_to_hass(hass)
+    ids = {}
+    for key in keys:
+        domain = "binary_sensor" if key == "charge_before_pv_recommended" else "sensor"
+        entity = er.async_get(hass).async_get_or_create(
+            domain,
+            "ev_assistant",
+            f"{entry.entry_id}_{key}",
+            suggested_object_id=f"{title}_{key}",
+            config_entry=entry,
+            translation_key=key,
+        )
+        hass.states.async_set(entity.entity_id, "0")
+        ids[key] = entity.entity_id
+    return ids
+
+
+async def test_no_ev_assistant_no_offer(hass) -> None:
+    assert ev_assistant(hass) is None
+
+
+async def test_ev_assistant_vehicle_gives_live_sensor_and_today(hass) -> None:
+    ids = _ev_vehicle(hass, "id3")
+    assert ev_assistant(hass) == {
+        "vehicles": [
+            {
+                "name": "id3",
+                "live": ids["home_kwh"],
+                "kwh_today": ids["kwh_day"],
+                "cost_today": ids["cost_day"],
+                "recommend": ids["charge_before_pv_recommended"],
+            }
+        ]
+    }
+    assert "ev_assistant" in available(hass)
+
+
+async def test_several_vehicles_are_sorted_by_name_and_empty_ones_are_skipped(
+    hass,
+) -> None:
+    _ev_vehicle(hass, "zoe")
+    _ev_vehicle(hass, "id3")
+    _ev_vehicle(hass, "nothing", keys=("charge_before_pv_recommended",))
+    assert [v["name"] for v in ev_assistant(hass)["vehicles"]] == ["id3", "zoe"]
+
+
+async def test_ev_sensors_of_other_platforms_are_ignored(hass) -> None:
+    entry = MockConfigEntry(domain="other", title="x")
+    entry.add_to_hass(hass)
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        "other",
+        "u",
+        suggested_object_id="x",
+        config_entry=entry,
+        translation_key="home_kwh",
+    )
+    assert ev_assistant(hass) is None

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-12
+
+### Added
+
+- Optional link to [EV Assistant](https://github.com/weskona/ev_assistant): when it is installed, the Power tab shows a **Wallbox** block per vehicle with the live status (charging with the power in W, connected, not connected), the charge level, the solar share of the session, what was charged today (kWh) and what it cost, and the note **Charge before PV is recommended** when EV Assistant advises it. The live data comes from the attributes of its `home_kwh` sensor (`evcc_live` with evcc, otherwise `home_generic_live`). Without EV Assistant nothing is shown.
+
 ## [0.10.0] - 2026-11-12
 
 ### Added
