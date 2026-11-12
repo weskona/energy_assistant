@@ -1,12 +1,12 @@
-/* Energyboard sidebar panel. Tab 1: household power. */
+/* Energy Assistant sidebar panel. Tab 1: household power. */
 const BASE = new URL(import.meta.url).pathname.replace(/\/[^/]*$/, "");
 
 // @font-face must live in the document, not in the shadow DOM.
-if (!document.getElementById("energyboard-fonts")) {
+if (!document.getElementById("energy-assistant-fonts")) {
   const l = document.createElement("link");
-  l.id = "energyboard-fonts";
+  l.id = "energy-assistant-fonts";
   l.rel = "stylesheet";
-  l.href = `${BASE}/energyboard-tokens.css`;
+  l.href = `${BASE}/energy-assistant-tokens.css`;
   document.head.appendChild(l);
 }
 
@@ -134,7 +134,7 @@ const STRINGS = {
     noHistory: "No history available yet",
     chartLabel: "House power over the last 24 hours",
     notConfigured:
-      "No sensors configured. Open Settings → Devices & services → Energyboard.",
+      "No sensors configured. Open Settings → Devices & services → Energy Assistant.",
     menu: "Menu",
     solar: "Solar",
     solarDirect: "Solar used directly",
@@ -252,7 +252,7 @@ const STRINGS = {
     noHistory: "Noch kein Verlauf verfügbar",
     chartLabel: "Hausleistung der letzten 24 Stunden",
     notConfigured:
-      "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energyboard auswählen.",
+      "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energy Assistant auswählen.",
     menu: "Menü",
     solar: "PV",
     solarDirect: "PV direkt verbraucht",
@@ -413,7 +413,7 @@ const fmtPower = (w) => {
   return [Math.round(w).toLocaleString(), "W"];
 };
 
-class EnergyboardPanel extends HTMLElement {
+class EnergyAssistantPanel extends HTMLElement {
   constructor() {
     super();
     this._tab = "house";
@@ -443,9 +443,9 @@ class EnergyboardPanel extends HTMLElement {
     if (this._ready || this._loadingCfg || !this._hass) return;
     this._loadingCfg = true;
     try {
-      this._config = await this._hass.callWS({ type: "energyboard/get_config" });
+      this._config = await this._hass.callWS({ type: "energy_assistant/get_config" });
     } catch (e) {
-      console.warn("Energyboard: could not load settings, using the registration copy", e);
+      console.warn("Energy Assistant: could not load settings, using the registration copy", e);
       this._config = this._fallback || {};
     } finally {
       this._draft = this._normalize(this._config);
@@ -472,7 +472,7 @@ class EnergyboardPanel extends HTMLElement {
       const res = await this._hass.callWS({ type: "pv_assistant/config" });
       this._pv = this._normalizePv(res);
     } catch (e) {
-      console.info("Energyboard: PV Assistant is installed but its configuration is not available", e);
+      console.info("Energy Assistant: PV Assistant is installed but its configuration is not available", e);
       this._pv = null;
     } finally {
       this._pvLoading = false;
@@ -498,7 +498,7 @@ class EnergyboardPanel extends HTMLElement {
     }
     for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
     // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on
-    // request. Separate in/out sensors may report negative values (abs_storage_power); Energyboard counts
+    // request. Separate in/out sensors may report negative values (abs_storage_power); Energy Assistant counts
     // the magnitude of those sensors anyway.
     const battery = {
       combined: list(res?.storage_combined_power_sensors),
@@ -550,11 +550,11 @@ class EnergyboardPanel extends HTMLElement {
     if (this._labelsLoading || !this._hass) return;
     this._labelsLoading = true;
     try {
-      const res = await this._hass.callWS({ type: "energyboard/labels" });
+      const res = await this._hass.callWS({ type: "energy_assistant/labels" });
       // Never let an incomplete answer break the settings form.
       this._labelData = { labels: Array.isArray(res?.labels) ? res.labels : [], entities: res?.entities || {} };
     } catch (e) {
-      console.warn("Energyboard: could not load labels", e);
+      console.warn("Energy Assistant: could not load labels", e);
       this._labelData = this._labelData || { labels: [], entities: {} };
     } finally {
       this._labelsLoading = false;
@@ -610,7 +610,7 @@ class EnergyboardPanel extends HTMLElement {
     this._settingsDirty = true;
     this._render();
     try {
-      this._config = await this._hass.callWS({ type: "energyboard/update_config", config: this._draft });
+      this._config = await this._hass.callWS({ type: "energy_assistant/update_config", config: this._draft });
       this._draft = this._normalize(this._config);
       this._history = null;
       this._lastHistory = 0;
@@ -661,11 +661,11 @@ class EnergyboardPanel extends HTMLElement {
     if (this._draft) this._draft.device_names = { ...names };
     this._endRename();
     try {
-      const res = await this._hass.callWS({ type: "energyboard/update_config", config: { device_names: names } });
+      const res = await this._hass.callWS({ type: "energy_assistant/update_config", config: { device_names: names } });
       this._config = res;
       if (this._draft) this._draft.device_names = { ...(res.device_names || {}) };
     } catch (e) {
-      console.warn("Energyboard: could not save the name", e);
+      console.warn("Energy Assistant: could not save the name", e);
       this._config = { ...this._cfg, device_names: before };
       if (this._draft) this._draft.device_names = { ...before };
     }
@@ -1205,7 +1205,7 @@ class EnergyboardPanel extends HTMLElement {
       this._history = this._buildSeries(res, start.getTime(), end.getTime());
       this._lastHistory = now;
     } catch (e) {
-      console.warn("Energyboard: could not load history", e);
+      console.warn("Energy Assistant: could not load history", e);
       this._history = [];
       this._lastHistory = now - 4 * 60 * 1000; // retry after one minute
     } finally {
@@ -1587,7 +1587,7 @@ class EnergyboardPanel extends HTMLElement {
     if (!this.shadowRoot) return;
     if (!this._built) {
       this.shadowRoot.innerHTML = `<style>${STYLE}</style>
-        <link rel="stylesheet" href="${BASE}/energyboard-tokens.css">
+        <link rel="stylesheet" href="${BASE}/energy-assistant-tokens.css">
         <div class="wrap">
           <div class="top">
             <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
@@ -1685,4 +1685,4 @@ class EnergyboardPanel extends HTMLElement {
   }
 }
 
-customElements.define("energyboard-panel", EnergyboardPanel);
+customElements.define("energy-assistant-panel", EnergyAssistantPanel);

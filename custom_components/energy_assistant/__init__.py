@@ -1,4 +1,4 @@
-"""Energyboard: sidebar panel showing household energy flows."""
+"""Energy Assistant: sidebar panel showing household energy flows."""
 
 from __future__ import annotations
 
@@ -47,10 +47,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await panel_custom.async_register_panel(
         hass,
-        webcomponent_name="energyboard-panel",
+        webcomponent_name="energy-assistant-panel",
         frontend_url_path=PANEL_URL_PATH,
-        module_url=f"{STATIC_URL}/energyboard-panel.js?v={_version()}",
-        sidebar_title="Energyboard",
+        module_url=f"{STATIC_URL}/energy-assistant-panel.js?v={_version()}",
+        sidebar_title="Energy Assistant",
         sidebar_icon="mdi:lightning-bolt-circle",
         require_admin=False,
         config=config,

@@ -13,7 +13,7 @@ globalThis.customElements = {
   get: (name) => (name === "ha-icon" && globalThis.haIcon ? class {} : undefined),
 };
 
-await import("../custom_components/energyboard/frontend/energyboard-panel.js");
+await import("../custom_components/energy_assistant/frontend/energy-assistant-panel.js");
 
 const st = (state, unit = "W") => ({ state: String(state), attributes: { unit_of_measurement: unit } });
 
@@ -1084,7 +1084,7 @@ test("names: saving sends all names, shows the new name at once and keeps the dr
   const p = renamePanel({ names: { "sensor.herd_leistung": "Herd" } });
   await p._commitRename("sensor.wallbox_leistung", "  Wallbox  ");
   assert.deepEqual(p._hass.calls, [
-    { type: "energyboard/update_config", config: { device_names: { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" } } },
+    { type: "energy_assistant/update_config", config: { device_names: { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" } } },
   ]);
   assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
   assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd", "sensor.wallbox_leistung": "Wallbox" });

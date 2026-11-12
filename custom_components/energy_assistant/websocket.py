@@ -63,7 +63,7 @@ def _entry(hass: HomeAssistant):
     return entries[0] if entries else None
 
 
-@websocket_api.websocket_command({vol.Required("type"): "energyboard/get_config"})
+@websocket_api.websocket_command({vol.Required("type"): "energy_assistant/get_config"})
 @callback
 def ws_get_config(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -71,12 +71,12 @@ def ws_get_config(
     """Return the current settings."""
     entry = _entry(hass)
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "Energyboard is not set up")
+        connection.send_error(msg["id"], "not_found", "Energy Assistant is not set up")
         return
     connection.send_result(msg["id"], normalize({**entry.data, **entry.options}))
 
 
-@websocket_api.websocket_command({vol.Required("type"): "energyboard/labels"})
+@websocket_api.websocket_command({vol.Required("type"): "energy_assistant/labels"})
 @callback
 def ws_labels(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
@@ -111,7 +111,7 @@ def ws_labels(
 @websocket_api.require_admin
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "energyboard/update_config",
+        vol.Required("type"): "energy_assistant/update_config",
         vol.Required("config"): _CONFIG_SCHEMA,
     }
 )
@@ -122,7 +122,7 @@ def ws_update_config(
     """Change the settings (admins only). Missing keys keep their value."""
     entry = _entry(hass)
     if entry is None:
-        connection.send_error(msg["id"], "not_found", "Energyboard is not set up")
+        connection.send_error(msg["id"], "not_found", "Energy Assistant is not set up")
         return
     merged = normalize({**entry.data, **entry.options, **msg["config"]})
     if not has_source(merged):

@@ -1,5 +1,5 @@
 {
-  "title": "Energyboard",
+  "title": "Energy Assistant",
   "config": {
     "step": {
       "user": {
@@ -43,7 +43,7 @@
       "invalid_pattern": "Only letters, digits, _ . * and ? are allowed."
     },
     "abort": {
-      "single_instance_allowed": "Energyboard is already set up."
+      "single_instance_allowed": "Energy Assistant is already set up."
     }
   },
   "options": {

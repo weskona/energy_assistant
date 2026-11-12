@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.energyboard.config_flow import (
+from custom_components.energy_assistant.config_flow import (
     _devices_schema,
     _grid_schema,
     _storage_schema,
 )
 
 TRANSLATIONS = (
-    Path(__file__).parent.parent / "custom_components/energyboard/translations"
+    Path(__file__).parent.parent / "custom_components/energy_assistant/translations"
 )
 
 

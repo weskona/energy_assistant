@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.3] - 2026-11-12
+## [0.8.0] - 2026-11-12
 
 ### Changed
 
-- The repository is now called `weskona/energy_assistant`; the links in the manifest and the changelog follow. The integration itself (domain `energyboard`, name Energyboard) is unchanged, so existing installations keep working.
+- **Breaking:** the integration is now called **Energy Assistant** (domain `energy_assistant`, folder `custom_components/energy_assistant`, release file `energy_assistant.zip`, WebSocket commands `energy_assistant/…`, panel `energy-assistant-panel` at `/energy-assistant`). The repository is `weskona/energy_assistant`. Existing installations of the old `energyboard` domain have to be removed and set up again: delete the old integration and the folder `custom_components/energyboard`, install this version and add **Energy Assistant** in *Settings → Devices & services*.
+- Removed the file `.storage/core.config_entries` that was committed to the repository by mistake.
 - The PV Assistant notice now takes over **all** sensors, nothing is left out any more. A feed-in sensor that PV Assistant reports as negative values is used as the combined grid sensor (import +, feed-in −) and is not counted twice when it is also an import sensor. Separate charging and discharging sensors that report negative values are taken over too: the separate charging and discharging fields count the magnitude of their sensors (also in the history chart).
 
 ## [0.7.2] - 2026-11-12

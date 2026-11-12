@@ -18,7 +18,7 @@ jobs:
       - name: Read version and check whether it is new
         id: version
         run: |
-          version=$(jq -r .version custom_components/energyboard/manifest.json)
+          version=$(jq -r .version custom_components/energy_assistant/manifest.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
             echo "Tag v$version already exists, nothing to release."
@@ -44,7 +44,7 @@ jobs:
       - name: Package the integration as a ZIP (for HACS)
         if: steps.version.outputs.new == 'true'
         run: |
-          (cd custom_components/energyboard && zip -r "$GITHUB_WORKSPACE/energyboard.zip" . -x "__pycache__/*" "*.pyc")
+          (cd custom_components/energy_assistant && zip -r "$GITHUB_WORKSPACE/energy_assistant.zip" . -x "__pycache__/*" "*.pyc")
 
       - name: Create tag and release
         if: steps.version.outputs.new == 'true'
@@ -54,4 +54,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: v${{ steps.version.outputs.version }}
           body_path: release_notes.md
-          files: energyboard.zip
+          files: energy_assistant.zip

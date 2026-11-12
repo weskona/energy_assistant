@@ -1,6 +1,6 @@
 {
-  "domain": "energyboard",
-  "name": "Energyboard",
+  "domain": "energy_assistant",
+  "name": "Energy Assistant",
   "codeowners": [
     "@weskona"
   ],
@@ -16,5 +16,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/weskona/energy_assistant/issues",
   "single_config_entry": true,
-  "version": "0.7.3"
+  "version": "0.8.0"
 }
