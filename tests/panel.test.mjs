@@ -1538,3 +1538,102 @@ test("drill-down: sensor names in the opened list are HTML-escaped; devices and 
   assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
   assert.doesNotMatch(p._renderDevices(9000), /data-open/);
 });
+
+// --- optional link to the PV Assistant integration ---------------------------------------------
+const PV_CONFIG = {
+  production_power_sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2", "sensor.wr2_pv"],
+  settings: {
+    strings: { "sensor.wr2_pv": { name: "Garage" } },
+    inverters: [{ name: "Wechselrichter Haus", sensors: ["sensor.wr1_pv1", "sensor.wr1_pv2"] }],
+  },
+};
+
+function pvPanel({ solar = [], reply = PV_CONFIG, installed = true, admin = true } = {}) {
+  const p = new Panel();
+  p._config = { solar_power: solar, grid_import: ["sensor.netz"] };
+  p._draft = p._normalize(p._config);
+  p._ready = true;
+  p._render = () => {};
+  p._hass = {
+    user: { is_admin: admin },
+    entities: installed ? { "sensor.pv_assistant_pv_power": { platform: "pv_assistant" } } : { "sensor.x": { platform: "other" } },
+    states: {
+      "sensor.wr1_pv1": st(1200), "sensor.wr1_pv2": st(800), "sensor.wr2_pv": st(300), "sensor.netz": st(100),
+    },
+    calls: [],
+    callWS: async (msg) => {
+      p._hass.calls.push(msg.type);
+      if (reply instanceof Error) throw reply;
+      return reply;
+    },
+  };
+  return p;
+}
+
+test("pv assistant: production sensors and plants are read from its configuration", async () => {
+  const p = pvPanel();
+  await p._loadPv();
+  assert.deepEqual(p._pv.sensors, PV_CONFIG.production_power_sensors);
+  assert.deepEqual(p._pv.plants.map((x) => x.name), ["Wechselrichter Haus", "Garage"]); // inverter first, then the sensor on its own
+  assert.deepEqual(p._pv.plants[0].sensors, ["sensor.wr1_pv1", "sensor.wr1_pv2"]);
+});
+
+test("pv assistant: nothing is requested when the integration is not installed", async () => {
+  const p = pvPanel({ installed: false });
+  await p._loadPv();
+  assert.deepEqual(p._hass.calls, []);
+  assert.equal(p._pv, undefined);
+});
+
+test("pv assistant: a failing or empty answer changes nothing", async () => {
+  const failing = pvPanel({ reply: new Error("unknown command") });
+  await failing._loadPv();
+  assert.equal(failing._pv, null);
+  const empty = pvPanel({ reply: {} });
+  await empty._loadPv();
+  assert.equal(empty._pv, null);
+  assert.equal(empty._renderPvPlants(null), "");
+});
+
+test("pv assistant: settings offer the production sensors, admins can take them over", async () => {
+  const p = pvPanel();
+  await p._loadPv();
+  let html = p._renderSettings();
+  assert.match(html, /PV Assistant is installed and reports 3 production sensors/);
+  assert.match(html, /data-pvuse/);
+  p._edited = () => {};
+  const el = {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-pvuse]" ? el : null) } });
+  assert.deepEqual(p._draft.solar_power, PV_CONFIG.production_power_sensors);
+  html = p._renderSettings();
+  assert.match(html, /Already in use/);
+  assert.doesNotMatch(html, /data-pvuse/);
+});
+
+test("pv assistant: read-only users get the information but no button", async () => {
+  const p = pvPanel({ admin: false });
+  await p._loadPv();
+  const html = p._renderSettings();
+  assert.match(html, /reports 3 production sensors/);
+  assert.doesNotMatch(html, /data-pvuse/);
+});
+
+test("pv assistant: the Power tab lists the plants in a row that opens, strongest first", async () => {
+  const p = pvPanel({ solar: PV_CONFIG.production_power_sensors });
+  await p._loadPv();
+  let html = p._renderPvPlants(null);
+  assert.match(html, /PV by plant/);
+  assert.match(html, /data-open="pv:plants"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.doesNotMatch(html, /class="subs"/);
+  clickOpen(p, "pv:plants");
+  html = p._renderPvPlants(null);
+  assert.ok(html.indexOf("Wechselrichter Haus") < html.indexOf("Garage"));
+  assert.match(html, /2,000 W|2\.000 W|2000 W/); // 1200 + 800
+});
+
+test("pv assistant: a single plant adds no row", async () => {
+  const p = pvPanel({ reply: { production_power_sensors: ["sensor.wr2_pv"] } });
+  await p._loadPv();
+  assert.equal(p._renderPvPlants(null), "");
+});

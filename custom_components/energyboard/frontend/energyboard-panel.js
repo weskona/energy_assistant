@@ -192,6 +192,10 @@ const STRINGS = {
     noAreaMatches: "No area matches the filters",
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    pvPlants: "PV by plant",
+    pvFound: "PV Assistant is installed and reports {n} production sensors.",
+    pvUse: "Use as solar production",
+    pvUsed: "Already in use.",
     areaAutoHint: "Nothing selected: all areas with power sensors are shown. Select areas to show only these.",
     noPowerLabels: "No label has power sensors yet. Add a label to your power sensors under Settings → Areas, labels & zones.",
     filterActive: "Active",
@@ -294,6 +298,10 @@ const STRINGS = {
     noAreaMatches: "Kein Bereich passt zu den Filtern",
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    pvPlants: "PV je Anlage",
+    pvFound: "PV Assistant ist installiert und meldet {n} Erzeugungssensoren.",
+    pvUse: "Als PV-Erzeugung übernehmen",
+    pvUsed: "Bereits übernommen.",
     areaAutoHint: "Nichts ausgewählt: Es werden alle Bereiche mit Leistungssensoren gezeigt. Wähle Bereiche, um nur diese zu zeigen.",
     noPowerLabels: "Noch kein Label hat Leistungssensoren. Versieh deine Leistungssensoren unter Einstellungen → Bereiche, Labels & Zonen mit einem Label.",
     filterActive: "Aktiv",
@@ -419,7 +427,49 @@ class EnergyboardPanel extends HTMLElement {
       this._render();
       this._maybeLoadHistory();
       this._loadLabels();
+      this._loadPv();
     }
+  }
+
+  /**
+   * Optional link to the PV Assistant integration (weskona/pv-assistant): when it is installed, its
+   * configuration tells which sensors measure the PV production and how they group into plants.
+   * Without it, or when anything fails, nothing changes.
+   */
+  async _loadPv() {
+    const present = Object.values(this._hass?.entities || {}).some((e) => e?.platform === "pv_assistant");
+    if (!present || this._pvLoading) return;
+    this._pvLoading = true;
+    try {
+      const res = await this._hass.callWS({ type: "pv_assistant/config" });
+      this._pv = this._normalizePv(res);
+    } catch (e) {
+      console.info("Energyboard: PV Assistant is installed but its configuration is not available", e);
+      this._pv = null;
+    } finally {
+      this._pvLoading = false;
+      this._settingsDirty = true;
+      this._render();
+    }
+  }
+
+  /** Production sensors and plants of PV Assistant, in a small fixed shape (null if nothing usable). */
+  _normalizePv(res) {
+    const list = (v) => (typeof v === "string" ? [v] : Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+    const sensors = list(res?.production_power_sensors);
+    if (!sensors.length) return null;
+    const cfg = res?.settings || {};
+    const named = (id) => cfg.strings?.[id]?.name || this._hass?.states?.[id]?.attributes?.friendly_name || id;
+    const plants = [];
+    const taken = new Set();
+    for (const inv of Array.isArray(cfg.inverters) ? cfg.inverters : []) {
+      const ids = list(inv?.sensors).filter((id) => sensors.includes(id) && !taken.has(id));
+      if (!ids.length) continue;
+      ids.forEach((id) => taken.add(id));
+      plants.push({ name: inv.name || named(ids[0]), sensors: ids });
+    }
+    for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
+    return { sensors, plants };
   }
 
   /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
@@ -573,6 +623,9 @@ class EnergyboardPanel extends HTMLElement {
       const [group, value] = seg.dataset.seg.split(":");
       if (group === "state") this._fState = value;
       else this._fSel = value;
+      this._edited();
+    } else if (e.target.closest("[data-pvuse]") && this._isAdmin && this._pv) {
+      this._draft.solar_power = [...this._pv.sensors];
       this._edited();
     } else if (e.target.closest("[data-open]")) {
       // Click on an area or label row: show or hide the sensors it sums up.
@@ -855,10 +908,11 @@ class EnergyboardPanel extends HTMLElement {
       if (kind === "areas") return `<div class="fld span"><label>${esc(label)}</label>${this._renderPicker("area", ro)}${this._draft.area_ids.length ? "" : `<div class="hint">${esc(this._t("areaAutoHint"))}</div>`}</div>`;
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
+      const pvHint = key === "solar_power" && this._pv ? this._renderPvHint(ro) : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${pvHint}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
@@ -875,6 +929,16 @@ class EnergyboardPanel extends HTMLElement {
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
+  }
+
+  /** Offer the production sensors of PV Assistant as solar production (admins only). */
+  _renderPvHint(ro) {
+    const wanted = this._pv.sensors;
+    const have = this._draftList("solar_power");
+    const same = wanted.length === have.length && wanted.every((id) => have.includes(id));
+    const text = this._t("pvFound", { n: wanted.length });
+    if (same) return `<div class="hint">${esc(text)} ${esc(this._t("pvUsed"))}</div>`;
+    return `<div class="hint">${esc(text)}${ro ? "" : ` <button type="button" class="linkbtn" data-pvuse>${esc(this._t("pvUse"))}</button>`}</div>`;
   }
 
   /** Translate a key using the Home Assistant UI language (de, otherwise en). */
@@ -1185,12 +1249,36 @@ class EnergyboardPanel extends HTMLElement {
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
+        ${this._renderPvPlants(cur.house)}
       </div>
       <div class="eb-card">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
+  }
+
+  /**
+   * PV by plant (from PV Assistant): one row that opens to the plants with their power. Only shown
+   * when there are at least two plants; otherwise the solar tile already says everything.
+   */
+  _renderPvPlants(house) {
+    const plants = (this._pv?.plants || [])
+      .map((p) => ({ name: p.name, w: this._sum(p.sensors) }))
+      .filter((p) => p.w != null);
+    if (plants.length < 2) return "";
+    const total = plants.reduce((a, p) => a + Math.max(0, p.w), 0);
+    const isOpen = this._open?.has("pv:plants");
+    const [tv, tu] = fmtPower(total);
+    const subs = isOpen
+      ? `<div class="subs">${[...plants].sort((a, b) => b.w - a.w).map((p) => {
+        const [v, u] = fmtPower(p.w);
+        return `<div class="s${p.w < IDLE_W ? " idle" : ""}"><span class="sn" title="${esc(p.name)}">${esc(p.name)}</span><b>${v} ${u}</b></div>`;
+      }).join("")}</div>`
+      : "";
+    return `<div class="dev pvdev"><div class="line open" data-open="pv:plants" role="button" tabindex="0" aria-expanded="${isOpen ? "true" : "false"}">
+      <span class="name"><span class="chev${isOpen ? " on" : ""}" aria-hidden="true">▶</span><span class="nt">${esc(this._t("pvPlants"))}</span> <small class="cnt">${plants.length}</small></span>
+      <span class="val">${tv}<small>${tu}</small></span></div>${subs}</div>`;
   }
 
   /** Card with the power of individual devices. Empty string if none are configured. */

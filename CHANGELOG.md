@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-12
+
+### Added
+
+- Optional link to the [PV Assistant](https://github.com/weskona/pv-assistant) integration. When it is installed, the Settings tab offers its production power sensors as **Solar production** (one click, administrators) and the Power tab shows a row **PV by plant** that opens to the plants with their power. Energyboard only reads the configuration over `pv_assistant/config`; without PV Assistant, or if the call fails, nothing changes.
+
 ## [0.6.0] - 2026-11-11
 
 ### Added
