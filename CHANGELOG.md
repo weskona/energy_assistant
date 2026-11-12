@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-12
+
+### Changed
+
+- The notice at the top of the Settings tab now lists every sibling integration that was found (PV Assistant, Tariffy, EV Assistant, Amortix) and what Energy Assistant shows from each on the Power tab, not only PV Assistant. The question to take over the sensors of PV Assistant stays in it. The notice also appears when only Tariffy, EV Assistant or Amortix is installed.
+
 ## [0.13.0] - 2026-11-12
 
 ### Added

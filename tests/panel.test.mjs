@@ -1588,7 +1588,7 @@ test("pv assistant: no offer, an empty answer or an error change nothing", async
     const p = pvPanel({ reply });
     await p._loadPv();
     assert.equal(p._pv, null);
-    assert.equal(p._renderPvNotice(false), "");
+    assert.equal(p._renderIntegrations(false), "");
     assert.equal(p._renderPvPlants(null), "");
   }
 });
@@ -1637,7 +1637,7 @@ test("pv assistant: read-only users get the information but no button", async ()
   const p = pvPanel({ admin: false });
   await p._loadPv();
   const html = p._renderSettings();
-  assert.match(html, /PV Assistant detected/);
+  assert.match(html, /Detected integrations/);
   assert.doesNotMatch(html, /data-pvapply/);
 });
 
@@ -1932,4 +1932,38 @@ test("amortix: several entries show one block each; the card is part of the Powe
   assert.ok(html.indexOf("Balkon") < html.indexOf("Wallbox"));
   p._ready = true;
   assert.match(p._renderHouse(), /<span class="eb-title">Payback<\/span>/);
+});
+
+
+// --- the notice lists every sibling integration that was found ----------------------------------
+test("integrations notice: lists PV Assistant, Tariffy, EV Assistant and Amortix when they are found", () => {
+  const p = pvPanel();
+  p._pv = { targets: { solar_power: ["a"] }, notes: {}, plants: [] };
+  p._int = {
+    pv_assistant: { entities: { production_today: "sensor.x" } },
+    tariffy: { price: "sensor.p" },
+    ev_assistant: { vehicles: [{ name: "ID.3" }, { name: "Zoe" }] },
+    amortix: { entries: [{ title: "Anlage", entities: {} }] },
+  };
+  const html = p._renderIntegrations(false);
+  assert.match(html, /Detected integrations/);
+  assert.match(html, /Do you want to take over its sensors/);
+  assert.match(html, /PV Assistant: day figures, forecast and plant fault/);
+  assert.match(html, /Tariffy: electricity price/);
+  assert.match(html, /EV Assistant: wallbox and today.s charging on the Power tab \(ID\.3, Zoe\)/);
+  assert.match(html, /Amortix: savings and payback/);
+});
+
+test("integrations notice: shows without a PV Assistant offer, and says nothing when nothing was found", () => {
+  const p = pvPanel();
+  p._pv = null;
+  p._int = { tariffy: { price: "sensor.p" }, amortix: { entries: [{ title: "x", entities: {} }] } };
+  const html = p._renderIntegrations(false);
+  assert.match(html, /Tariffy/);
+  assert.match(html, /Amortix/);
+  assert.doesNotMatch(html, /data-pvapply|PV Assistant/);
+  p._int = {};
+  assert.equal(p._renderIntegrations(false), "");
+  p._int = { pv_assistant: { entities: { production_today: "sensor.x" } } };
+  assert.match(p._renderIntegrations(false), /PV Assistant: day figures/);
 });

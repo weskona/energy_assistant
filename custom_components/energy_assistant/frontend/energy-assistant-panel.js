@@ -85,6 +85,7 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .pvnote .pvq{font-size:16px;font-weight:600;margin:10px 0 6px}
 .pvnote ul{margin:0 0 4px;padding-left:20px;color:var(--eb-muted);font-size:14px}
 .pvnote .bar2{margin-top:12px}
+.pvnote ul.ints{margin:10px 0 0;padding-left:20px;color:var(--eb-muted);font-size:14px}
 .fld{margin-top:16px}
 .fld>label,.sw{display:block;font-size:12.5px;color:var(--eb-muted);margin-bottom:6px}
 .sw{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--eb-text);font-size:14px;cursor:pointer}
@@ -240,6 +241,12 @@ const STRINGS = {
     tFeedIn: "Feed-in earns",
     tPvSaves: "Solar saves",
     pvPlants: "PV by plant",
+    intTitle: "Detected integrations",
+    intPv: "PV Assistant",
+    intPvData: "PV Assistant: day figures, forecast and plant fault on the Power tab",
+    intTariffy: "Tariffy: electricity price and feed-in tariff as costs on the Power tab",
+    intEv: "EV Assistant: wallbox and today's charging on the Power tab ({n})",
+    intAmortix: "Amortix: savings and payback on the Power tab",
     pvTitle: "PV Assistant detected",
     pvAsk: "PV Assistant is installed. Do you want to take over its sensors?",
     pvSolar: "Solar production: {n} sensors",
@@ -396,6 +403,12 @@ const STRINGS = {
     tFeedIn: "Einspeisung bringt",
     tPvSaves: "PV spart",
     pvPlants: "PV je Anlage",
+    intTitle: "Erkannte Integrationen",
+    intPv: "PV Assistant",
+    intPvData: "PV Assistant: Tagesbilanz, Prognose und Anlagenstörung auf dem Leistungs-Tab",
+    intTariffy: "Tariffy: Strompreis und Einspeisevergütung als Kosten auf dem Leistungs-Tab",
+    intEv: "EV Assistant: Wallbox und heutiges Laden auf dem Leistungs-Tab ({n})",
+    intAmortix: "Amortix: Einsparung und Amortisation auf dem Leistungs-Tab",
     pvTitle: "PV Assistant erkannt",
     pvAsk: "PV Assistant ist installiert. Sollen die Sensoren übernommen werden?",
     pvSolar: "PV-Erzeugung: {n} Sensoren",
@@ -556,6 +569,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._int = {};
     } finally {
       this._intLoading = false;
+      this._settingsDirty = true;
       this._render();
     }
   }
@@ -1246,15 +1260,33 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
     else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
     return `<datalist id="eb-sensors">${options}</datalist>
-      <div class="set">${this._renderPvNotice(ro)}<div class="grid">${sections}</div>
+      <div class="set">${this._renderIntegrations(ro)}<div class="grid">${sections}</div>
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
   }
 
-  /** Notice at the top of the settings: PV Assistant is installed, take over its sensors? */
-  _renderPvNotice(ro) {
-    if (!this._pv) return "";
+  /**
+   * Notice at the top of the settings: which sibling integrations were found (PV Assistant, Tariffy,
+   * EV Assistant, Amortix) and what Energy Assistant uses from them. For PV Assistant it also asks
+   * whether to take over its sensors. Empty if none was found.
+   */
+  _renderIntegrations(ro) {
+    const found = this._int || {};
+    const others = [];
+    if (found.pv_assistant) others.push(this._t("intPvData"));
+    if (found.tariffy) others.push(this._t("intTariffy"));
+    const vehicles = found.ev_assistant?.vehicles;
+    if (Array.isArray(vehicles) && vehicles.length) others.push(this._t("intEv", { n: vehicles.map((v) => v.name).join(", ") }));
+    if (Array.isArray(found.amortix?.entries) && found.amortix.entries.length) others.push(this._t("intAmortix"));
+    const pvPart = this._pv ? this._renderPvOffer(ro) : "";
+    if (!pvPart && !others.length) return "";
+    return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("intTitle"))}</div>${pvPart}
+      ${others.length ? `<ul class="ints">${others.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>`;
+  }
+
+  /** The PV Assistant part of the notice: the question, what would be taken over and the button. */
+  _renderPvOffer(ro) {
     const t = this._pv.targets;
     const n = (key) => (t[key] || []).length;
     const parts = [];
@@ -1271,13 +1303,11 @@ class EnergyAssistantPanel extends HTMLElement {
       gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
     ].filter(Boolean);
     const done = this._pvApplied();
-    return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
-      <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
+    return `<p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
       ${this._pv.notes.feed_in_negative ? `<div class="hint">${esc(this._t("pvFeedInfo"))}</div>` : ""}
       ${this._pv.notes.storage_absolute ? `<div class="hint">${esc(this._t("pvAbsInfo"))}</div>` : ""}
-      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
-    </div>`;
+      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}`;
   }
 
   /** Translate a key using the Home Assistant UI language (de, otherwise en). */
