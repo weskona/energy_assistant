@@ -15,6 +15,20 @@ from homeassistant.helpers import entity_registry as er
 
 TARIFFY = "tariffy"
 EV_ASSISTANT = "ev_assistant"
+PV_ASSISTANT = "pv_assistant"
+_PV_KEYS = (
+    "production_today",
+    "feed_in_today",
+    "self_consumption_rate_today",
+    "autarky_today",
+    "benefit_today",
+    "forecast_reached_today",
+    "expected_feed_in_tomorrow",
+    "best_window_tomorrow",
+    "storage_usable",
+    "storage_empty_at",
+    "string_fault",
+)
 _EV_KEYS = ("home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended")
 _ELECTRICITY = ("electricity", "strom", "electricity_ht_nt")
 _TARIFFY_KEYS = (
@@ -112,7 +126,31 @@ def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
     return {"vehicles": result} if result else None
 
 
+def pv_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
+    """Day figures, forecast and plant fault of PV Assistant, as entity ids by translation key.
+
+    The panel reads the live values from the states (the sensors carry the values of today and the
+    forecast for tomorrow; `best_window_tomorrow` has the attributes `end` and `energy`, `string_fault`
+    the attribute `plants`).
+    """
+    found: dict[str, str] = {}
+    for entry in sorted(
+        er.async_get(hass).entities.values(), key=lambda e: e.entity_id
+    ):
+        if (
+            entry.platform == PV_ASSISTANT
+            and not entry.disabled_by
+            and entry.translation_key in _PV_KEYS
+        ):
+            found.setdefault(entry.translation_key, entry.entity_id)
+    return {"entities": found} if found else None
+
+
 def available(hass: HomeAssistant) -> dict[str, Any]:
     """Everything the sibling integrations offer right now (only what exists)."""
-    found = {"tariffy": tariffy(hass), "ev_assistant": ev_assistant(hass)}
+    found = {
+        "tariffy": tariffy(hass),
+        "ev_assistant": ev_assistant(hass),
+        "pv_assistant": pv_assistant(hass),
+    }
     return {name: data for name, data in found.items() if data}

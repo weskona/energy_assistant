@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-12
+
+### Added
+
+- Optional link to [PV Assistant](https://github.com/weskona/pv-assistant), part 2: when it is installed, the Power tab shows a card **PV today and tomorrow**. Today: production, feed-in, self-consumption, self-sufficiency, forecast reached and benefit. Storage: usable energy and when it is empty. Tomorrow: expected feed-in and the best three-hour window. A plant fault of PV Assistant shows as a warning with the affected plants. The values come live from its sensors, found over the entity registry (`energy_assistant/integrations`); tiles without a value are left out and without PV Assistant nothing is shown.
+
 ## [0.11.0] - 2026-11-12
 
 ### Added

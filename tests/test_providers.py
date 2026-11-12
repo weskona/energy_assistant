@@ -6,6 +6,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.energy_assistant.providers import (
     available,
     ev_assistant,
+    pv_assistant,
     tariffy,
 )
 from custom_components.energy_assistant.websocket import async_register
@@ -162,3 +163,40 @@ async def test_ev_sensors_of_other_platforms_are_ignored(hass) -> None:
         translation_key="home_kwh",
     )
     assert ev_assistant(hass) is None
+
+
+def _pv_sensor(hass, entry, key, domain="sensor", disabled=False):
+    entity = er.async_get(hass).async_get_or_create(
+        domain,
+        "pv_assistant",
+        f"{entry.entry_id}_{key}",
+        suggested_object_id=f"pv_{key}",
+        config_entry=entry,
+        translation_key=key,
+        disabled_by=er.RegistryEntryDisabler.USER if disabled else None,
+    )
+    hass.states.async_set(entity.entity_id, "1")
+    return entity.entity_id
+
+
+async def test_no_pv_assistant_no_day_data(hass) -> None:
+    assert pv_assistant(hass) is None
+
+
+async def test_pv_assistant_day_entities_by_translation_key(hass) -> None:
+    entry = MockConfigEntry(domain="pv_assistant", title="PV")
+    entry.add_to_hass(hass)
+    prod = _pv_sensor(hass, entry, "production_today")
+    fc = _pv_sensor(hass, entry, "best_window_tomorrow")
+    fault = _pv_sensor(hass, entry, "string_fault", domain="binary_sensor")
+    _pv_sensor(hass, entry, "pv_power")  # not a day value: not offered here
+    _pv_sensor(hass, entry, "autarky_today", disabled=True)
+    offer = pv_assistant(hass)
+    assert offer == {
+        "entities": {
+            "production_today": prod,
+            "best_window_tomorrow": fc,
+            "string_fault": fault,
+        }
+    }
+    assert available(hass)["pv_assistant"] == offer

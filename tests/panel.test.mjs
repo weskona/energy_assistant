@@ -1792,3 +1792,75 @@ test("ev assistant: the Power tab contains the wallbox block", () => {
   p._ready = true;
   assert.match(p._renderHouse(), /Wallbox/);
 });
+
+// --- optional data from PV Assistant (day figures, forecast, plant fault) -----------------------
+const PV_DAY = {
+  production_today: "sensor.pv_prod",
+  feed_in_today: "sensor.pv_feed",
+  self_consumption_rate_today: "sensor.pv_self",
+  autarky_today: "sensor.pv_autarky",
+  forecast_reached_today: "sensor.pv_fc",
+  benefit_today: "sensor.pv_benefit",
+  expected_feed_in_tomorrow: "sensor.pv_exp",
+  best_window_tomorrow: "sensor.pv_window",
+  storage_usable: "sensor.pv_stor",
+  storage_empty_at: "sensor.pv_empty",
+  string_fault: "binary_sensor.pv_fault",
+};
+
+function pvDayPanel({ entities = PV_DAY, fault = "off", empty = "2026-11-12T22:30:00+00:00" } = {}) {
+  const e = (state, attributes = {}) => ({ state, attributes });
+  const p = panel({ house_power: "h" }, {
+    h: st(1),
+    "sensor.pv_prod": e("18.46"), "sensor.pv_feed": e("7.2"), "sensor.pv_self": e("61.2"), "sensor.pv_autarky": e("74.6"),
+    "sensor.pv_fc": e("92.3"), "sensor.pv_benefit": e("4.2", { unit_of_measurement: "EUR" }),
+    "sensor.pv_exp": e("9.8"), "sensor.pv_window": e("2026-11-13T10:00:00+00:00", { end: "2026-11-13T13:00:00+00:00", energy: 8.1 }),
+    "sensor.pv_stor": e("5.4"), "sensor.pv_empty": e(empty),
+    "binary_sensor.pv_fault": e(fault, { plants: ["Garage", "Carport"] }),
+  });
+  p._hass.language = "en";
+  p._int = { pv_assistant: { entities } };
+  return p;
+}
+
+test("pv assistant day: today's figures, tomorrow's forecast and the storage show as tiles", () => {
+  const html = pvDayPanel()._renderPvDay();
+  assert.match(html, /PV today and tomorrow/);
+  assert.match(html, /Production<\/div><div class="eb-value">18\.5<small>kWh/);
+  assert.match(html, /Feed-in<\/div><div class="eb-value">7\.2<small>kWh/);
+  assert.match(html, /Self-consumption<\/div><div class="eb-value">61<small>%/);
+  assert.match(html, /Self-sufficiency<\/div><div class="eb-value">75<small>%/);
+  assert.match(html, /Forecast reached<\/div><div class="eb-value">92<small>%/);
+  assert.match(html, /Benefit<\/div><div class="eb-value">4\.20<small>[^<]*</);
+  assert.match(html, /Expected feed-in<\/div><div class="eb-value">9\.8<small>kWh/);
+  assert.match(html, /Best window<\/div><div class="eb-value">[^<]*\d[^<]*–[^<]*\d/);
+  assert.match(html, />Storage<\/div>/); // own group, not part of tomorrow
+  assert.ok(html.indexOf("Storage usable") < html.indexOf(">Tomorrow<"));
+  assert.match(html, /Storage usable<\/div><div class="eb-value">5\.4<small>kWh/);
+  assert.match(html, /Storage empty at<\/div><div class="eb-value">[^<]*\d/);
+  assert.doesNotMatch(html, /class="alert"/);
+});
+
+test("pv assistant day: a plant fault shows a warning with the plants", () => {
+  const html = pvDayPanel({ fault: "on" })._renderPvDay();
+  assert.match(html, /class="alert">⚠ Plant fault: Garage, Carport/);
+});
+
+test("pv assistant day: unknown values and missing entities leave tiles out, nothing without any", () => {
+  const p = pvDayPanel({ entities: { production_today: "sensor.pv_prod" }, empty: "unknown" });
+  const html = p._renderPvDay();
+  assert.match(html, /Production/);
+  assert.doesNotMatch(html, /Tomorrow|Storage|Feed-in/);
+  assert.equal(pvDayPanel({ entities: {} })._renderPvDay().includes("tile"), false);
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._int = {};
+  assert.equal(none._renderPvDay(), "");
+  const unavailable = pvDayPanel({ entities: { storage_empty_at: "sensor.pv_empty" }, empty: "unavailable" });
+  assert.equal(unavailable._renderPvDay(), "");
+});
+
+test("pv assistant day: the card is part of the Power tab", () => {
+  const p = pvDayPanel();
+  p._ready = true;
+  assert.match(p._renderHouse(), /PV today and tomorrow/);
+});

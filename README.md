@@ -123,7 +123,7 @@ If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is in
 
 - **Config flow / options flow:** a first question asks whether to take over the sensors of PV Assistant. With "yes" the fields of the following steps are pre-filled and can still be changed.
 - **Settings tab:** a notice at the top asks the same. The button (administrators) fills the fields: production power sensors (**Solar production**), storage sensors (combined with its sign, charging, discharging) and grid sensors (import, feed-in). Save as usual. Nothing is left out: a feed-in sensor that PV Assistant reports as negative values becomes the combined grid sensor, and separate charging and discharging sensors that report negative values count with their magnitude.
-- **Power tab:** a row **PV by plant** opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
+- **Power tab:** a card **PV today and tomorrow** (production, feed-in, self-consumption, self-sufficiency, forecast reached, benefit, storage, expected feed-in and best window of tomorrow, plant fault warning) and a row **PV by plant** that opens to the plants (inverters with their strings, as set up in PV Assistant) and their current power. It appears when there are at least two plants.
 
 Without PV Assistant nothing changes.
 
