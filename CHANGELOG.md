@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-12
+
+### Changed
+
+- The PV Assistant hint in the Settings tab is now a prominent notice at the top that asks whether to take over the sensors and lists what would be taken over. The button now also takes over the **storage** sensors (combined with its sign, charging and discharging). Separate charging and discharging sensors that PV Assistant reports as negative values are not taken over; the notice says so.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added

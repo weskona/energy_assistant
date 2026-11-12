@@ -1595,27 +1595,47 @@ test("pv assistant: a failing or empty answer changes nothing", async () => {
   assert.equal(empty._renderPvPlants(null), "");
 });
 
-test("pv assistant: settings offer the production sensors, admins can take them over", async () => {
-  const p = pvPanel();
+test("pv assistant: the settings ask whether to take over the sensors, admins can do it", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"] } });
   await p._loadPv();
   let html = p._renderSettings();
-  assert.match(html, /PV Assistant is installed and reports 3 production sensors/);
-  assert.match(html, /data-pvuse/);
+  assert.match(html, /PV Assistant is installed\. Do you want to take over its sensors\?/);
+  assert.match(html, /Solar production: 3 sensors/);
+  assert.match(html, /Storage: combined 1, charging 1, discharging 1/);
+  assert.match(html, /data-pvapply/);
   p._edited = () => {};
-  const el = {};
-  p._onClick({ target: { closest: (sel) => (sel === "[data-pvuse]" ? el : null) } });
+  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
   assert.deepEqual(p._draft.solar_power, PV_CONFIG.production_power_sensors);
+  assert.deepEqual(p._draft.battery_power, ["sensor.batt"]);
+  assert.deepEqual(p._draft.battery_charge, ["sensor.in"]);
+  assert.deepEqual(p._draft.battery_discharge, ["sensor.out"]);
+  assert.equal(p._draft.invert_battery, false);
   html = p._renderSettings();
-  assert.match(html, /Already in use/);
-  assert.doesNotMatch(html, /data-pvuse/);
+  assert.match(html, /sensors of PV Assistant are in use/);
+  assert.doesNotMatch(html, /data-pvapply/);
+});
+
+test("pv assistant: the sign of a combined storage sensor follows PV Assistant", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, storage_combined_power_sensors: ["sensor.batt"], invert_storage_combined_power: true } });
+  await p._loadPv();
+  p._edited = () => {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
+  assert.equal(p._draft.invert_battery, true);
+});
+
+test("pv assistant: separate storage sensors with negative directions are not taken over", async () => {
+  const p = pvPanel({ reply: { ...PV_CONFIG, storage_in_power_sensors: ["sensor.in"], storage_out_power_sensors: ["sensor.out"], abs_storage_power: true } });
+  await p._loadPv();
+  assert.deepEqual(p._pvTargets(), { solar_power: PV_CONFIG.production_power_sensors });
+  assert.match(p._renderSettings(), /not taken over/);
 });
 
 test("pv assistant: read-only users get the information but no button", async () => {
   const p = pvPanel({ admin: false });
   await p._loadPv();
   const html = p._renderSettings();
-  assert.match(html, /reports 3 production sensors/);
-  assert.doesNotMatch(html, /data-pvuse/);
+  assert.match(html, /PV Assistant detected/);
+  assert.doesNotMatch(html, /data-pvapply/);
 });
 
 test("pv assistant: the Power tab lists the plants in a row that opens, strongest first", async () => {
