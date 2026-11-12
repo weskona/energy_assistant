@@ -1,6 +1,6 @@
 # Design
 
-The design of ha-energyboard follows the style of
+The design of energy_assistant follows the style of
 [glow-dashboard](https://github.com/deepblue120/glow-dashboard): dark, modern, card-based.
 Own values and code, no source taken from it.
 

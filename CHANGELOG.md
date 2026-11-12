@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The repository is now called `weskona/energy_assistant`; the links in the manifest and the changelog follow. The integration itself (domain `energyboard`, name Energyboard) is unchanged, so existing installations keep working.
 - The PV Assistant notice now takes over **all** sensors, nothing is left out any more. A feed-in sensor that PV Assistant reports as negative values is used as the combined grid sensor (import +, feed-in −) and is not counted twice when it is also an import sensor. Separate charging and discharging sensors that report negative values are taken over too: the separate charging and discharging fields count the magnitude of their sensors (also in the history chart).
 
 ## [0.7.2] - 2026-11-12
@@ -159,11 +160,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/ha-energyboard/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/weskona/ha-energyboard/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/weskona/ha-energyboard/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/weskona/ha-energyboard/compare/v0.2.2...v0.3.0
-[0.2.2]: https://github.com/weskona/ha-energyboard/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/weskona/ha-energyboard/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/weskona/ha-energyboard/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/weskona/ha-energyboard/releases/tag/v0.1.0
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/weskona/energy_assistant/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/weskona/energy_assistant/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/weskona/energy_assistant/compare/v0.2.2...v0.3.0
+[0.2.2]: https://github.com/weskona/energy_assistant/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/weskona/energy_assistant/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/weskona/energy_assistant/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/weskona/energy_assistant/releases/tag/v0.1.0

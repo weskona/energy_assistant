@@ -11,10 +11,10 @@
     "panel_custom",
     "websocket_api"
   ],
-  "documentation": "https://github.com/weskona/ha-energyboard",
+  "documentation": "https://github.com/weskona/energy_assistant",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/weskona/ha-energyboard/issues",
+  "issue_tracker": "https://github.com/weskona/energy_assistant/issues",
   "single_config_entry": true,
   "version": "0.7.3"
 }
