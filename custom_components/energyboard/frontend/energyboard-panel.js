@@ -76,6 +76,10 @@ svg.chart{width:100%;height:auto;display:block;margin-top:12px}
 .dev .subs .s.idle b{color:var(--eb-dim)}
 .tab{white-space:nowrap}
 .set .sec{margin-bottom:var(--eb-gap)}
+.pvnote{border-color:var(--eb-green);margin-bottom:var(--eb-gap)}
+.pvnote .pvq{font-size:16px;font-weight:600;margin:10px 0 6px}
+.pvnote ul{margin:0 0 4px;padding-left:20px;color:var(--eb-muted);font-size:14px}
+.pvnote .bar2{margin-top:12px}
 .fld{margin-top:16px}
 .fld>label,.sw{display:block;font-size:12.5px;color:var(--eb-muted);margin-bottom:6px}
 .sw{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:var(--eb-text);font-size:14px;cursor:pointer}
@@ -193,9 +197,17 @@ const STRINGS = {
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
     pvPlants: "PV by plant",
-    pvFound: "PV Assistant is installed and reports {n} production sensors.",
-    pvUse: "Use as solar production",
-    pvUsed: "Already in use.",
+    pvTitle: "PV Assistant detected",
+    pvAsk: "PV Assistant is installed. Do you want to take over its sensors?",
+    pvSolar: "Solar production: {n} sensors",
+    pvStorage: "Storage: {parts}",
+    pvCombined: "combined {n}",
+    pvCharge: "charging {n}",
+    pvDischarge: "discharging {n}",
+    pvAbsNote: "The separate charging and discharging sensors of PV Assistant report their direction as negative values and are not taken over.",
+    pvApply: "Take over sensors",
+    pvOverwrite: "This replaces the sensors in these fields. Save afterwards to keep them.",
+    pvDone: "The sensors of PV Assistant are in use.",
     areaAutoHint: "Nothing selected: all areas with power sensors are shown. Select areas to show only these.",
     noPowerLabels: "No label has power sensors yet. Add a label to your power sensors under Settings → Areas, labels & zones.",
     filterActive: "Active",
@@ -299,9 +311,17 @@ const STRINGS = {
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
     pvPlants: "PV je Anlage",
-    pvFound: "PV Assistant ist installiert und meldet {n} Erzeugungssensoren.",
-    pvUse: "Als PV-Erzeugung übernehmen",
-    pvUsed: "Bereits übernommen.",
+    pvTitle: "PV Assistant erkannt",
+    pvAsk: "PV Assistant ist installiert. Sollen die Sensoren übernommen werden?",
+    pvSolar: "PV-Erzeugung: {n} Sensoren",
+    pvStorage: "Speicher: {parts}",
+    pvCombined: "kombiniert {n}",
+    pvCharge: "Laden {n}",
+    pvDischarge: "Entladen {n}",
+    pvAbsNote: "Die getrennten Lade- und Entlade-Sensoren von PV Assistant melden die Richtung als negative Werte und werden nicht übernommen.",
+    pvApply: "Sensoren übernehmen",
+    pvOverwrite: "Dadurch werden die Sensoren in diesen Feldern ersetzt. Danach speichern, damit sie bleiben.",
+    pvDone: "Die Sensoren von PV Assistant sind übernommen.",
     areaAutoHint: "Nichts ausgewählt: Es werden alle Bereiche mit Leistungssensoren gezeigt. Wähle Bereiche, um nur diese zu zeigen.",
     noPowerLabels: "Noch kein Label hat Leistungssensoren. Versieh deine Leistungssensoren unter Einstellungen → Bereiche, Labels & Zonen mit einem Label.",
     filterActive: "Aktiv",
@@ -469,7 +489,35 @@ class EnergyboardPanel extends HTMLElement {
       plants.push({ name: inv.name || named(ids[0]), sensors: ids });
     }
     for (const id of sensors) if (!taken.has(id)) plants.push({ name: named(id), sensors: [id] });
-    return { sensors, plants };
+    // Storage like PV Assistant counts it: combined sensors are "+ = from the storage" (like here), inverted on request.
+    // Separate in/out sensors that report their direction as negative values (abs_storage_power) do not fit.
+    const abs = !!res?.abs_storage_power;
+    const battery = {
+      combined: list(res?.storage_combined_power_sensors),
+      invert: !!res?.invert_storage_combined_power,
+      charge: abs ? [] : list(res?.storage_in_power_sensors),
+      discharge: abs ? [] : list(res?.storage_out_power_sensors),
+      skipped: abs && (list(res?.storage_in_power_sensors).length > 0 || list(res?.storage_out_power_sensors).length > 0),
+    };
+    return { sensors, plants, battery };
+  }
+
+  /** What "take over" puts into the settings form (only fields PV Assistant has an answer for). */
+  _pvTargets() {
+    const b = this._pv.battery;
+    const t = { solar_power: [...this._pv.sensors] };
+    if (b.combined.length) {
+      t.battery_power = [...b.combined];
+      t.invert_battery = b.invert;
+    }
+    if (b.charge.length) t.battery_charge = [...b.charge];
+    if (b.discharge.length) t.battery_discharge = [...b.discharge];
+    return t;
+  }
+
+  _pvApplied() {
+    const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+    return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : same(v, this._draftList(k))));
   }
 
   /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
@@ -624,8 +672,8 @@ class EnergyboardPanel extends HTMLElement {
       if (group === "state") this._fState = value;
       else this._fSel = value;
       this._edited();
-    } else if (e.target.closest("[data-pvuse]") && this._isAdmin && this._pv) {
-      this._draft.solar_power = [...this._pv.sensors];
+    } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
+      Object.assign(this._draft, this._pvTargets());
       this._edited();
     } else if (e.target.closest("[data-open]")) {
       // Click on an area or label row: show or hide the sensors it sums up.
@@ -908,11 +956,10 @@ class EnergyboardPanel extends HTMLElement {
       if (kind === "areas") return `<div class="fld span"><label>${esc(label)}</label>${this._renderPicker("area", ro)}${this._draft.area_ids.length ? "" : `<div class="hint">${esc(this._t("areaAutoHint"))}</div>`}</div>`;
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
-      const pvHint = key === "solar_power" && this._pv ? this._renderPvHint(ro) : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${pvHint}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
@@ -925,20 +972,28 @@ class EnergyboardPanel extends HTMLElement {
     else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
     else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
     return `<datalist id="eb-sensors">${options}</datalist>
-      <div class="set"><div class="grid">${sections}</div>
+      <div class="set">${this._renderPvNotice(ro)}<div class="grid">${sections}</div>
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
   }
 
-  /** Offer the production sensors of PV Assistant as solar production (admins only). */
-  _renderPvHint(ro) {
-    const wanted = this._pv.sensors;
-    const have = this._draftList("solar_power");
-    const same = wanted.length === have.length && wanted.every((id) => have.includes(id));
-    const text = this._t("pvFound", { n: wanted.length });
-    if (same) return `<div class="hint">${esc(text)} ${esc(this._t("pvUsed"))}</div>`;
-    return `<div class="hint">${esc(text)}${ro ? "" : ` <button type="button" class="linkbtn" data-pvuse>${esc(this._t("pvUse"))}</button>`}</div>`;
+  /** Notice at the top of the settings: PV Assistant is installed, take over its sensors? */
+  _renderPvNotice(ro) {
+    if (!this._pv) return "";
+    const b = this._pv.battery;
+    const parts = [];
+    if (b.combined.length) parts.push(this._t("pvCombined", { n: b.combined.length }));
+    if (b.charge.length) parts.push(this._t("pvCharge", { n: b.charge.length }));
+    if (b.discharge.length) parts.push(this._t("pvDischarge", { n: b.discharge.length }));
+    const lines = [this._t("pvSolar", { n: this._pv.sensors.length }), parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : ""].filter(Boolean);
+    const done = this._pvApplied();
+    return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
+      <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
+      <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
+      ${b.skipped ? `<div class="hint">${esc(this._t("pvAbsNote"))}</div>` : ""}
+      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
+    </div>`;
   }
 
   /** Translate a key using the Home Assistant UI language (de, otherwise en). */
