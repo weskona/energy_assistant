@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-12
+
+### Added
+
+- Optional link to [Tariffy](https://github.com/weskona/tariffy): when it is installed, the Power tab shows **Costs right now**: the electricity price (the live price of a dynamic tariff, otherwise the unit price of the contract), what the grid import costs per hour, what the feed-in earns per hour (feed-in tariff of Tariffy) and what the directly used solar power saves per hour. Without Tariffy nothing is shown.
+- Framework for sibling integrations: `providers.py` finds their sensors in the entity registry (platform and translation key, independent of the language) and the WebSocket command `energy_assistant/integrations` hands the entity ids to the panel, which reads the live values from the states. Everything is read only, a missing integration simply gives no answer.
+
 ## [0.9.0] - 2026-11-12
 
 ### Added

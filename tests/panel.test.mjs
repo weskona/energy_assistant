@@ -1674,3 +1674,66 @@ test("display: a feed-in sensor with negative values as combined grid sensor cou
   assert.equal(c.gridOut, 400);
   assert.equal(c.gridIn, 0);
 });
+
+// --- optional data from Tariffy (prices) -------------------------------------------------------
+function costPanel({ price = "0.298", unit = "EUR/kWh", attrs = {}, feedIn = "0.08", tariffy = true, grid = {} } = {}) {
+  const states = {
+    "sensor.t_preis": { state: price, attributes: { unit_of_measurement: unit, ...attrs } },
+    "sensor.t_einsp": { state: feedIn, attributes: { unit_of_measurement: unit } },
+    pv: st(3000), gi: st(grid.gi ?? 2000), ge: st(grid.ge ?? 500), h: st(4500),
+  };
+  const p = panel({ solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], house_power: "h" }, states);
+  p._hass.language = "en";
+  p._int = tariffy ? { tariffy: { price: "sensor.t_preis", feed_in: feedIn === null ? null : "sensor.t_einsp" } } : {};
+  return p;
+}
+
+test("tariffy: money flows per hour from the price, the feed-in tariff and the live power", () => {
+  const p = costPanel();
+  const html = p._renderCosts(p._current());
+  assert.match(html, /Costs right now/);
+  assert.match(html, /Electricity price<\/div><div class="eb-value">29\.8<small>ct\/kWh/);
+  assert.match(html, /Grid import costs<\/div><div class="eb-value">0\.60<small>[^<]*\/h/); // 2 kW x 0.298
+  assert.match(html, /Feed-in earns<\/div><div class="eb-value">0\.04<small>[^<]*\/h/); // 0.5 kW x 0.08
+  assert.match(html, /Solar saves<\/div><div class="eb-value">0\.75<small>[^<]*\/h/); // direct 2.5 kW x 0.298
+});
+
+test("tariffy: the live price of a dynamic tariff wins over the average", () => {
+  const p = costPanel({ price: "0.25", attrs: { arbeitspreis_aktuell: 0.4 } });
+  assert.equal(p._price().value, 0.4);
+  assert.match(p._renderCosts(p._current()), /40\.0<small>ct\/kWh/);
+});
+
+test("tariffy: without a feed-in sensor there is no feed-in tile; without Tariffy nothing is shown", () => {
+  const p = costPanel({ feedIn: null });
+  assert.doesNotMatch(p._renderCosts(p._current()), /Feed-in earns/);
+  const none = costPanel({ tariffy: false });
+  assert.equal(none._renderCosts(none._current()), "");
+  const unknown = costPanel({ price: "unavailable" });
+  assert.equal(unknown._renderCosts(unknown._current()), "");
+});
+
+test("tariffy: other currencies show the price with their unit", () => {
+  const p = costPanel({ unit: "CHF/kWh", price: "0.3" });
+  const html = p._renderCosts(p._current());
+  assert.match(html, /0\.3<small>CHF\/kWh/);
+});
+
+test("tariffy: the costs are part of the Power tab", () => {
+  const p = costPanel();
+  p._ready = true;
+  assert.match(p._renderHouse(), /Costs right now/);
+});
+
+test("integrations: the panel asks the backend and an error leaves nothing to show", async () => {
+  const p = costPanel({ tariffy: false });
+  p._render = () => {};
+  p._hass.callWS = async (msg) => ({ type: msg.type, tariffy: { price: "sensor.t_preis" } });
+  await p._loadIntegrations();
+  assert.equal(p._int.tariffy.price, "sensor.t_preis");
+  const broken = costPanel();
+  broken._render = () => {};
+  broken._hass.callWS = async () => { throw new Error("nope"); };
+  await broken._loadIntegrations();
+  assert.deepEqual(broken._int, {});
+});

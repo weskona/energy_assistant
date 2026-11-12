@@ -127,6 +127,10 @@ If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is in
 
 Without PV Assistant nothing changes.
 
+### Tariffy (optional)
+
+If [Tariffy](https://github.com/weskona/tariffy) is installed, the Power tab shows **Costs right now** below the tiles: the electricity price (live for a dynamic tariff), the cost of the grid import, the earnings of the feed-in and the savings of the directly used solar power, each per hour. The price comes from the first electricity contract, the feed-in tariff from any Tariffy contract that has one. Energy Assistant only reads Tariffy; without it nothing is shown and both run on their own.
+
 ### Changing the settings
 
 After the first setup in the config flow you can change everything in the panel itself:

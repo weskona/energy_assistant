@@ -38,6 +38,7 @@ const STYLE = `
 .big{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px}
 .big b{font-size:64px;font-weight:800;line-height:1}
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
+.eb-label.costs{margin-top:18px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
@@ -196,6 +197,11 @@ const STRINGS = {
     noAreaMatches: "No area matches the filters",
     noPowerAreas: "No area has power sensors yet. Assign your power sensors or their devices to an area.",
     noAreasDefined: "No areas exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
+    costsNow: "Costs right now",
+    tPrice: "Electricity price",
+    tGridCost: "Grid import costs",
+    tFeedIn: "Feed-in earns",
+    tPvSaves: "Solar saves",
     pvPlants: "PV by plant",
     pvTitle: "PV Assistant detected",
     pvAsk: "PV Assistant is installed. Do you want to take over its sensors?",
@@ -314,6 +320,11 @@ const STRINGS = {
     noAreaMatches: "Kein Bereich passt zu den Filtern",
     noPowerAreas: "Noch kein Bereich hat Leistungssensoren. Ordne deine Leistungssensoren oder ihre Geräte einem Bereich zu.",
     noAreasDefined: "In Home Assistant gibt es noch keine Bereiche. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
+    costsNow: "Kosten jetzt",
+    tPrice: "Strompreis",
+    tGridCost: "Netzbezug kostet",
+    tFeedIn: "Einspeisung bringt",
+    tPvSaves: "PV spart",
     pvPlants: "PV je Anlage",
     pvTitle: "PV Assistant erkannt",
     pvAsk: "PV Assistant ist installiert. Sollen die Sensoren übernommen werden?",
@@ -456,7 +467,82 @@ class EnergyAssistantPanel extends HTMLElement {
       this._maybeLoadHistory();
       this._loadLabels();
       this._loadPv();
+      this._loadIntegrations();
     }
+  }
+
+  /**
+   * Entities of installed sibling integrations (Tariffy, ...). The backend only reads them; the values
+   * come live from the states. Without any of them the answer is empty and nothing is shown.
+   */
+  async _loadIntegrations() {
+    if (this._intLoading || !this._hass) return;
+    this._intLoading = true;
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/integrations" });
+      this._int = res && typeof res === "object" ? res : {};
+    } catch (e) {
+      console.info("Energy Assistant: could not ask for sibling integrations", e);
+      this._int = {};
+    } finally {
+      this._intLoading = false;
+      this._render();
+    }
+  }
+
+  /** Electricity price in currency/kWh (the live price of a dynamic tariff if Tariffy has one). */
+  _price() {
+    const t = this._int?.tariffy;
+    const state = t?.price && this._hass?.states?.[t.price];
+    if (!state) return null;
+    const live = parseFloat(state.attributes?.arbeitspreis_aktuell);
+    const value = Number.isNaN(live) ? parseFloat(state.state) : live;
+    if (Number.isNaN(value)) return null;
+    const unit = String(state.attributes?.unit_of_measurement || "EUR/kWh");
+    return { value, currency: unit.split("/")[0] || "EUR" };
+  }
+
+  _feedInTariff() {
+    const id = this._int?.tariffy?.feed_in;
+    const v = id && this._hass?.states?.[id] ? parseFloat(this._hass.states[id].state) : NaN;
+    return Number.isNaN(v) ? null : v;
+  }
+
+  /** [number, symbol] of an amount, with the currency symbol of the locale where known. */
+  _money(v, currency, digits = 2) {
+    const lang = this._hass?.language || "en";
+    let symbol = currency;
+    try {
+      symbol = new Intl.NumberFormat(lang, { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value || currency;
+    } catch (e) { /* unknown currency code: keep the code */ }
+    return [v.toLocaleString(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }), symbol];
+  }
+
+  /**
+   * Money flows right now (needs Tariffy): what the grid import costs, what the feed-in earns and what
+   * the directly used solar power saves, each per hour. Empty without Tariffy or without a price.
+   */
+  _renderCosts(cur) {
+    const price = this._price();
+    if (!price) return "";
+    const feedIn = this._feedInTariff();
+    const kw = (w) => (w == null ? null : w / 1000);
+    const perHour = (w, rate) => (w == null || rate == null ? null : kw(w) * rate);
+    const tiles = [];
+    const tile = (label, value, unit) => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div></div>`;
+    const priceDisplay = price.currency === "EUR"
+      ? [(price.value * 100).toLocaleString(this._hass?.language || "en", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), "ct/kWh"]
+      : [price.value.toLocaleString(this._hass?.language || "en", { maximumFractionDigits: 4 }), `${price.currency}/kWh`];
+    tiles.push(tile(this._t("tPrice"), priceDisplay[0], priceDisplay[1]));
+    const money = (label, amount) => {
+      if (amount == null) return;
+      const [n, sym] = this._money(amount, price.currency);
+      tiles.push(tile(label, n, `${sym}/h`));
+    };
+    money(this._t("tGridCost"), perHour(cur.gridIn, price.value));
+    money(this._t("tFeedIn"), perHour(cur.gridOut, feedIn));
+    money(this._t("tPvSaves"), perHour(cur.direct, price.value));
+    return `<div class="eb-label costs">${esc(this._t("costsNow"))}</div><div class="tiles">${tiles.join("")}</div>`;
   }
 
   /**
@@ -1293,6 +1379,7 @@ class EnergyAssistantPanel extends HTMLElement {
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
+        ${this._renderCosts(cur)}
         ${this._renderPvPlants(cur.house)}
       </div>
       <div class="eb-card">
