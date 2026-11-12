@@ -204,6 +204,10 @@ const STRINGS = {
     pvCombined: "combined {n}",
     pvCharge: "charging {n}",
     pvDischarge: "discharging {n}",
+    pvGrid: "Grid: {parts}",
+    pvImport: "import {n}",
+    pvExport: "feed-in {n}",
+    pvFeedNote: "The feed-in sensor of PV Assistant reports feed-in as negative values and is not taken over.",
     pvAbsNote: "The separate charging and discharging sensors of PV Assistant report their direction as negative values and are not taken over.",
     pvApply: "Take over sensors",
     pvOverwrite: "This replaces the sensors in these fields. Save afterwards to keep them.",
@@ -318,6 +322,10 @@ const STRINGS = {
     pvCombined: "kombiniert {n}",
     pvCharge: "Laden {n}",
     pvDischarge: "Entladen {n}",
+    pvGrid: "Netz: {parts}",
+    pvImport: "Bezug {n}",
+    pvExport: "Einspeisung {n}",
+    pvFeedNote: "Der Einspeise-Sensor von PV Assistant meldet die Einspeisung als negative Werte und wird nicht übernommen.",
     pvAbsNote: "Die getrennten Lade- und Entlade-Sensoren von PV Assistant melden die Richtung als negative Werte und werden nicht übernommen.",
     pvApply: "Sensoren übernehmen",
     pvOverwrite: "Dadurch werden die Sensoren in diesen Feldern ersetzt. Danach speichern, damit sie bleiben.",
@@ -499,7 +507,15 @@ class EnergyboardPanel extends HTMLElement {
       discharge: abs ? [] : list(res?.storage_out_power_sensors),
       skipped: abs && (list(res?.storage_in_power_sensors).length > 0 || list(res?.storage_out_power_sensors).length > 0),
     };
-    return { sensors, plants, battery };
+    // Grid: the import sensors fit as they are. A feed-in sensor that reports negative values does not
+    // (the separate feed-in field expects positive values), so it stays out.
+    const feedIn = list(res?.feed_in_power_sensor);
+    const grid = {
+      import: list(res?.grid_import_power_sensors),
+      export: res?.invert_feed_in_power ? [] : feedIn,
+      skipped: !!res?.invert_feed_in_power && feedIn.length > 0,
+    };
+    return { sensors, plants, battery, grid };
   }
 
   /** What "take over" puts into the settings form (only fields PV Assistant has an answer for). */
@@ -510,6 +526,9 @@ class EnergyboardPanel extends HTMLElement {
       t.battery_power = [...b.combined];
       t.invert_battery = b.invert;
     }
+    const g = this._pv.grid;
+    if (g.import.length) t.grid_import = [...g.import];
+    if (g.export.length) t.grid_export = [...g.export];
     if (b.charge.length) t.battery_charge = [...b.charge];
     if (b.discharge.length) t.battery_discharge = [...b.discharge];
     return t;
@@ -986,12 +1005,21 @@ class EnergyboardPanel extends HTMLElement {
     if (b.combined.length) parts.push(this._t("pvCombined", { n: b.combined.length }));
     if (b.charge.length) parts.push(this._t("pvCharge", { n: b.charge.length }));
     if (b.discharge.length) parts.push(this._t("pvDischarge", { n: b.discharge.length }));
-    const lines = [this._t("pvSolar", { n: this._pv.sensors.length }), parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : ""].filter(Boolean);
+    const g = this._pv.grid;
+    const gridParts = [];
+    if (g.import.length) gridParts.push(this._t("pvImport", { n: g.import.length }));
+    if (g.export.length) gridParts.push(this._t("pvExport", { n: g.export.length }));
+    const lines = [
+      this._t("pvSolar", { n: this._pv.sensors.length }),
+      parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : "",
+      gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
+    ].filter(Boolean);
     const done = this._pvApplied();
     return `<div class="eb-card pvnote"><div class="eb-title">${esc(this._t("pvTitle"))}</div>
       <p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
       <ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
       ${b.skipped ? `<div class="hint">${esc(this._t("pvAbsNote"))}</div>` : ""}
+      ${g.skipped ? `<div class="hint">${esc(this._t("pvFeedNote"))}</div>` : ""}
       ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-pvapply>${esc(this._t("pvApply"))}</button><span class="hint">${esc(this._t("pvOverwrite"))}</span></div>`}
     </div>`;
   }
