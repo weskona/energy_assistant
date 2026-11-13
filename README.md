@@ -8,8 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history chart of the last 24 hours, power of individual devices |
-| **Consumption** (German: Verbrauch) | Only with devices set up: the base load of the house with its cost per year, the biggest consumers of today in kWh and euro, and the devices that are always on (standby) |
-| **Balance** (German: Bilanz) | Only with energy counters (see below): the energy of a day, week, month or year in kWh with the change to the period before, self-consumption, self-sufficiency, grid cost and feed-in revenue (with Tariffy) and bars per hour, day or month |
+| **Consumption** (German: Verbrauch) | One period picker (day, week, month, year) for the whole tab. On top the **balance** of your energy counters (only with energy counters, see below): the energy of the period in kWh with the change to the period before, self-consumption, self-sufficiency, grid cost and feed-in revenue (with Tariffy) and bars per hour, day or month. Below it the **devices** (only with devices set up): the base load of the house with its cost per year, the biggest consumers in kWh, the devices that are always on (standby) and the energy per label |
 | **PV** | Only with PV Assistant: production, feed-in, self-consumption, self-sufficiency, forecast, storage, plant fault and the PV power by plant |
 | **EV** | Only with EV Assistant: wallbox status and power, charge level, solar share, today's charging and the advice to charge before PV |
 | **Costs** (German: Kosten) | Only with Tariffy: electricity price, what the grid import costs, what the feed-in earns and what the solar power saves per hour, and the contract figures |
@@ -132,7 +131,7 @@ The panel shows it as a tile, in the source bar and as a second line in the hist
 
 ### Config flow and options
 
-The config flow (and the options, which can be changed later with *Configure*) has four steps: grid and house, solar and storage, **energy counters** and devices. The storage step now also asks for the charge level sensor, the capacity (kWh) and the minimum charge level (%). The energy step asks for the counters of the Balance tab; if the Energy dashboard of Home Assistant is set up, its counters are suggested the first time and can be changed or removed. In the options, a field that you empty is cleared (before, the old value came back).
+The config flow (and the options, which can be changed later with *Configure*) has four steps: grid and house, solar and storage, **energy counters** and devices. The storage step now also asks for the charge level sensor, the capacity (kWh) and the minimum charge level (%). The energy step asks for the counters of the balance; if the Energy dashboard of Home Assistant is set up, its counters are suggested the first time and can be changed or removed. In the options, a field that you empty is cleared (before, the old value came back).
 
 ### Storage card
 
@@ -149,7 +148,7 @@ A card **Notices** at the top of the Power tab appears when something needs atte
 
 ### Time zone
 
-All periods and times (the day limits of the Balance and Consumption tabs, the clock times in the history chart and its table, "empty at") use the **time zone of your Home Assistant instance** (*Settings → System → General*), not the one of the browser. Days with a clock change have 23 or 25 hours, zones with a half-hour offset work too. If the time zone is not known, the browser's is used.
+All periods and times (the day limits of the Consumption tab, the clock times in the history chart and its table, "empty at") use the **time zone of your Home Assistant instance** (*Settings → System → General*), not the one of the browser. Days with a clock change have 23 or 25 hours, zones with a half-hour offset work too. If the time zone is not known, the browser's is used.
 
 ### Consumption tab: base load and devices
 
@@ -175,11 +174,11 @@ The **Labels card of the Consumption tab** does not use these sensors but the lo
 
 Devices that are unavailable now still count with their history; the wallbox row of EV Assistant has no history of its own and is not part of it.
 
-**Period picker:** like in the Balance tab, **Day, Week, Month and Year** with arrows. *Day / today* is read from the history in 5-minute steps (as described above). Every other period comes from the long-term statistics of Home Assistant (the power sensors need the state class `measurement`): the energy of a device is its hourly means (daily means for a month or a year) times their duration, and the base load is the lowest hourly mean of the house and of every device in the period (at most the last 31 days of it). Without a house power sensor the house power is the balance of the separate sensors per hour, like the live value.
+**Period picker:** one picker on top of the Consumption tab for the balance and for the devices, **Day, Week, Month and Year** with arrows. *Day / today* is read from the history in 5-minute steps (as described above). Every other period comes from the long-term statistics of Home Assistant (the power sensors need the state class `measurement`): the energy of a device is its hourly means (daily means for a month or a year) times their duration, and the base load is the lowest hourly mean of the house and of every device in the period (at most the last 31 days of it). Without a house power sensor the house power is the balance of the separate sensors per hour, like the live value.
 
-### Energy counters and the Balance tab
+### Energy counters and the balance
 
-For the **Balance** tab enter your energy counters in the Settings tab (section *Energy counters (kWh)*): PV production, grid import, grid export, to storage, from storage and, if you have one, the house consumption. These are cumulative kWh counters or utility meters; several counters per field are summed. If the **Energy dashboard** of Home Assistant is set up, a notice offers its counters with one button (read only, nothing is changed in the dashboard); save as usual.
+For the **balance** at the top of the Consumption tab enter your energy counters in the Settings tab (section *Energy counters (kWh)*): PV production, grid import, grid export, to storage, from storage and, if you have one, the house consumption. These are cumulative kWh counters or utility meters; several counters per field are summed. If the **Energy dashboard** of Home Assistant is set up, a notice offers its counters with one button (read only, nothing is changed in the dashboard); save as usual.
 
 The tab reads the long-term statistics of Home Assistant, so the history that already exists is used from the first day. Day (per hour), week from Monday and month (per day) and year (per month) can be paged through with the arrows. Consumption is the measured house counter, otherwise production + import + discharge − export − charge. Self-consumption is the share of the production that was not exported, self-sufficiency the share of the consumption that did not come from the grid. With Tariffy the grid cost and the feed-in revenue are valued with the price of the contract.
 

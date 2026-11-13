@@ -2544,7 +2544,7 @@ test("balance: the statistics are asked for with the counters, the period and kW
   p._maybeLoadBalance(); // fresh data: no new request
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(calls.length, 2);
-  p._balRange = "month";
+  p._usRange = "month";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(calls.length, 4);
@@ -2566,8 +2566,8 @@ function loadedBalance(extra = {}, off = 0) {
   const buckets = { solar: col(10, 20), imp: col(4, 2), exp: col(2, 5), chg: col(3), dis: col(1) };
   const prevBuckets = { solar: col(10), imp: col(8), exp: col(1) };
   const prevWin = p._balWindow("week", off - 1);
-  p._balRange = "week";
-  p._balOff = off;
+  p._usRange = "week";
+  p._usOff = off;
   p._bal = {
     range: "week", off, win, at: Date.now(), failed: false,
     ...p._balCompute(buckets, win),
@@ -2608,16 +2608,16 @@ test("balance: with Tariffy the grid cost, the feed-in revenue and the balance a
 test("balance: the picker marks the range, 'next' is off for the current period and the label follows", () => {
   const p = loadedBalance();
   let html = p._renderBalance();
-  assert.match(html, /<button type="button" class="seg on" data-brange="week">Week<\/button>/);
-  assert.match(html, /data-bnav="1"[^>]*disabled/);
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "-1" } } : null) } });
-  assert.equal(p._balOff, -1);
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
-  assert.equal(p._balOff, 0); // never into the future
-  p._onClick({ target: { closest: (sel) => (sel === "[data-brange]" ? { dataset: { brange: "year" } } : null) } });
-  assert.equal(p._balRange, "year");
-  assert.equal(p._balOff, 0);
+  assert.match(html, /<button type="button" class="seg on" data-urange="week">Week<\/button>/);
+  assert.match(html, /data-unav="1"[^>]*disabled/);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "-1" } } : null) } });
+  assert.equal(p._usOff, -1);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "1" } } : null) } });
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "1" } } : null) } });
+  assert.equal(p._usOff, 0); // never into the future
+  p._onClick({ target: { closest: (sel) => (sel === "[data-urange]" ? { dataset: { urange: "year" } } : null) } });
+  assert.equal(p._usRange, "year");
+  assert.equal(p._usOff, 0);
   html = p._renderBalance(); // data of another range: loading until the new data is there
   assert.match(html, /Loading/);
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
@@ -2643,16 +2643,16 @@ test("balance: a period without any energy says so, the table state is kept", ()
   assert.match(q._renderBalance(), /<details class="tableview" open>/);
 });
 
-test("balance: the tab exists only with energy counters and comes right after Power", () => {
+test("balance: energy counters give the consumption tab, which comes right after Power", () => {
   const none = panel({ house_power: "h" }, { h: st(1) });
   assert.equal(none._balEnabled(), false);
   assert.deepEqual(none._tabs(), ["house"]);
   const p = balPanel({ energy_solar: ["sensor.pv_e"] });
   p._int = { tariffy: { price: "x" } };
-  assert.deepEqual(p._tabs(), ["house", "balance", "costs"]);
+  assert.deepEqual(p._tabs(), ["house", "usage", "costs"]); // no tab of its own any more
   p._hass.language = "de";
-  assert.equal(p._tabLabel("balance"), "Bilanz");
-  p._tab = "balance";
+  assert.equal(p._tabLabel("usage"), "Verbrauch");
+  p._tab = "usage";
   p._bal = null;
   assert.match(p._renderPage(), /Lädt …/);
 });
@@ -2773,7 +2773,7 @@ test("usage: the consumption tab exists only with devices and comes right after 
   assert.equal(byPattern._usageEnabled(), true);
   const p = usagePanel({});
   p._cfg.energy_solar = ["sensor.pv_e"];
-  assert.deepEqual(p._tabs(), ["house", "usage", "balance"]);
+  assert.deepEqual(p._tabs(), ["house", "usage"]); // devices and counters share one tab
   p._hass.language = "de";
   assert.equal(p._tabLabel("usage"), "Verbrauch");
 });
@@ -3383,17 +3383,45 @@ test("notices: the card on the Power tab shows warnings and information, escaped
 // --- the period picker of the consumption tab -----------------------------------------------------
 const hourRows = (start, means) => means.map((m, i) => ({ start: start + i * 3600000, end: start + (i + 1) * 3600000, mean: m }));
 
-test("usage picker: the same picker as in the balance, with its own data attributes", () => {
+test("usage picker: one picker on top of the whole tab, none inside the cards", () => {
   const p = usagePanel();
-  const html = p._renderUsage();
+  const html = p._renderConsumption();
   assert.match(html, /<button type="button" class="seg on" data-urange="day">Day<\/button>/);
   for (const r of ["week", "month", "year"]) assert.match(html, new RegExp(`data-urange="${r}"`));
   assert.match(html, /data-unav="-1"/);
   assert.match(html, /data-unav="1"[^>]*disabled/);
-  assert.doesNotMatch(html, /data-brange|data-bnav/);
+  assert.equal((html.match(/data-urange="day"/g) || []).length, 1); // one picker for balance and devices
+  assert.doesNotMatch(p._renderUsage({ bare: true }), /data-urange|data-unav/);
   const bal = balPanel();
   bal._bal = null;
-  assert.match(bal._renderBalance(), /data-brange="day"/); // the balance keeps its attributes
+  assert.doesNotMatch(bal._renderBalance({ bare: true }), /data-urange/);
+  assert.match(bal._renderBalance(), /data-urange="day"/); // alone it still brings its picker
+});
+
+test("consumption tab: the balance comes first, then the devices, both for the same period", () => {
+  const p = loadedUsage();
+  p._cfg.energy_solar = ["sensor.pv_e"];
+  p._cfg.energy_grid_import = ["sensor.imp_e"];
+  p._bal = {
+    range: "day", off: 0, win: p._balWindow("day", 0), failed: false, before: null,
+    rows: [{ t: 0, solar: 3, imp: 2, exp: 1, chg: null, dis: null, cons: 4 }],
+    totals: { solar: 3, imp: 2, exp: 1, chg: null, dis: null, cons: 4, self: 66, autarky: 50 },
+    at: Date.now(),
+  };
+  const html = p._renderConsumption();
+  assert.ok(html.indexOf("data-urange") < html.indexOf('<span class="eb-title">Balance</span>')); // picker first
+  assert.ok(html.indexOf('<span class="eb-title">Balance</span>') < html.indexOf('<span class="eb-title">Base load</span>')); // then the devices
+  assert.match(html, /Energy per period/); // the chart of the balance
+});
+
+test("consumption tab: only devices or only counters show only their part", () => {
+  const devices = usagePanel();
+  assert.doesNotMatch(devices._renderConsumption(), /eb-title">Balance</);
+  const counters = balPanel({ energy_solar: ["sensor.pv_e"] });
+  counters._bal = null;
+  const html = counters._renderConsumption();
+  assert.match(html, /eb-title">Balance</);
+  assert.doesNotMatch(html, /Base load/);
 });
 
 test("usage picker: clicks change the period, 'next' never goes into the future", () => {

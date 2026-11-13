@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Balance and consumption in one tab:** the Balance tab is gone; its figures (energy of the period from your energy counters, change to the period before, self-consumption, self-sufficiency, costs and the bars) now sit at the top of the Consumption tab, followed by the devices. One period picker (day, week, month, year, with arrows) on top acts on everything below it. The tab exists with energy counters, with devices, or both. An old stored selection of the Balance tab leads to the Consumption tab.
+
+### Changed
+
 - **Labels card with history:** the *Labels* card of the Consumption tab now takes the energy per label from the long-term statistics of the power sensors that carry it, for every period (day, week, month, year and the earlier ones), complete up to the running hour. A label whose sensors only partly have statistics says *n of m sensors*. The energy sensors per label stay for dashboards and automations; they count from the moment they were created.
 
 ### Changed

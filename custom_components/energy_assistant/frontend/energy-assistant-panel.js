@@ -1005,8 +1005,8 @@ class EnergyAssistantPanel extends HTMLElement {
   _tabs() {
     const found = this._int || {};
     const tabs = ["house"];
-    if (this._usageEnabled()) tabs.push("usage");
-    if (this._balEnabled()) tabs.push("balance");
+    // Balance (energy counters) and consumption (devices) are one tab with one period picker.
+    if (this._usageEnabled() || this._balEnabled()) tabs.push("usage");
     if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
     if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
     if (found.tariffy) tabs.push("costs");
@@ -1015,7 +1015,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _tabLabel(tab) {
-    return this._t({ house: "tabPower", usage: "tabUsage", balance: "tabBalance", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+    return this._t({ house: "tabPower", usage: "tabUsage", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
   }
 
   /** Markup of the page of the current tab (not the settings). */
@@ -1023,8 +1023,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
     switch (this._tab) {
-      case "usage": return this._renderUsage();
-      case "balance": return this._renderBalance();
+      case "usage": return this._renderConsumption();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
       case "costs": return stack(this._renderCosts(this._current()), this._renderLabelCosts(), this._renderContract());
@@ -1309,17 +1308,19 @@ class EnergyAssistantPanel extends HTMLElement {
    * The consumption tab: the base load of the house (what never goes away) with its yearly cost, the
    * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
    */
-  _renderUsage() {
+  _renderUsage({ bare = false } = {}) {
+    // bare: the cards only, the period picker and the stack come from the consumption tab
+    const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const lang = this._hass?.language || "en";
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const today = range === "day" && off === 0;
     const win = this._balWindow(range, off);
-    const picker = this._rangePicker("u", range, off, win);
+    const picker = bare ? "" : this._rangePicker("u", range, off, win);
     const v = this._usageView;
     const u = today ? this._usage : v && v.range === range && v.off === off ? v : null;
     const head = `<div class="row"><span class="eb-title">${esc(this._t("uBaseTitle"))}</span>${!today && this._usageViewLoading ? `<span class="eb-label">…</span>` : ""}</div>${picker}`;
-    if (!u) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div></div>`;
+    if (!u) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div>`);
     const priceState = this._int?.tariffy?.price && this._hass?.states?.[this._int.tariffy.price];
     const price = priceState ? parseFloat(priceState.state) : NaN;
     const currency = String(priceState?.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
@@ -1403,7 +1404,7 @@ class EnergyAssistantPanel extends HTMLElement {
     // 4) energy per selected label, from the sensors Energy Assistant creates for them
     const labelsCard = this._renderLabelEnergy({ range, off, num });
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
-    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}</div>`;
+    return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}`);
   }
 
   /**
@@ -1685,7 +1686,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * or a calendar year (per month); `off` counts the periods back from now (0 = the current one).
    * `edges` are the starts of the buckets plus the end of the period.
    */
-  _balWindow(range = this._balRange ?? "day", off = this._balOff ?? 0) {
+  _balWindow(range = this._usRange ?? "day", off = this._usOff ?? 0) {
     const tz = this._tz();
     const now = tzParts(Date.now(), tz);
     const y = now.y, m = now.m - 1, d = now.d;
@@ -1796,13 +1797,13 @@ class EnergyAssistantPanel extends HTMLElement {
   _maybeLoadBalance() {
     if (!this._ready || this._balLoading) return;
     const b = this._bal;
-    if (!b || b.range !== (this._balRange ?? "day") || b.off !== (this._balOff ?? 0) || Date.now() - b.at > 5 * 60 * 1000) this._loadBalance();
+    if (!b || b.range !== (this._usRange ?? "day") || b.off !== (this._usOff ?? 0) || Date.now() - b.at > 5 * 60 * 1000) this._loadBalance();
   }
 
   async _loadBalance() {
     if (!this._hass || this._balLoading) return;
     this._balLoading = true;
-    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
     try {
       const win = this._balWindow(range, off), prev = this._balWindow(range, off - 1);
       const [cur, old] = await Promise.all([this._balFetch(win), this._balFetch(prev)]);
@@ -1858,17 +1859,34 @@ class EnergyAssistantPanel extends HTMLElement {
         <button type="button" class="seg" data-${kind}nav="1" aria-label="${esc(this._t("bNext"))}" ${off >= 0 ? "disabled" : ""}>›</button></div></div>`;
   }
 
+  /**
+   * The consumption tab: one period picker for everything below it, the balance of the energy counters
+   * (totals, change to the period before, costs, bars) and then the devices (base load, biggest consumers,
+   * standby, labels). Each part only when its data is set up.
+   */
+  _renderConsumption() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
+    const parts = [picker];
+    if (this._balEnabled()) parts.push(this._renderBalance({ bare: true }));
+    if (this._usageEnabled()) parts.push(this._renderUsage({ bare: true }));
+    return `<div class="stack">${parts.join("")}</div>`;
+  }
+
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
-  _renderBalance() {
+  _renderBalance({ bare = false } = {}) {
+    // bare: the cards only, the period picker and the stack come from the consumption tab
+    const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const lang = this._hass?.language || "en";
-    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const b = this._bal;
     const win = b?.win && b.range === range && b.off === off ? b.win : this._balWindow(range, off);
-    const picker = this._rangePicker("b", range, off, win);
+    const picker = bare ? "" : this._rangePicker("u", range, off, win);
     const head = `<div class="row"><span class="eb-title">${esc(this._t("balTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>${picker}`;
-    if (!b || b.range !== range || b.off !== off) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div></div>`;
-    if (b.failed) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("bNoData")}</div></div></div>`;
+    if (!b || b.range !== range || b.off !== off) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div>`);
+    if (b.failed) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("bNoData")}</div></div>`);
     const t = b.totals, prev = b.before;
     const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
@@ -1905,7 +1923,7 @@ class EnergyAssistantPanel extends HTMLElement {
       money = `<div class="hint">${esc(this._t("bPriceNote"))}</div>`;
     }
     const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>${money}` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
-    return `<div class="stack">${first}${this._balanceChart(b)}</div>`;
+    return wrap(`${first}${this._balanceChart(b)}`);
   }
 
   /** Grouped bars per bucket (production, consumption, import, export) with a title tooltip and the table. */
@@ -2382,10 +2400,6 @@ class EnergyAssistantPanel extends HTMLElement {
       if (group === "state") this._fState = value;
       else this._fSel = value;
       this._edited();
-    } else if (e.target.closest("[data-brange]")) {
-      this._balRange = e.target.closest("[data-brange]").dataset.brange;
-      this._balOff = 0;
-      this._render();
     } else if (e.target.closest("[data-urange]")) {
       this._usRange = e.target.closest("[data-urange]").dataset.urange;
       this._usOff = 0;
@@ -2394,12 +2408,6 @@ class EnergyAssistantPanel extends HTMLElement {
       const next = (this._usOff ?? 0) + Number(e.target.closest("[data-unav]").dataset.unav);
       if (next <= 0) {
         this._usOff = next;
-        this._render();
-      }
-    } else if (e.target.closest("[data-bnav]")) {
-      const next = (this._balOff ?? 0) + Number(e.target.closest("[data-bnav]").dataset.bnav);
-      if (next <= 0) {
-        this._balOff = next;
         this._render();
       }
     } else if (e.target.closest("[data-energyapply]") && this._isAdmin && this._energyOffer) {
@@ -3621,6 +3629,7 @@ class EnergyAssistantPanel extends HTMLElement {
     this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
     // Tabs come and go with the integrations that were found; a tab that vanished leads back to Power.
     const tabs = this._tabs();
+    if (this._tab === "balance") this._tab = "usage"; // the balance is part of the consumption tab
     if (this._tab !== "settings" && !tabs.includes(this._tab)) {
       this._tab = "house";
       this._html = null;
@@ -3652,10 +3661,10 @@ class EnergyAssistantPanel extends HTMLElement {
     // While a name is being typed the page is not redrawn, live updates would wipe the text field.
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
-    if (this._tab === "balance") this._maybeLoadBalance();
-    if (this._tab === "usage" || (this._tab === "house" && this._usageEnabled())) this._maybeLoadUsage();
-    if (this._tab === "usage") this._maybeLoadUsageView();
-    if (this._tab === "usage") this._maybeLoadLabelUsage();
+    if (this._tab === "usage" && this._balEnabled()) this._maybeLoadBalance();
+    if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
+    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
+    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadLabelUsage();
     if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {
