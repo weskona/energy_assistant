@@ -3882,3 +3882,21 @@ test("tooltip: nothing under the pointer hides it, a broken structure and touch 
     assert.equal(tip.hidden, true); // touch devices have no hover
   } finally { restore(); }
 });
+
+test("settings: a click on the header of the matches opens the list and redraws the settings page", () => {
+  const p = matchPanel();
+  p._tab = "settings";
+  p._render = () => {};
+  p._settingsDirty = false;
+  const header = { dataset: { open: "settings:matches" } };
+  const click = () => p._onClick({ target: { closest: (sel) => (sel === "[data-open]" ? header : null) } });
+  click();
+  assert.equal(p._open.has("settings:matches"), true);
+  assert.equal(p._settingsDirty, true); // without this the page keeps its old markup
+  assert.match(p._renderSettings(), /data-device="sensor\.herd_leistung"/);
+  p._settingsDirty = false;
+  click(); // a second click closes it again
+  assert.equal(p._open.has("settings:matches"), false);
+  assert.equal(p._settingsDirty, true);
+  assert.doesNotMatch(p._renderSettings(), /data-device="sensor\.herd_leistung"/);
+});

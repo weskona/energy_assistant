@@ -2465,6 +2465,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const key = e.target.closest("[data-open]").dataset.open;
       this._open = this._open || new Set();
       if (!this._open.delete(key)) this._open.add(key);
+      this._settingsDirty = true; // the settings page is only redrawn when it is marked as changed
       this._render();
     } else if (e.target.closest("[data-ustoptoggle]")) {
       this._usTopExpanded = !this._usTopExpanded;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The list of matching sensors in the device settings now opens and closes with a click on its header (the page was not redrawn after the click).
+
 ### Removed
 
 - **Folding of cards:** the cards can no longer be folded with a click on their title (arrow in front of the title); the cards are always open. The lists still unfold with *Show all*.
