@@ -1301,7 +1301,7 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const baseCard = `<div class="eb-card">${head}${baseTiles.length ? `<div class="tiles">${baseTiles.join("")}</div>` : `<div class="empty">${this._t("uNone")}</div>`}</div>`;
     // 2) biggest consumers today
-    const top = u.devices.filter((d) => d.kwh >= 0.005).sort((a, b) => b.kwh - a.kwh).slice(0, 10);
+    const top = u.devices.filter((d) => d.kwh >= 0.005).sort((a, b) => b.kwh - a.kwh);
     const total = u.devices.reduce((a, d) => a + d.kwh, 0);
     const facts = (d) => {
       const f = [[this._t("uFactEnergy"), `${num(d.kwh, 2)} kWh`]];
@@ -1323,14 +1323,24 @@ class EnergyAssistantPanel extends HTMLElement {
       <span class="val">${this._sparkline(d.spark)}${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
       <div class="track"><div class="fill" style="width:${Math.min(100, width)}%"></div></div>${detail}</div>`;
     };
-    const topRows = top.map((d) => {
+    // Both lists show as many rows as the shorter one has (within MIN_ROWS and MAX_ROWS); the rest unfolds per list.
+    const lens = [top.length, ...(always.length ? [always.length] : [])];
+    const limit = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Math.min(...lens)));
+    const fold = (list, expanded, toggle) => ({
+      shown: list.length > limit && !expanded ? list.slice(0, limit) : list,
+      cls: expanded && list.length > limit ? " devlist" : "",
+      button: list.length > limit ? `<button class="linkbtn" ${toggle}>${expanded ? this._t("showLess") : this._t("showAll", { n: list.length })}</button>` : "",
+    });
+    const topFold = fold(top, this._usTopExpanded, "data-ustoptoggle");
+    const alwaysFold = fold(always, this._usAlwaysExpanded, "data-usalwaystoggle");
+    const topRows = topFold.shown.map((d) => {
       const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
       return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
-      <div class="devgrid devlist">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+      <div class="devgrid${topFold.cls}">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${topFold.button}</div>`;
     // 3) always on
-    const alwaysRows = always.map((d) => {
+    const alwaysRows = alwaysFold.shown.map((d) => {
       const year = (d.baseW / 1000) * 8760;
       const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
       const [v, unit] = fmtPower(d.baseW);
@@ -1338,7 +1348,7 @@ class EnergyAssistantPanel extends HTMLElement {
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
-      <div class="devgrid devlist">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+      <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}</div>`;
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${note}</div>`;
   }
@@ -2196,6 +2206,12 @@ class EnergyAssistantPanel extends HTMLElement {
       const key = e.target.closest("[data-open]").dataset.open;
       this._open = this._open || new Set();
       if (!this._open.delete(key)) this._open.add(key);
+      this._render();
+    } else if (e.target.closest("[data-ustoptoggle]")) {
+      this._usTopExpanded = !this._usTopExpanded;
+      this._render();
+    } else if (e.target.closest("[data-usalwaystoggle]")) {
+      this._usAlwaysExpanded = !this._usAlwaysExpanded;
       this._render();
     } else if (e.target.closest("[data-devtoggle]")) {
       this._devExpanded = !this._devExpanded;

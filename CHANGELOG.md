@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Consumption tab in two columns:** the cards *Biggest consumers today* and *Always on (standby)* stand side by side in one row, one below the other on narrow screens. Both cards have the same height; a long list scrolls inside its card like in the Power tab.
+- **Consumption tab in two columns:** the cards *Biggest consumers today* and *Always on (standby)* stand side by side in one row, one below the other on narrow screens. Both cards have the same height and show as many rows as the shorter list has (at least 5, at most 8); the rest unfolds with *Show all* per list, and an unfolded long list scrolls inside its card, like in the Power tab. The *Biggest consumers* list is no longer cut at 10 devices.
 
 ### Added
 

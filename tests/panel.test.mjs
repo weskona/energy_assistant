@@ -2866,6 +2866,28 @@ test("usage: defined standby devices are part of the device list", () => {
   assert.equal(p._usageEnabled(), true);
 });
 
+test("usage: both lists show as many rows as the shorter one (at least 5), the rest unfolds per list", () => {
+  const p = loadedUsage();
+  const many = [];
+  for (let k = 0; k < 9; k++) many.push({ id: `sensor.d${k}`, name: `Gerät${k}`, kwh: 5 - k * 0.4, baseW: k < 3 ? 30 - k : 0 });
+  p._usage.devices = many;
+  let html = p._renderUsage();
+  const rows = (card) => (card.match(/class="dev"/g) || []).length;
+  const split = (h) => [h.slice(h.indexOf("Biggest consumers"), h.indexOf("Always on (standby)")), h.slice(h.indexOf("Always on (standby)"))];
+  let [top, always] = split(html);
+  assert.equal(rows(top), 5); // the standby list has 3, but there are at least 5 rows
+  assert.equal(rows(always), 3);
+  assert.match(top, /Show all 9/);
+  assert.doesNotMatch(always, /Show all/);
+  assert.doesNotMatch(top, /devlist/);
+  p._usTopExpanded = true;
+  html = p._renderUsage();
+  [top] = split(html);
+  assert.equal(rows(top), 9);
+  assert.match(top, /Show less/);
+  assert.match(top, /devgrid devlist/);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();
