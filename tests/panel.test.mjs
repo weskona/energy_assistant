@@ -2932,6 +2932,20 @@ test("usage: the labels card shows the kWh of every selected label for the shown
   assert.doesNotMatch(card, /Kaputt/); // an unavailable sensor is left out
   assert.match(card, /width:100%/); // the biggest label fills the bar
   assert.match(card, /creates the sensors/);
+  assert.doesNotMatch(card, /€/); // no cost sensor, so no cost (never today's price times the energy)
+});
+
+test("usage: the cost of a label comes from its cost sensor, not from the current price", () => {
+  const p = labelEnergyPanel();
+  p._hass.states["sensor.c_licht_day"] = { state: "1.37", attributes: { unit_of_measurement: "EUR" } };
+  p._labelEnergy.licht.cost_day = "sensor.c_licht_day";
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  p._hass.states["sensor.t_preis"] = { state: "9.99", attributes: { unit_of_measurement: "EUR/kWh" } };
+  const html = p._renderUsage();
+  const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
+  assert.match(card, /Licht[\s\S]*1[.,]37[^<]*€/);
+  assert.doesNotMatch(card, /44[.,]9/); // 4.5 kWh x 9.99 would be 44.96
+  assert.doesNotMatch(card.slice(card.indexOf("Klima")), /€/); // Klima has no cost sensor
 });
 
 test("usage: the labels card follows the period picker and says when only the running period exists", () => {

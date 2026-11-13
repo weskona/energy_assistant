@@ -148,6 +148,18 @@
       },
       "label_energy_year": {
         "name": "{label} energy this year"
+      },
+      "label_cost_day": {
+        "name": "{label} cost today"
+      },
+      "label_cost_week": {
+        "name": "{label} cost this week"
+      },
+      "label_cost_month": {
+        "name": "{label} cost this month"
+      },
+      "label_cost_year": {
+        "name": "{label} cost this year"
       }
     }
   }

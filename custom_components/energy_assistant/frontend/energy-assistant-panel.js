@@ -1357,7 +1357,7 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div></div>`; // the hint sits below the list so both lists start at the same height
     // 4) energy per selected label, from the sensors Energy Assistant creates for them
-    const labelsCard = this._renderLabelEnergy({ range, off, price, currency, money, num });
+    const labelsCard = this._renderLabelEnergy({ range, off, num });
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}</div>`;
   }
@@ -1366,7 +1366,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * Card with the energy (kWh) of every selected label for the shown period, from its energy sensor.
    * The sensors only count the running period, so another one shows a hint. Empty without selected labels.
    */
-  _renderLabelEnergy({ range, off, price, currency, money, num }) {
+  _renderLabelEnergy({ range, off, num }) {
     const selected = this._cfg.label_ids || [];
     if (!selected.length) return "";
     const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
@@ -1378,14 +1378,19 @@ class EnergyAssistantPanel extends HTMLElement {
       .map((id) => {
         const entityId = this._labelEnergy?.[id]?.[range];
         const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
-        return { id, name: names[id] || id, kwh: value };
+        // The cost comes from the cost sensor (priced step by step), never from today's price times the energy.
+        const costId = this._labelEnergy?.[id]?.[`cost_${range}`];
+        const costState = costId && this._hass?.states?.[costId];
+        const cost = costState ? parseFloat(costState.state) : NaN;
+        const currency = String(costState?.attributes?.unit_of_measurement || "EUR");
+        return { id, name: names[id] || id, kwh: value, cost, currency };
       })
       .filter((r) => Number.isFinite(r.kwh))
       .sort((a, b) => b.kwh - a.kwh);
     const max = Math.max(0, ...rows.map((r) => r.kwh));
     const html = rows
       .map((r) => {
-        const cost = !Number.isNaN(price) ? `<small class="cnt">${esc(money(r.kwh * price))}</small>` : "";
+        const cost = Number.isFinite(r.cost) ? `<small class="cnt">${esc(this._money(r.cost, r.currency).join(" "))}</small>` : "";
         return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span> ${cost}</span>
           <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;

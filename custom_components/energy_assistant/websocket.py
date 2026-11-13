@@ -29,7 +29,7 @@ from .const import (
 from .energy_prefs import async_energy_suggestion
 from .providers import available
 from .pv_assistant import suggestion
-from .sensor import PERIODS, unique_id
+from .sensor import COST, PERIODS, unique_id
 from .settings import has_source, normalize, to_storage
 
 _CONFIG_SCHEMA = vol.Schema(
@@ -131,7 +131,7 @@ def ws_labels(
 def ws_label_energy(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Return the energy sensors (day, week, month, year) of the selected labels.
+    """Return the energy and cost sensors of the selected labels: day, week, month, year, cost_day, ...
 
     Only entity ids: the panel reads the values from the states.
     """
@@ -140,11 +140,14 @@ def ws_label_energy(
     for entry in hass.config_entries.async_entries(DOMAIN):
         for label_id in normalize({**entry.data, **entry.options})["label_ids"]:
             sensors = {
-                period: entity_id
+                f"{prefix}{period}": entity_id
+                for prefix in ("", COST)
                 for period in PERIODS
                 if (
                     entity_id := registry.async_get_entity_id(
-                        "sensor", DOMAIN, unique_id(entry.entry_id, label_id, period)
+                        "sensor",
+                        DOMAIN,
+                        unique_id(entry.entry_id, label_id, prefix + period),
                     )
                 )
             }
