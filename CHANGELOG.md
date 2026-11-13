@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **German names of the label sensors:** *Verbrauch täglich / wöchentlich / monatlich / jährlich* and *Kosten täglich / wöchentlich / monatlich / jährlich* instead of today, this week and so on.
 - **Tidier device settings:** the input of every sensor list sits directly under its label, the chips below it, so the inputs of one row line up. The four inputs (name patterns, exclude patterns, additional sensors, standby devices) share one row on wide screens, the long list of excluded sensors takes the full width and scrolls when it is very long. The explanation of the standby field moved from its label into a hint.
 
 ## [0.24.0] - 2026-11-13
