@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-13
+
+### Added
+
+- **Balance tab** (appears as soon as an energy counter is configured): the energy of a day (per hour), a week from Monday (per day), a month (per day) or a year (per month) in kWh, with arrows to page through the periods. Tiles for production, consumption, grid import, feed-in, to and from storage, self-sufficiency and self-consumption, each with the change to the period before; with Tariffy also the grid cost, the feed-in revenue and their balance, valued with the price of the contract. Grouped bars per period with a tooltip and **Show as table**.
+- Settings: section **Energy counters (kWh)** for PV production, grid import and export, to and from storage and the house consumption (cumulative counters or utility meters, several per field are summed). The Balance tab reads their long-term statistics, so the existing history is used from the first day.
+- If the Energy dashboard of Home Assistant is set up, a notice offers its counters with one button. It is only read (`energy_assistant/energy_suggestion`), nothing is changed in the dashboard.
+- The manifest lists `energy` and `recorder` as `after_dependencies`.
+
 ## [0.17.0] - 2026-11-13
 
 ### Changed

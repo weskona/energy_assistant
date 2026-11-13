@@ -63,6 +63,12 @@ async def test_setup_registers_panel_with_normalized_config(
         "label_ids": ["klima", "licht"],
         "area_ids": ["kueche"],
         "device_names": {"sensor.oven": "Ofen"},
+        "energy_solar": [],
+        "energy_grid_import": [],
+        "energy_grid_export": [],
+        "energy_battery_charge": [],
+        "energy_battery_discharge": [],
+        "energy_house": [],
         "invert_grid": True,
         "invert_battery": False,
     }

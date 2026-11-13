@@ -24,6 +24,7 @@ from .const import (
     PATTERN_REGEX,
     TEXT_KEYS,
 )
+from .energy_prefs import async_energy_suggestion
 from .providers import available
 from .pv_assistant import suggestion
 from .settings import has_source, normalize, to_storage
@@ -60,6 +61,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_labels)
     websocket_api.async_register_command(hass, ws_pv_suggestion)
     websocket_api.async_register_command(hass, ws_integrations)
+    websocket_api.async_register_command(hass, ws_energy_suggestion)
 
 
 def _entry(hass: HomeAssistant):
@@ -138,6 +140,20 @@ def ws_integrations(
     Only entity ids and meta data: the panel reads the live values from the states.
     """
     connection.send_result(msg["id"], available(hass))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "energy_assistant/energy_suggestion"}
+)
+@websocket_api.async_response
+async def ws_energy_suggestion(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy counters of the Energy dashboard of Home Assistant as an offer, or null.
+
+    The dashboard is only read. Nothing is returned without it or without counters in it.
+    """
+    connection.send_result(msg["id"], await async_energy_suggestion(hass))
 
 
 @websocket_api.require_admin

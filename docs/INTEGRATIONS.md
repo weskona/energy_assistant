@@ -10,6 +10,9 @@ them runs on its own:
 | [EV Assistant](https://github.com/weskona/ev_assistant) | wallbox status and power, charge level, solar share, charging of today, charging advice | **EV** tab, a row in the device list |
 | [Amortix](https://github.com/weskona/amortix) | savings, investment, progress, remaining amount, savings per day, time left, payback date | **Payback** tab |
 
+Besides the sibling integrations Energy Assistant reads the **Energy dashboard of Home Assistant** (its preferences, read
+only) to offer its energy counters for the Balance tab, and the long-term statistics (recorder) for the Balance tab.
+
 ## The rules
 
 - **Read only.** Energy Assistant never changes anything in the other integrations.

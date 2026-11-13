@@ -26,6 +26,22 @@ CONF_BATTERY_POWER = "battery_power"  # storage: discharge positive, charge nega
 CONF_INVERT_GRID = "invert_grid"
 CONF_INVERT_BATTERY = "invert_battery"
 
+# Energy counters (kWh, cumulative or utility meters) for the balance tab; one or more each, summed.
+CONF_ENERGY_SOLAR = "energy_solar"
+CONF_ENERGY_GRID_IMPORT = "energy_grid_import"
+CONF_ENERGY_GRID_EXPORT = "energy_grid_export"
+CONF_ENERGY_CHARGE = "energy_battery_charge"
+CONF_ENERGY_DISCHARGE = "energy_battery_discharge"
+CONF_ENERGY_HOUSE = "energy_house"  # optional, otherwise calculated from the others
+ENERGY_KEYS = (
+    CONF_ENERGY_SOLAR,
+    CONF_ENERGY_GRID_IMPORT,
+    CONF_ENERGY_GRID_EXPORT,
+    CONF_ENERGY_CHARGE,
+    CONF_ENERGY_DISCHARGE,
+    CONF_ENERGY_HOUSE,
+)
+
 LIST_KEYS = (
     CONF_GRID_POWER,
     CONF_BATTERY_POWER,
@@ -39,6 +55,7 @@ LIST_KEYS = (
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,
+    *ENERGY_KEYS,
 )
 # List keys that hold text patterns instead of entity ids.
 TEXT_KEYS = (CONF_DEVICE_PATTERNS, CONF_DEVICE_EXCLUDE_PATTERNS)

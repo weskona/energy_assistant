@@ -2443,3 +2443,268 @@ test("history: the buckets carry production, feed-in, import and the storage bal
   const without = panel({ solar_power: ["pv"], grid_import: ["gi"] }, {})._buildSeries({ pv: rows(3000), gi: rows(100) }, 0, 3600 * 1000);
   assert.equal(without[0].net, null);
 });
+
+// --- the balance tab (energy counters, long-term statistics) -----------------------------------------
+const ENERGY_CFG = {
+  energy_solar: ["sensor.pv_e", "sensor.balkon_e"],
+  energy_grid_import: ["sensor.imp_e"],
+  energy_grid_export: ["sensor.exp_e"],
+  energy_battery_charge: ["sensor.chg_e"],
+  energy_battery_discharge: ["sensor.dis_e"],
+};
+function balPanel(cfg = ENERGY_CFG, extra = {}) {
+  const p = panel({ house_power: "h", ...cfg }, { h: st(1), ...extra });
+  p._hass.language = "en";
+  p._ready = true;
+  p._render = () => {};
+  return p;
+}
+
+test("balance: the periods are a day per hour, a week from Monday, a month per day and a year per month", () => {
+  const p = balPanel();
+  const day = p._balWindow("day", 0);
+  assert.equal(day.bucket, "hour");
+  assert.ok([23, 24, 25].includes(day.edges.length - 1)); // 23 or 25 on the days of the clock change
+  assert.equal(new Date(day.start).getHours(), 0);
+  const week = p._balWindow("week", 0);
+  assert.equal(week.edges.length - 1, 7);
+  assert.equal(new Date(week.start).getDay(), 1); // Monday
+  const month = p._balWindow("month", 0);
+  assert.equal(new Date(month.start).getDate(), 1);
+  assert.ok([28, 29, 30, 31].includes(month.edges.length - 1));
+  const year = p._balWindow("year", 0);
+  assert.equal(year.edges.length - 1, 12);
+  assert.equal(new Date(year.start).getMonth(), 0);
+  for (const range of ["day", "week", "month", "year"]) {
+    assert.equal(p._balWindow(range, -1).end, p._balWindow(range, 0).start); // the previous period ends where this one starts
+  }
+  assert.equal(p._balWindow("nonsense", 0).bucket, "hour");
+});
+
+test("balance: the changes of the counters are summed per bucket and category", () => {
+  const p = balPanel();
+  const win = p._balWindow("week", 0);
+  const day = (i) => win.edges[i];
+  const res = {
+    "sensor.pv_e": [{ start: day(0), change: 5 }, { start: day(2), change: 7.5 }],
+    "sensor.balkon_e": [{ start: new Date(day(0)).toISOString(), change: 1 }, { start: day(2), change: null }],
+    "sensor.imp_e": [{ start: day(1), change: 3 }, { start: win.start - 86400000, change: 99 }, { start: win.end + 1, change: 99 }],
+  };
+  const b = p._balBuckets(win, res);
+  assert.deepEqual(b.solar, [6, null, 7.5, null, null, null, null]);
+  assert.deepEqual(b.imp, [null, 3, null, null, null, null, null]);
+  assert.equal(b.house, undefined); // no counter for the house
+  assert.deepEqual(Object.keys(b).sort(), ["chg", "dis", "exp", "imp", "solar"]);
+});
+
+test("balance: consumption, self-consumption and self-sufficiency", () => {
+  const p = balPanel();
+  const win = p._balWindow("week", 0);
+  const n = 7;
+  const zero = Array(n).fill(null);
+  const set = (arr, i, v) => { const a = [...arr]; a[i] = v; return a; };
+  const buckets = {
+    solar: set(zero, 0, 10), imp: set(zero, 0, 4), exp: set(zero, 0, 2), chg: set(zero, 0, 3), dis: set(zero, 0, 1),
+  };
+  const { rows, totals } = p._balCompute(buckets, win);
+  assert.equal(rows[0].cons, 10 + 4 + 1 - 2 - 3); // 10
+  assert.equal(totals.cons, 10);
+  assert.equal(totals.self, 80); // (10 - 2) / 10
+  assert.equal(totals.autarky, 60); // (10 - 4) / 10
+  // a measured house counter wins
+  const measured = p._balCompute({ ...buckets, house: set(zero, 0, 12) }, win);
+  assert.equal(measured.totals.cons, 12);
+  // without the import counter the consumption is unknown
+  const noImp = p._balCompute({ solar: set(zero, 0, 10) }, win);
+  assert.equal(noImp.totals.cons, null);
+  assert.equal(noImp.totals.autarky, null);
+  assert.equal(noImp.totals.self, 100);
+  // no production: no self-consumption share
+  assert.equal(p._balCompute({ imp: set(zero, 0, 5) }, win).totals.self, null);
+});
+
+test("balance: the statistics are asked for with the counters, the period and kWh", async () => {
+  const p = balPanel();
+  const calls = [];
+  p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
+  p._tab = "balance";
+  p._maybeLoadBalance();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 2); // this period and the one before
+  const first = calls[0];
+  assert.equal(first.type, "recorder/statistics_during_period");
+  assert.equal(first.period, "hour");
+  assert.deepEqual(first.types, ["change"]);
+  assert.deepEqual(first.units, { energy: "kWh" });
+  assert.deepEqual([...first.statistic_ids].sort(), ["sensor.balkon_e", "sensor.chg_e", "sensor.dis_e", "sensor.exp_e", "sensor.imp_e", "sensor.pv_e"]);
+  assert.equal(p._bal.range, "day");
+  p._maybeLoadBalance(); // fresh data: no new request
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 2);
+  p._balRange = "month";
+  p._maybeLoadBalance();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 4);
+  assert.equal(calls[2].period, "day");
+});
+
+test("balance: a failing request says there is no data instead of breaking", async () => {
+  const p = balPanel();
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  await p._loadBalance();
+  assert.equal(p._bal.failed, true);
+  assert.match(p._renderBalance(), /No data for this period/);
+});
+
+function loadedBalance(extra = {}, off = 0) {
+  const p = balPanel(ENERGY_CFG, extra);
+  const win = p._balWindow("week", off);
+  const col = (...v) => v.concat(Array(7 - v.length).fill(null));
+  const buckets = { solar: col(10, 20), imp: col(4, 2), exp: col(2, 5), chg: col(3), dis: col(1) };
+  const prevBuckets = { solar: col(10), imp: col(8), exp: col(1) };
+  const prevWin = p._balWindow("week", off - 1);
+  p._balRange = "week";
+  p._balOff = off;
+  p._bal = {
+    range: "week", off, win, at: Date.now(), failed: false,
+    ...p._balCompute(buckets, win),
+    before: p._balCompute(prevBuckets, prevWin).totals,
+  };
+  return p;
+}
+
+test("balance: tiles with totals, the change to the period before and the shares", () => {
+  const html = loadedBalance()._renderBalance();
+  assert.match(html, /<span class="eb-title">Balance<\/span>/);
+  assert.match(html, /Production<\/div><div class="eb-value">30\.0<small>kWh/);
+  assert.match(html, /▲ 200 % vs\. previous period/); // 30 kWh against 10
+  assert.match(html, /Grid import<\/div><div class="eb-value">6\.0<small>kWh/);
+  assert.match(html, /▼ 25 % vs\. previous period/); // 6 against 8
+  assert.match(html, /Feed-in<\/div><div class="eb-value">7\.0<small>kWh/);
+  assert.match(html, /To storage<\/div><div class="eb-value">3\.0/);
+  assert.match(html, /From storage<\/div><div class="eb-value">1\.0/);
+  assert.match(html, /Consumption<\/div><div class="eb-value">/);
+  assert.match(html, /Self-sufficiency<\/div><div class="eb-value">\d+<small>%/);
+  assert.match(html, /Self-consumption<\/div><div class="eb-value">77<small>%/); // (30 - 7) / 30
+  assert.doesNotMatch(html, /Grid cost/); // without Tariffy no money
+});
+
+test("balance: with Tariffy the grid cost, the feed-in revenue and the balance are shown", () => {
+  const p = loadedBalance({
+    "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: 0.99 } },
+    "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } },
+  });
+  p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
+  const html = p._renderBalance();
+  assert.match(html, /Grid cost<\/div><div class="eb-value">1\.80<small>[^<]*</); // 6 kWh x 0.30 (contract price, not the live price)
+  assert.match(html, /Feed-in revenue<\/div><div class="eb-value">0\.56/); // 7 x 0.08
+  assert.match(html, /Balance<\/div><div class="eb-value">-1\.24/);
+  assert.match(html, /Valued with the price of the Tariffy contract/);
+});
+
+test("balance: the picker marks the range, 'next' is off for the current period and the label follows", () => {
+  const p = loadedBalance();
+  let html = p._renderBalance();
+  assert.match(html, /<button type="button" class="seg on" data-brange="week">Week<\/button>/);
+  assert.match(html, /data-bnav="1"[^>]*disabled/);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "-1" } } : null) } });
+  assert.equal(p._balOff, -1);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
+  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
+  assert.equal(p._balOff, 0); // never into the future
+  p._onClick({ target: { closest: (sel) => (sel === "[data-brange]" ? { dataset: { brange: "year" } } : null) } });
+  assert.equal(p._balRange, "year");
+  assert.equal(p._balOff, 0);
+  html = p._renderBalance(); // data of another range: loading until the new data is there
+  assert.match(html, /Loading/);
+  assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
+});
+
+test("balance: the bar chart has a bar per bucket and series, a title tooltip and the table with the sum", () => {
+  const html = loadedBalance()._renderBalance();
+  assert.match(html, /<span class="eb-title">Energy per period<\/span>/);
+  assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // two days with production
+  assert.match(html, /<title>[^<]*Production: 10[.,]00 kWh&#10;/);
+  assert.match(html, /<summary>Show as table<\/summary>/);
+  assert.match(html, /<th>Sum<\/th><td>30[.,]00<\/td>/);
+  assert.equal((html.match(/<tr><th>/g) || []).length, 1 + 7 + 1); // the header, seven days and the sum row
+});
+
+test("balance: a period without any energy says so, the table state is kept", () => {
+  const p = loadedBalance();
+  const win = p._bal.win;
+  p._bal = { ...p._bal, ...p._balCompute({ solar: Array(7).fill(0), imp: Array(7).fill(0) }, win) };
+  assert.match(p._renderBalance(), /No data for this period/);
+  const q = loadedBalance();
+  q._balTableOpen = true;
+  assert.match(q._renderBalance(), /<details class="tableview" open>/);
+});
+
+test("balance: the tab exists only with energy counters and comes right after Power", () => {
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  assert.equal(none._balEnabled(), false);
+  assert.deepEqual(none._tabs(), ["house"]);
+  const p = balPanel({ energy_solar: ["sensor.pv_e"] });
+  p._int = { tariffy: { price: "x" } };
+  assert.deepEqual(p._tabs(), ["house", "balance", "costs"]);
+  p._hass.language = "de";
+  assert.equal(p._tabLabel("balance"), "Bilanz");
+  p._tab = "balance";
+  p._bal = null;
+  assert.match(p._renderPage(), /Lädt …/);
+});
+
+// --- the energy counters in the settings and the offer of the Energy dashboard -------------------
+test("energy settings: the counters are part of the form and of the draft", () => {
+  const p = balPanel();
+  p._draft = p._normalize({ energy_solar: ["sensor.pv_e"] });
+  assert.deepEqual(p._draft.energy_solar, ["sensor.pv_e"]);
+  assert.deepEqual(p._draft.energy_house, []);
+  p._draftAdd("energy_solar", "sensor.balkon_e", "emulti");
+  p._draftAdd("energy_solar", "sensor.balkon_e", "emulti"); // no duplicates
+  assert.deepEqual(p._draft.energy_solar, ["sensor.pv_e", "sensor.balkon_e"]);
+  p._hass.states["sensor.pv_e"] = { state: "1", attributes: { device_class: "energy", friendly_name: "PV gesamt" } };
+  p._hass.states["sensor.watt"] = { state: "1", attributes: { device_class: "power" } };
+  assert.deepEqual(p._energyCandidates().map((c) => c.id), ["sensor.pv_e"]);
+  const html = p._renderSettings();
+  assert.match(html, /Energy counters \(kWh\)/);
+  assert.match(html, /data-add="energy_solar" data-mode="emulti" list="eb-energy"/);
+  assert.match(html, /<datalist id="eb-energy"><option value="sensor\.pv_e">PV gesamt<\/option><\/datalist>/);
+  assert.match(html, /utility meters/);
+});
+
+test("energy settings: the offer of the Energy dashboard can be taken over by administrators", async () => {
+  const p = balPanel();
+  p._draft = p._normalize({ house_power: "h" });
+  p._edited = () => {};
+  p._hass.user = { is_admin: true };
+  p._hass.callWS = async (msg) => (msg.type === "energy_assistant/energy_suggestion" ? { targets: { energy_solar: ["sensor.pv_e"], energy_grid_import: ["sensor.imp_e"] } } : {});
+  await p._loadEnergyOffer();
+  let html = p._renderSettings();
+  assert.match(html, /The Energy dashboard of Home Assistant has counters\. Do you want to take them over\?/);
+  assert.match(html, /data-energyapply/);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-energyapply]" ? {} : null) } });
+  assert.deepEqual(p._draft.energy_solar, ["sensor.pv_e"]);
+  assert.deepEqual(p._draft.energy_grid_import, ["sensor.imp_e"]);
+  html = p._renderSettings();
+  assert.match(html, /counters of the Energy dashboard are in use/);
+  assert.doesNotMatch(html, /data-energyapply/);
+  // read-only users see the question but no button
+  p._draft = p._normalize({ house_power: "h" });
+  p._hass.user = { is_admin: false };
+  html = p._renderSettings();
+  assert.match(html, /Do you want to take them over/);
+  assert.doesNotMatch(html, /data-energyapply/);
+});
+
+test("energy settings: no dashboard, no offer, and an error changes nothing", async () => {
+  const p = balPanel();
+  p._draft = p._normalize({});
+  p._hass.callWS = async () => null;
+  await p._loadEnergyOffer();
+  assert.equal(p._energyOffer, null);
+  assert.doesNotMatch(p._renderSettings(), /data-energyapply|Do you want to take them over/);
+  p._hass.callWS = async () => { throw new Error("unknown command"); };
+  await p._loadEnergyOffer();
+  assert.equal(p._energyOffer, null);
+});
