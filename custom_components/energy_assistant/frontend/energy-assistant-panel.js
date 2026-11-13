@@ -70,6 +70,9 @@ svg .hdot{stroke:var(--eb-panel);stroke-width:2}
 .tip .tr b{font-weight:600;color:var(--eb-text)}
 .tip .tr span{color:var(--eb-muted)}
 .tip .tr i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.tip .ts{display:flex;gap:8px;padding-left:19px;font-size:11.5px;color:var(--eb-muted)}
+.tip .ts span:first-child{min-width:4.5em;text-align:right}
+.tip .ts b{margin-left:4px;color:var(--eb-text);font-weight:600}
 details.tableview{margin-top:8px;font-size:12.5px;color:var(--eb-muted)}
 details.tableview summary{cursor:pointer}
 details.tableview table{border-collapse:collapse;margin-top:6px;width:100%}
@@ -180,6 +183,9 @@ const STRINGS = {
     hFromStorage: "From storage (+)",
     hToStorage: "To storage (−)",
     hStorage: "Storage",
+    hStorageNet: "Storage (+ discharge / − charge)",
+    hDischarge: "From storage",
+    hCharge: "To storage",
     hDirect: "Used directly",
     hDirectShort: "Direct",
     hGrid: "Grid import",
@@ -362,6 +368,9 @@ const STRINGS = {
     hFromStorage: "Aus Speicher (+)",
     hToStorage: "In Speicher (−)",
     hStorage: "Speicher",
+    hStorageNet: "Speicher (+ Entladen / − Laden)",
+    hDischarge: "Aus Speicher",
+    hCharge: "In Speicher",
     hDirect: "Direkt verbraucht",
     hDirectShort: "Direkt",
     hGrid: "Netzbezug",
@@ -1711,6 +1720,9 @@ class EnergyAssistantPanel extends HTMLElement {
       gridCharge: group(c.battery_grid_charge),
       grid: group(c.grid_power, c.invert_grid), battery: group(c.battery_power, c.invert_battery),
     };
+    // The single production sensors, for the split in the tooltip.
+    const solarIds = c.solar_power || [];
+    const solarSamples = solarIds.map((id) => sample(id));
     const pts = [];
     for (let k = 0; k <= n; k++) {
       const parts = this._split(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null])));
@@ -1719,8 +1731,11 @@ class EnergyAssistantPanel extends HTMLElement {
       pts.push({
         t: t0 + k * step, v, d: v == null ? null : this._calcDirect(parts, v),
         solar: parts.solar, gridOut: parts.gridOut, gridIn: parts.gridIn, net,
+        discharge: parts.discharge, charge: parts.charge, gridCharge: parts.gridCharge, measured: !!house,
+        sp: solarSamples.map((arr) => (arr ? Math.max(0, arr[k] ?? 0) : null)),
       });
     }
+    pts.meta = { solarNames: solarIds.map((id) => this._deviceName(id)) };
     return pts;
   }
 
@@ -1737,7 +1752,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (has("gridOut")) list.push({ key: "feed", name: this._t("hFeed"), short: this._t("hFeed"), color: "--ea-feed", points: pts("gridOut") });
     if (has("net")) {
       list.push({
-        key: "net", name: this._t("hStorage"), short: this._t("hStorage"), color: "--ea-bout", colorNeg: "--ea-bin",
+        key: "net", name: this._t("hStorage"), short: this._t("hStorage"), tipName: this._t("hStorageNet"), color: "--ea-bout", colorNeg: "--ea-bin",
         legendItems: [{ name: this._t("hFromStorage"), color: "--ea-bout" }, { name: this._t("hToStorage"), color: "--ea-bin" }],
         points: pts("net"),
       });
@@ -1846,11 +1861,11 @@ class EnergyAssistantPanel extends HTMLElement {
       e[i][1] += 1;
       byHour.set(h, e);
     }));
-    const fmtTime = (ts) => new Date(ts).toLocaleString(lang, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    const fmtTime = (ts) => new Date(ts).toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
     const rows = [...byHour.entries()].sort((a, b) => a[0] - b[0]).map(([h, e]) =>
       `<tr><th>${esc(fmtTime(h))}</th>${e.map(([sum, n]) => `<td>${n ? Math.round(sum / n).toLocaleString(lang) : "–"}</td>`).join("")}</tr>`).join("");
     const times = [...new Set(series.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
-    this._hv = { W, H, M, pw, ph, t0, t1, lo, hi, series, lang, fmtTime, labelW, times, maps: series.map((s) => new Map(s.points)), x, y };
+    this._hv = { W, H, M, pw, ph, t0, t1, lo, hi, series, lang, fmtTime, labelW, times, maps: series.map((s) => new Map(s.points)), byTs: new Map(points.map((p) => [p.t, p])), solarNames: points.meta?.solarNames || [], x, y };
     return `<div class="hchart"><div class="legend">${legend}</div>
       <div class="chartwrap"><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("chartLabel"))}">${clip}${svg}</svg><div class="tip" hidden></div></div>
       <details class="tableview"${this._tableOpen ? " open" : ""}><summary>${esc(this._t("hTable"))}</summary>
@@ -2247,12 +2262,33 @@ class EnergyAssistantPanel extends HTMLElement {
       else hi = m;
     }
     const ts = Math.abs(hv.times[lo] - t) <= Math.abs(hv.times[hi] - t) ? hv.times[lo] : hv.times[hi];
+    const point = hv.byTs.get(ts) || {};
     const rows = hv.series.map((s, i) => {
       const v = hv.maps[i].get(ts);
-      const item = s.legendItems ? (v != null && v < 0 ? s.legendItems[1] : s.legendItems[0]) : s;
-      return { name: item.name, color: item.color, value: v ?? null };
+      const color = s.colorNeg && v != null && v < 0 ? s.colorNeg : s.color;
+      return { name: s.tipName || s.name, color, value: v ?? null, parts: v == null ? [] : this._tipParts(s.key, v, point, hv) };
     });
     return { ts, title: hv.fmtTime(ts), rows };
+  }
+
+  /**
+   * The sources behind a value in the tooltip (only where there are at least two non-zero ones): the plants
+   * of the production with their share, and what the directly used solar power is made of: the house
+   * consumption minus grid import and storage if the house is measured, otherwise production minus feed-in
+   * and charging.
+   */
+  _tipParts(key, value, p, hv) {
+    let parts = [];
+    if (key === "prod") {
+      const sp = p.sp || [];
+      parts = sp.map((w, i) => ({ name: hv.solarNames[i] ?? `#${i + 1}`, value: w, note: value > 0 && w != null ? `${Math.round((w / value) * 100)} %` : undefined }));
+    } else if (key === "direct") {
+      parts = p.measured
+        ? [{ name: this._t("hHouse"), value: p.v }, { name: `− ${this._t("hGrid")}`, value: -(p.gridIn ?? 0) }, { name: `− ${this._t("hDischarge")}`, value: -(p.discharge ?? 0) }]
+        : [{ name: this._t("hProd"), value: p.solar }, { name: `− ${this._t("hFeed")}`, value: -(p.gridOut ?? 0) }, { name: `− ${this._t("hCharge")}`, value: -Math.max(0, (p.charge ?? 0) - (p.gridCharge ?? 0)) }];
+    }
+    parts = parts.filter((x) => x.value != null && x.value !== 0 && !Number.isNaN(x.value));
+    return parts.length >= 2 || (key === "direct" && parts.length >= 1) ? parts : [];
   }
 
   /**
@@ -2313,6 +2349,21 @@ class EnergyAssistantPanel extends HTMLElement {
         name.textContent = row.name;
         line.append(key, val, name);
         tip.append(line);
+        for (const part of row.parts || []) {
+          const sub = document.createElement("div");
+          sub.className = "ts";
+          const pv = document.createElement("span");
+          pv.textContent = `${Math.round(part.value).toLocaleString(hv.lang)} W`;
+          const pn = document.createElement("span");
+          pn.textContent = part.name;
+          sub.append(pv, pn);
+          if (part.note) {
+            const note = document.createElement("b");
+            note.textContent = part.note;
+            sub.append(note);
+          }
+          tip.append(sub);
+        }
       }
       tip.hidden = false;
       const left = (cx / hv.W) * r.width + 14;
