@@ -16,6 +16,7 @@ from .const import (
     BOOL_KEYS,
     CONF_DEVICE_NAMES,
     CONF_HOUSE_POWER,
+    CONF_LABEL_TARIFFS,
     DOMAIN,
     ID_KEYS,
     ID_REGEX,
@@ -56,6 +57,9 @@ _CONFIG_SCHEMA = vol.Schema(
         },
         vol.Optional(CONF_DEVICE_NAMES): {
             cv.entity_id: vol.All(cv.string, vol.Length(max=NAME_MAX_LEN))
+        },
+        vol.Optional(CONF_LABEL_TARIFFS): {
+            vol.All(cv.string, vol.Match(ID_REGEX)): cv.entity_id
         },
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }

@@ -11,6 +11,7 @@ from .const import (
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
     CONF_HOUSE_POWER,
+    CONF_LABEL_TARIFFS,
     CONFIG_KEYS,
     DICT_KEYS,
     ID_KEYS,
@@ -61,6 +62,20 @@ def clean_names(value: Any) -> dict[str, str]:
     return names
 
 
+def clean_label_tariffs(value: Any) -> dict[str, str]:
+    """Tariffy price sensor per label: keep only valid label ids with a sensor entity id."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        label_id: entity_id
+        for label_id, entity_id in value.items()
+        if isinstance(label_id, str)
+        and isinstance(entity_id, str)
+        and re.fullmatch(r"[a-z0-9_]+", label_id)
+        and re.fullmatch(r"sensor\.[a-z0-9_]+", entity_id)
+    }
+
+
 def clean_number(value: Any) -> float | None:
     """A number or None: texts with a decimal comma work, anything unusable (and negative values) means not set."""
     if isinstance(value, bool) or value is None:
@@ -88,6 +103,8 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
     return {
         key: clean_patterns(data.get(key))
         if key in TEXT_KEYS
+        else clean_label_tariffs(data.get(key))
+        if key == CONF_LABEL_TARIFFS
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
@@ -121,6 +138,9 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             items = as_list(value)
             if items:
                 stored[key] = items[0]
+        elif key == CONF_LABEL_TARIFFS:
+            if tariffs := clean_label_tariffs(value):
+                stored[key] = tariffs
         elif key in DICT_KEYS:
             if value:
                 stored[key] = clean_names(value)

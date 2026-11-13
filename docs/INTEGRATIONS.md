@@ -38,7 +38,7 @@ and `pv_assistant.py` have to follow.
   `storage_usable`, `storage_empty_at`, binary sensor `string_fault` (attribute `plants`).
 
 **Tariffy** (`tariffy`), sensors by translation key
-- `arbeitspreis` (attributes `sparte`, `arbeitspreis_aktuell`; only electricity contracts), `einspeiseverguetung`,
+- `arbeitspreis` (attributes `sparte`, `arbeitspreis_aktuell`; only electricity contracts) - every electricity contract is offered as a price for the tariff choice per label, the first one is the default, `einspeiseverguetung`,
   `kosten_bisher`, `guthaben_bisher`, `prognose_real`.
 
 **EV Assistant** (`ev_assistant`)

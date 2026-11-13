@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tariff per label:** with several Tariffy electricity contracts, a contract can be chosen per selected label (settings, Labels section), e.g. the heat pump tariff for the heat pump label. Without a choice the first electricity contract is used as before. A chosen contract is never replaced by another one; switching closes the running step with the old price.
+
 ### Changed
 
 - **German names of the label sensors:** *Verbrauch täglich / wöchentlich / monatlich / jährlich* and *Kosten täglich / wöchentlich / monatlich / jährlich* instead of today, this week and so on.
