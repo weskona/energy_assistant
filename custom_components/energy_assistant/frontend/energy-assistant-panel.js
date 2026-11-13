@@ -40,6 +40,10 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.row[data-collapse-toggle]{cursor:pointer;user-select:none}
+.row[data-collapse-toggle] .eb-title::before{content:"▾";display:inline-block;margin-right:8px;color:var(--eb-dim);font-size:11px;transition:transform .2s}
+.eb-card.collapsed .row[data-collapse-toggle] .eb-title::before{transform:rotate(-90deg)}
+.eb-card.collapsed > *:not(.row){display:none}
 .stack{display:grid;gap:var(--eb-gap)}
 .amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
@@ -1025,6 +1029,8 @@ class EnergyAssistantPanel extends HTMLElement {
     } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
       Object.assign(this._draft, this._pvTargets());
       this._edited();
+    } else if (e.target.closest("[data-collapse-toggle]")) {
+      this._toggleCollapse(e.target.closest("[data-collapse-toggle]"));
     } else if (e.target.closest("[data-open]")) {
       // Click on an area or label row: show or hide the sensors it sums up.
       const key = e.target.closest("[data-open]").dataset.open;
@@ -1458,15 +1464,43 @@ class EnergyAssistantPanel extends HTMLElement {
   _devices() {
     const explicit = this._cfg.device_power || [];
     const ids = [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
-    return ids
+    const sensors = ids
       .map((id) => ({
         id,
         name: this._deviceName(id),
         original: this._hass?.states?.[id]?.attributes?.friendly_name || id,
         w: this._watts(id),
       }))
-      .filter((d) => d.w != null)
-      .sort((a, b) => b.w - a.w);
+      .filter((d) => d.w != null);
+    return [...sensors, ...this._evRows(ids)].sort((a, b) => b.w - a.w);
+  }
+
+  /**
+   * The wallbox of EV Assistant as a row of the device list (read only): its charging power is usually the
+   * biggest single consumer and is not a sensor of the list. Left out when the wallbox sensor is already a
+   * device or was excluded on purpose, so nothing is counted twice or against the wish of the user.
+   */
+  _evRows(deviceIds = []) {
+    const vehicles = this._int?.ev_assistant?.vehicles;
+    if (!Array.isArray(vehicles)) return [];
+    const excluded = this._excluder(this._cfg);
+    const rows = [];
+    for (const v of vehicles) {
+      if (v.wallbox_power && (deviceIds.includes(v.wallbox_power) || excluded(v.wallbox_power))) continue;
+      const attrs = this._hass?.states?.[v.live]?.attributes || {};
+      const live = attrs.evcc_live || attrs.home_generic_live;
+      const kw = Number(live?.charge_power);
+      if (!live || live.charge_power == null || !Number.isFinite(kw)) continue;
+      const solar = Number(live.session_solar_pct ?? attrs.solaranteil_pct);
+      const charging = kw * 1000 >= IDLE_W;
+      rows.push({
+        name: `${this._t("evWallbox")} · ${v.name}`,
+        icon: "mdi:ev-station",
+        w: Math.max(0, kw * 1000),
+        tip: charging && (live.session_solar_pct != null || attrs.solaranteil_pct != null) && Number.isFinite(solar) ? `${this._t("evSolar")} ${Math.round(solar)} %` : "",
+      });
+    }
+    return rows;
   }
 
   /**
@@ -1766,7 +1800,7 @@ class EnergyAssistantPanel extends HTMLElement {
    */
   _collapsedLimit() {
     const counts = [];
-    if ((this._cfg.device_power || []).length || (this._cfg.device_patterns || []).length) {
+    if ((this._cfg.device_power || []).length || (this._cfg.device_patterns || []).length || this._evRows().length) {
       counts.push(this._devices().filter((d) => d.w >= IDLE_W).length);
     }
     const areas = this._areas();
@@ -1778,7 +1812,8 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _renderDevices(house, limit = MAX_ROWS) {
-    if (!(this._cfg.device_power || []).length && !(this._cfg.device_patterns || []).length) return "";
+    const configured = (this._cfg.device_power || []).length || (this._cfg.device_patterns || []).length;
+    if (!configured && !this._evRows().length) return "";
     const all = this._devices();
     // Admins can rename the sensors right in the list (pencil next to the name).
     const active = all.filter((d) => d.w >= IDLE_W).map((d) => ({ ...d, editable: this._isAdmin }));
@@ -1983,7 +2018,7 @@ class EnergyAssistantPanel extends HTMLElement {
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
       content.addEventListener("keydown", (e) => {
-        const row = e.target.closest?.("[data-open]");
+        const row = e.target.closest?.("[data-open], [data-collapse-toggle]");
         if (row && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           row.click();
@@ -2057,7 +2092,55 @@ class EnergyAssistantPanel extends HTMLElement {
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);
+      this._applyCollapse(content);
     }
+  }
+
+  /** Titles of the cards the user folded, remembered in the browser (only a convenience, it may be unavailable). */
+  _collapsedSet() {
+    if (!this._collapsed) {
+      try {
+        const saved = JSON.parse(globalThis.localStorage?.getItem("energy_assistant.collapsed") || "[]");
+        this._collapsed = new Set(Array.isArray(saved) ? saved.filter((x) => typeof x === "string") : []);
+      } catch (e) {
+        this._collapsed = new Set();
+      }
+    }
+    return this._collapsed;
+  }
+
+  /**
+   * Every card with a title row can be folded with a click on the title (the house card stays open). The
+   * state is applied after each redraw, because a new markup starts unfolded.
+   */
+  _applyCollapse(content) {
+    const folded = this._collapsedSet();
+    for (const card of content.querySelectorAll(".eb-card")) {
+      if (card.classList.contains("eb-card--glow")) continue;
+      const row = card.querySelector(":scope > .row");
+      const title = row?.querySelector(".eb-title")?.textContent?.trim();
+      if (!title) continue;
+      row.setAttribute("data-collapse-toggle", "");
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "0");
+      const isFolded = folded.has(title);
+      card.classList.toggle("collapsed", isFolded);
+      row.setAttribute("aria-expanded", isFolded ? "false" : "true");
+    }
+  }
+
+  /** Fold or unfold the card of a clicked title row and remember the choice. */
+  _toggleCollapse(row) {
+    const card = row.closest(".eb-card");
+    const title = row.querySelector(".eb-title")?.textContent?.trim();
+    if (!card || !title) return;
+    const folded = this._collapsedSet();
+    if (!folded.delete(title)) folded.add(title);
+    card.classList.toggle("collapsed", folded.has(title));
+    row.setAttribute("aria-expanded", folded.has(title) ? "false" : "true");
+    try {
+      globalThis.localStorage?.setItem("energy_assistant.collapsed", JSON.stringify([...folded]));
+    } catch (e) { /* private window or blocked storage: the choice only lasts until the next reload */ }
   }
 
   /**

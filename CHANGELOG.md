@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-13
+
+### Added
+
+- With EV Assistant the wallbox is a row of the device list (**Wallbox · vehicle**): its charging power counts in the total, in the share of the house and takes away from "Other (not measured)"; the tooltip shows the solar share of the session. The row is left out when the wallbox sensor is already a device or was excluded (also by pattern), so nothing is counted twice.
+- Every card except the house card can be folded with a click (or Enter / Space) on its title. The choice is remembered in the browser.
+- `docs/INTEGRATIONS.md` and a section **Working together** in the README: which data is read from PV Assistant, Tariffy, EV Assistant and Amortix, the rules (read only, everything optional, found over the entity registry) and a text for the READMEs of the other integrations.
+
 ## [0.15.0] - 2026-11-13
 
 ### Changed

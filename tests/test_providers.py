@@ -104,8 +104,12 @@ def _ev_vehicle(
     hass,
     title,
     keys=("home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended"),
+    data=None,
+    options=None,
 ):
-    entry = MockConfigEntry(domain="ev_assistant", title=title)
+    entry = MockConfigEntry(
+        domain="ev_assistant", title=title, data=data or {}, options=options or {}
+    )
     entry.add_to_hass(hass)
     ids = {}
     for key in keys:
@@ -133,6 +137,7 @@ async def test_ev_assistant_vehicle_gives_live_sensor_and_today(hass) -> None:
         "vehicles": [
             {
                 "name": "id3",
+                "wallbox_power": None,
                 "live": ids["home_kwh"],
                 "kwh_today": ids["kwh_day"],
                 "cost_today": ids["cost_day"],
@@ -274,3 +279,24 @@ async def test_device_sensors_and_foreign_keys_are_not_taken(hass) -> None:
 async def test_entries_without_savings_or_progress_are_skipped(hass) -> None:
     _amortix_entry(hass, "heizung", "heatpump", keys=("erzeugung",))
     assert amortix(hass) is None
+
+
+async def test_the_wallbox_power_sensor_of_ev_assistant_is_passed_on(hass) -> None:
+    _ev_vehicle(hass, "id3", data={"home_entity": "sensor.wallbox_leistung"})
+    assert (
+        ev_assistant(hass)["vehicles"][0]["wallbox_power"] == "sensor.wallbox_leistung"
+    )
+    # options win over the setup data, and anything but a sensor id is ignored
+    _ev_vehicle(
+        hass,
+        "zoe",
+        data={"home_entity": "sensor.alt"},
+        options={"home_entity": "sensor.neu"},
+    )
+    _ev_vehicle(hass, "ev3", data={"home_entity": "binary_sensor.plug"})
+    by_name = {v["name"]: v["wallbox_power"] for v in ev_assistant(hass)["vehicles"]}
+    assert by_name == {
+        "ev3": None,
+        "id3": "sensor.wallbox_leistung",
+        "zoe": "sensor.neu",
+    }
