@@ -145,8 +145,15 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .sw input{accent-color:var(--eb-green);width:18px;height:18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;max-width:100%}
-.sec .fields>.fld.chipfld{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
-.chips.cap{max-height:150px;overflow:auto}
+.tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:6px 8px;min-height:44px;cursor:text}
+.tags:focus-within{border-color:var(--eb-green)}
+.tags.cap{max-height:130px;overflow:auto}
+.set .tags input[type=text]{flex:1 1 130px;width:auto;min-width:110px;border:0;background:none;padding:5px 4px}
+.set .tags input[type=text]:focus{outline:none}
+.mtoggle{display:flex;align-items:center;gap:10px;width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:10px 12px;color:var(--eb-text);font:14px var(--eb-font);cursor:pointer;text-align:left}
+.mtoggle .chev{font-size:11px;color:var(--eb-dim);display:inline-block;transition:transform .2s}
+.mtoggle .chev.on{transform:rotate(90deg)}
+.mtoggle .go{margin-left:auto;color:var(--eb-green);font-weight:600;font-size:13px}
 .trow{display:flex;align-items:center;gap:12px;margin:6px 0}
 .trow .tn{font-size:14px;flex:0 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow select{flex:1 1 220px;min-width:0;max-width:420px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font:14px var(--eb-font)}
@@ -359,10 +366,13 @@ const STRINGS = {
     h_label_tariffs: "Which Tariffy electricity contract prices the cost of a label, e.g. the heat pump tariff for the heat pump label. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     tariffDefault: "Default ({name})",
     h_device_standby: "Shown as always on in the Consumption tab. None selected = detected automatically.",
-    f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
+    f_device_patterns: "Name patterns for device sensors",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
     matchesCount: "{n} matching, {x} excluded. Untick a sensor to exclude it.",
+    matchesSummary: "{n} matching sensors, {x} excluded",
+    matchesShow: "Show list",
+    matchesHide: "Hide list",
     filterMatches: "Filter matches …",
     filterAll: "All",
     filterGroupState: "Activity",
@@ -460,7 +470,7 @@ const STRINGS = {
     deviceCount1: "1 device",
     deviceCountN: "{n} devices",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
-    f_device_exclude_patterns: "Exclude patterns (e.g. alpha_ess_*)",
+    f_device_exclude_patterns: "Exclude patterns",
     addExcludePattern: "e.g. alpha_ess_*",
     excludedByPattern: "Excluded by an exclude pattern",
     noMatches: "No power sensor matches yet",
@@ -638,10 +648,13 @@ const STRINGS = {
     h_label_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Labels bewertet, z. B. der Wärmepumpentarif für das Wärmepumpen-Label. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     tariffDefault: "Standard ({name})",
     h_device_standby: "Werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
-    f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
+    f_device_patterns: "Namensmuster für Geräte-Sensoren",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
     matchesCount: "{n} passend, {x} ausgeschlossen. Häkchen entfernen schließt einen Sensor aus.",
+    matchesSummary: "{n} passende Sensoren, {x} ausgeschlossen",
+    matchesShow: "Liste zeigen",
+    matchesHide: "Liste ausblenden",
     filterMatches: "Treffer filtern …",
     filterAll: "Alle",
     filterGroupState: "Aktivität",
@@ -739,7 +752,7 @@ const STRINGS = {
     deviceCount1: "1 Gerät",
     deviceCountN: "{n} Geräte",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
-    f_device_exclude_patterns: "Ausschluss-Muster (z. B. alpha_ess_*)",
+    f_device_exclude_patterns: "Ausschluss-Muster",
     addExcludePattern: "z. B. alpha_ess_*",
     excludedByPattern: "Durch ein Ausschluss-Muster ausgeschlossen",
     noMatches: "Noch kein Leistungssensor passt",
@@ -2255,6 +2268,9 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _onClick(e) {
+    // A click on the empty part of a tag box goes to its input.
+    const tagBox = e.target.closest?.(".tags");
+    if (tagBox && !e.target.closest("button, input")) tagBox.querySelector("input")?.focus();
     const ren = e.target.closest("[data-rename]");
     if (ren) {
       this._startRename(ren.dataset.rename);
@@ -2636,13 +2652,23 @@ class EnergyAssistantPanel extends HTMLElement {
         .join("");
       if (kind === "areas") return `<div class="fld span"><label>${esc(label)}</label>${this._renderPicker("area", ro)}${this._draft.area_ids.length ? "" : `<div class="hint">${esc(this._t("areaAutoHint"))}</div>`}</div>`;
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
-      if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
+      if (kind === "matches") {
+        if (!this._draft.device_patterns.length) return "";
+        const { found } = this._matchList();
+        const open = this._open?.has("settings:matches");
+        const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+        const off = new Set(this._draft.device_exclude);
+        const x = found.filter((id) => off.has(id) || byPattern(id)).length;
+        const head = `<button type="button" class="mtoggle" data-open="settings:matches" aria-expanded="${open ? "true" : "false"}"><span class="chev${open ? " on" : ""}" aria-hidden="true">▶</span>${esc(this._t("matchesSummary", { n: found.length, x }))}<span class="go">${esc(this._t(open ? "matchesHide" : "matchesShow"))}</span></button>`;
+        return `<div class="fld span">${head}${open ? this._renderMatches(ro) : ""}</div>`;
+      }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       const hint = key === "device_standby" ? `<div class="hint">${esc(this._t("h_device_standby"))}</div>` : "";
-      const long = key === "device_exclude"; // can be a long list: full width, chips flow and scroll
-      return `<div class="fld chipfld${long ? " span" : ""}"><label>${esc(label)}</label>
-        <div class="inp">${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>
-        <div class="cl">${chips ? `<div class="chips${long ? " cap" : ""}">${chips}</div>` : ""}${hint}</div></div>`;
+      const long = key === "device_exclude"; // can be a long list: full width, scrolls when very long
+      const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
+      // The chips and the input share one box, so a list only grows as much as it has entries.
+      return `<div class="fld${long ? " span" : ""}"><label>${esc(label)}</label>
+        <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}${hint}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,

@@ -429,6 +429,7 @@ test("matches: unticking a match excludes it, ticking brings it back", () => {
 test("matches: excluded sensors stay in the list (unticked) so they can be re-included", () => {
   const p = matchPanel();
   p._onChange(checkbox("sensor.ofen_leistung", false));
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /4 matching, 1 excluded/);
   const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
@@ -533,6 +534,7 @@ test("exclude patterns: the settings list shows them excluded and locked", () =>
   p._hass.user = { is_admin: true };
   p._draft = p._normalize(p._cfg);
   p._ready = true;
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /4 matching, 2 excluded/);
   const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
@@ -762,6 +764,7 @@ test("list filters: bulk exclude acts on what the filters show, e.g. all inactiv
 test("list filters: the buttons show the counts and mark the chosen filters", () => {
   const p = filterPanel();
   p._onClick(seg("state:active"));
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /class="seg on" data-seg="state:active"[^>]*>Active <small>2<\/small>/);
   assert.match(html, /class="seg" data-seg="state:idle"[^>]*>Inactive <small>3<\/small>/);
@@ -3733,4 +3736,24 @@ test("settings: choosing a tariff changes the draft and the default removes it a
   assert.equal(p._isDirty(), true);
   change("");
   assert.deepEqual(p._draft.label_tariffs, {});
+});
+
+test("settings: the list of matches is folded by default and shows its counts in a header", () => {
+  const p = matchPanel();
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  const folded = p._renderSettings();
+  assert.match(folded, /class="mtoggle" data-open="settings:matches" aria-expanded="false"/);
+  assert.match(folded, /4 matching sensors, 1 excluded[\s\S]*Show list/);
+  assert.doesNotMatch(folded, /data-device="sensor\.herd_leistung"/); // the rows are not drawn
+  p._open = new Set(["settings:matches"]);
+  const open = p._renderSettings();
+  assert.match(open, /aria-expanded="true"[\s\S]*Hide list/);
+  assert.match(open, /data-device="sensor\.herd_leistung"/);
+});
+
+test("settings: a sensor list keeps its chips and its input in one box", () => {
+  const p = matchPanel();
+  p._draft.device_standby = ["sensor.herd_leistung"];
+  const html = p._renderSettings();
+  assert.match(html, /<div class="tags"><span class="chip"[^>]*>[^<]*<button data-remove="device_standby"[\s\S]*?<input type="text" data-add="device_standby"/);
 });
