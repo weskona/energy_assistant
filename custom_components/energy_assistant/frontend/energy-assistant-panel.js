@@ -60,7 +60,7 @@ const STYLE = `
 .eb-card.collapsed .row[data-collapse-toggle] .eb-title::before{transform:rotate(-90deg)}
 .eb-card.collapsed > *:not(.row){display:none}
 .stack{display:grid;gap:var(--eb-gap)}
-.pair{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.pair{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:800px){.pair{grid-template-columns:minmax(0,1fr)}}
 .amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
@@ -1328,7 +1328,7 @@ class EnergyAssistantPanel extends HTMLElement {
       return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
-      <div class="devgrid">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+      <div class="devgrid devlist">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
     // 3) always on
     const alwaysRows = always.map((d) => {
       const year = (d.baseW / 1000) * 8760;
@@ -1338,7 +1338,7 @@ class EnergyAssistantPanel extends HTMLElement {
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
-      <div class="devgrid">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+      <div class="devgrid devlist">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${note}</div>`;
   }
