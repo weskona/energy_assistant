@@ -145,6 +145,8 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .sw input{accent-color:var(--eb-green);width:18px;height:18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;max-width:100%}
+.sec .fields>.fld.chipfld{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
+.chips.cap{max-height:150px;overflow:auto}
 .chip button{border:0;background:none;color:var(--eb-muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
 .chip button:hover{color:var(--eb-red)}
 .set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
@@ -349,7 +351,8 @@ const STRINGS = {
     f_battery_charge: "To storage (charging)",
     f_battery_grid_charge: "Storage charged from grid",
     f_device_power: "Additional device sensors (optional)",
-    f_device_standby: "Standby devices (shown as always on; none = detected automatically)",
+    f_device_standby: "Standby devices",
+    h_device_standby: "Shown as always on in the Consumption tab. None selected = detected automatically.",
     f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
@@ -624,7 +627,8 @@ const STRINGS = {
     f_battery_charge: "Zum Speicher (Laden)",
     f_battery_grid_charge: "Speicher aus dem Netz geladen",
     f_device_power: "Zusätzliche Geräte-Sensoren (optional)",
-    f_device_standby: "Standby-Geräte (werden als Dauerlast gezeigt; leer = automatisch erkannt)",
+    f_device_standby: "Standby-Geräte",
+    h_device_standby: "Werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
     f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
@@ -770,7 +774,7 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"], ["device_standby", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
@@ -2593,9 +2597,11 @@ class EnergyAssistantPanel extends HTMLElement {
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
-      return `<div class="fld"><label>${esc(label)}</label>
-        ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
+      const hint = key === "device_standby" ? `<div class="hint">${esc(this._t("h_device_standby"))}</div>` : "";
+      const long = key === "device_exclude"; // can be a long list: full width, chips flow and scroll
+      return `<div class="fld chipfld${long ? " span" : ""}"><label>${esc(label)}</label>
+        <div class="inp">${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>
+        <div class="cl">${chips ? `<div class="chips${long ? " cap" : ""}">${chips}</div>` : ""}${hint}</div></div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
