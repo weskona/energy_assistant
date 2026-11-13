@@ -30,8 +30,9 @@ and `pv_assistant.py` have to follow.
 **PV Assistant** (`pv_assistant`)
 - Config entry (data and options): `production_power_sensors`, `storage_combined_power_sensors`,
   `invert_storage_combined_power`, `storage_in_power_sensors`, `storage_out_power_sensors`, `abs_storage_power`,
-  `grid_import_power_sensors`, `feed_in_power_sensor`, `invert_feed_in_power`.
-- Plants: `hass.data["pv_assistant"]["settings"]` (`inverters`, `strings`).
+  `grid_import_power_sensors`, `feed_in_power_sensor`, `invert_feed_in_power`, `battery_soc_sensor`.
+- Plants and storage: `hass.data["pv_assistant"]["settings"]` (`inverters`, `strings`, `general.storage_capacity_kwh`,
+  `general.battery_min_soc`).
 - Sensors by translation key: `production_today`, `feed_in_today`, `self_consumption_rate_today`, `autarky_today`,
   `benefit_today`, `forecast_reached_today`, `expected_feed_in_tomorrow`, `best_window_tomorrow` (attribute `end`),
   `storage_usable`, `storage_empty_at`, binary sensor `string_fault` (attribute `plants`).

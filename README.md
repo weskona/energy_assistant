@@ -130,6 +130,19 @@ Without the optional "storage charged from grid" sensor the storage is assumed t
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile, in the source bar and as a second line in the history. Under the tile the production is split up: how many percent go straight to the house, into the storage (the solar share of the charging) and into the grid, for example `40 % House · 60 % Storage`. The whole percentages add up to 100; parts that round to 0 % are left out.
 
+### Storage card
+
+With a **charge level sensor** (percent) in the settings (section *Solar and storage*) the Power tab shows a **Storage** card: the charge level as a bar with the minimum level marked, the status (charging, discharging, idle) and, with the **capacity** (kWh) and the **minimum charge level** (%), what is stored and what is usable. While the storage discharges it says when it is empty, while it charges when it is full, from the current power (from 20 W on). PV Assistant offers its charge level sensor, capacity and minimum level with the button of the notice.
+
+### Notices
+
+A card **Notices** at the top of the Power tab appears when something needs attention, otherwise it is not there:
+
+- a **plant fault** reported by PV Assistant (with the plants),
+- a **negative electricity price** of a dynamic tariff in Tariffy (information: using power now pays),
+- a **device that has been running for hours** (at least 200 W for 4 hours, breaks up to 15 minutes do not count; devices that never stopped in the last 24 hours, such as a heat pump, are not reported),
+- a **high base load**: the base load of the last 24 hours is at least 1.5 times and 50 W above the usual one (the median over the days before, from the long-term statistics of the house power sensor; it needs a house power sensor and three full days).
+
 ### Consumption tab: base load and devices
 
 The **Consumption** tab appears as soon as devices are set up (single sensors or name patterns) and needs no further setting. It reads the history of the last 24 hours (5-minute steps) of the device power sensors and the house power:

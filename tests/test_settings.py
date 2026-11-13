@@ -134,3 +134,33 @@ def test_area_ids_are_normalized_and_stored_as_a_list() -> None:
     assert normalize({})["area_ids"] == []  # none selected means all areas
     assert to_storage(settings)["area_ids"] == ["kueche", "wohnzimmer"]
     assert normalize(to_storage(settings)) == settings
+
+
+def test_numbers_are_floats_or_none() -> None:
+    from custom_components.energy_assistant.settings import (
+        clean_number,
+        normalize,
+        to_storage,
+    )
+
+    assert clean_number(10) == 10.0
+    assert clean_number("12,5") == 12.5
+    assert clean_number("7.25") == 7.25
+    for bad in (None, "", "abc", -1, "-3", float("nan"), True, False):
+        assert clean_number(bad) is None
+    assert clean_number(0) == 0.0
+    result = normalize(
+        {"battery_capacity": "10", "battery_min_soc": None, "battery_soc": "sensor.soc"}
+    )
+    assert result["battery_capacity"] == 10.0
+    assert result["battery_min_soc"] is None
+    assert result["battery_soc"] == ["sensor.soc"]
+    stored = to_storage(result)
+    assert stored["battery_capacity"] == 10.0
+    assert "battery_min_soc" not in stored  # not set: nothing stored
+    assert (
+        stored["battery_soc"] == "sensor.soc"
+    )  # one sensor in storage, like the other single fields
+    assert (
+        to_storage({"battery_min_soc": 0})["battery_min_soc"] == 0.0
+    )  # 0 % is a value

@@ -421,3 +421,36 @@ async def test_update_config_rejects_invalid_area_ids(
         assert not msg["success"], ids
         assert msg["error"]["code"] == "invalid_format"
     assert entry.options == {}
+
+
+async def test_the_storage_numbers_are_validated_and_stored(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {
+                "battery_soc": ["sensor.soc"],
+                "battery_capacity": 10.5,
+                "battery_min_soc": 10,
+            },
+        }
+    )
+    assert (await client.receive_json())["success"]
+    assert entry.options["battery_soc"] == "sensor.soc"
+    assert entry.options["battery_capacity"] == 10.5
+    await client.send_json_auto_id({"type": "energy_assistant/get_config"})
+    result = (await client.receive_json())["result"]
+    assert result["battery_soc"] == ["sensor.soc"]
+    assert (result["battery_capacity"], result["battery_min_soc"]) == (10.5, 10.0)
+    # empty (null) means not set again; out of range is refused
+    await client.send_json_auto_id(
+        {"type": "energy_assistant/update_config", "config": {"battery_capacity": None}}
+    )
+    assert (await client.receive_json())["success"]
+    assert "battery_capacity" not in entry.options
+    await client.send_json_auto_id(
+        {"type": "energy_assistant/update_config", "config": {"battery_min_soc": 120}}
+    )
+    assert not (await client.receive_json())["success"]

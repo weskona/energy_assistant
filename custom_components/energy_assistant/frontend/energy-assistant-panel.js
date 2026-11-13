@@ -40,6 +40,11 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
+.socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
+.socbar.charging i{background:var(--ea-bin)}
+.socbar.discharging i{background:var(--ea-bout)}
+.socbar b{position:absolute;top:-3px;width:2px;height:18px;background:var(--eb-text);opacity:.6;border-radius:1px}
 .bpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .bpick .segs{margin-top:0}
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
@@ -52,6 +57,7 @@ const STYLE = `
 .stack{display:grid;gap:var(--eb-gap)}
 .amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
+.alert.info{border-color:var(--eb-green);background:rgba(52,211,153,.12)}
 .alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
@@ -166,6 +172,28 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    alTitle: "Notices",
+    alFault: "Plant fault{plants}",
+    alNegPrice: "The electricity price is negative ({price} ct/kWh): using power now pays",
+    alLongRun: "{name} has been running for {dur} ({power})",
+    alBase: "The base load is high: {now} W, usually about {ref} W",
+    f_battery_soc: "Storage charge level sensor (%)",
+    f_battery_capacity: "Storage capacity (kWh)",
+    f_battery_min_soc: "Minimum charge level (%)",
+    pvSoc: "Storage: charge level sensor{cap}",
+    stTitle: "Storage",
+    stCharging: "Charging",
+    stDischarging: "Discharging",
+    stIdle: "Idle",
+    stSoc: "Charge level",
+    stStored: "Stored",
+    stUsable: "Usable",
+    stPower: "Power",
+    stEmptyAt: "Empty at",
+    stFullAt: "Full at",
+    stIn: "in {dur}",
+    stDur: "{h} h {m} min",
+    stDurMin: "{m} min",
     tabUsage: "Consumption",
     uBaseTitle: "Base load",
     uBase: "Base load",
@@ -402,6 +430,28 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    alTitle: "Hinweise",
+    alFault: "Anlagenstörung{plants}",
+    alNegPrice: "Der Strompreis ist negativ ({price} ct/kWh): Verbrauchen lohnt sich jetzt",
+    alLongRun: "{name} läuft seit {dur} ({power})",
+    alBase: "Die Grundlast ist hoch: {now} W, sonst etwa {ref} W",
+    f_battery_soc: "Ladestand-Sensor des Speichers (%)",
+    f_battery_capacity: "Speicherkapazität (kWh)",
+    f_battery_min_soc: "Mindest-Ladestand (%)",
+    pvSoc: "Speicher: Ladestand-Sensor{cap}",
+    stTitle: "Speicher",
+    stCharging: "Lädt",
+    stDischarging: "Entlädt",
+    stIdle: "Ruhe",
+    stSoc: "Ladestand",
+    stStored: "Gespeichert",
+    stUsable: "Nutzbar",
+    stPower: "Leistung",
+    stEmptyAt: "Leer um",
+    stFullAt: "Voll um",
+    stIn: "in {dur}",
+    stDur: "{h} h {m} min",
+    stDurMin: "{m} min",
     tabUsage: "Verbrauch",
     uBaseTitle: "Grundlast",
     uBase: "Grundlast",
@@ -642,16 +692,17 @@ const esc = (t) =>
 
 // Settings form: [key, kind]. "multi" = several sensors, "single" = one sensor.
 const BAL_CATS = [["solar", "energy_solar"], ["imp", "energy_grid_import"], ["exp", "energy_grid_export"], ["chg", "energy_battery_charge"], ["dis", "energy_battery_discharge"], ["house", "energy_house"]];
+const NUMBER_KEYS = ["battery_capacity", "battery_min_soc"];
 const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
-  { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
+  { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -662,6 +713,10 @@ const PICKERS = {
 
 // Power below this counts as idle and is only counted, not listed.
 const IDLE_W = 5;
+const LONG_RUN_W = 200; // a device that draws this much counts as running
+const LONG_RUN_MS = 4 * 3600 * 1000; // running this long is worth a notice
+const ALWAYS_RUN_MS = 20 * 3600 * 1000; // but not a device that never stopped (heat pump, pool pump)
+const FLOW_W = 20; // charging or discharging from this power on
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
 const MIN_ROWS = 5;
@@ -925,7 +980,17 @@ class EnergyAssistantPanel extends HTMLElement {
       if (!arr) continue;
       let kwh = 0;
       for (let k = from; k < n; k++) kwh += (Math.max(0, arr[k] ?? 0) * step) / 3600000 / 1000;
-      devices.push({ id, name: this._deviceName(id), kwh, baseW: this._baseline(arr) });
+      // How long the device has been running without a longer break (up to 15 minutes below the limit count as running).
+      let end = -1, run = 0;
+      for (let k = n; k >= Math.max(0, n - 3); k--) if (arr[k] != null && arr[k] >= LONG_RUN_W) { end = k; break; }
+      if (end >= 0) {
+        let startK = end, low = 0;
+        for (let k = end - 1; k >= 0; k--) {
+          if (arr[k] != null && arr[k] >= LONG_RUN_W) { startK = k; low = 0; } else if (++low > 3) break;
+        }
+        run = (end - startK + 1) * step;
+      }
+      devices.push({ id, name: this._deviceName(id), kwh, baseW: this._baseline(arr), run, nowW: arr[n] });
     }
     return { devices, at: Date.now() };
   }
@@ -1022,6 +1087,152 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="hint">${esc(this._t("uAlwaysHint"))}</div>
       <div class="devgrid">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
     return `<div class="stack">${baseCard}${topCard}${alwaysCard}</div>`;
+  }
+
+  /**
+   * The state of the storage from the charge level sensor, the capacity and the minimum level of the settings
+   * and the current charging or discharging power: what is stored and usable, the mode and when it is empty
+   * (discharging) or full (charging). Null without a charge level.
+   */
+  _storage(cur) {
+    const soc = this._num(this._cfg.battery_soc?.[0]);
+    if (soc == null) return null;
+    const level = Math.max(0, Math.min(100, soc));
+    const cap = this._cfg.battery_capacity > 0 ? this._cfg.battery_capacity : null;
+    const min = Math.max(0, Math.min(100, this._cfg.battery_min_soc ?? 0));
+    const out = cur?.discharge ?? 0, into = cur?.charge ?? 0;
+    const mode = out >= FLOW_W ? "discharging" : into >= FLOW_W ? "charging" : "idle";
+    const stored = cap != null ? (cap * level) / 100 : null;
+    const usable = cap != null ? (cap * Math.max(0, level - min)) / 100 : null;
+    let hours = null;
+    if (mode === "discharging" && usable != null) hours = usable / (out / 1000);
+    if (mode === "charging" && cap != null) hours = (cap * Math.max(0, 100 - level)) / 100 / (into / 1000);
+    return { soc: level, min, cap, mode, stored, usable, power: mode === "discharging" ? out : mode === "charging" ? into : 0, hours };
+  }
+
+  /** "4 h 20 min" or "35 min". */
+  _duration(hours) {
+    const total = Math.max(0, Math.round(hours * 60));
+    return total >= 60 ? this._t("stDur", { h: Math.floor(total / 60), m: total % 60 }) : this._t("stDurMin", { m: total });
+  }
+
+  /** The storage card: charge level as a bar with the minimum marked, what is stored and usable, power and the time. */
+  _renderStorage(cur) {
+    const st = this._storage(cur);
+    if (!st) return "";
+    const lang = this._hass?.language || "en";
+    const tile = (label, value, unit = "", extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${extra}</div>`;
+    const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const tiles = [tile(this._t("stSoc"), Math.round(st.soc), "%")];
+    if (st.stored != null) tiles.push(tile(this._t("stStored"), kwh(st.stored), "kWh"));
+    if (st.usable != null && st.min > 0) tiles.push(tile(this._t("stUsable"), kwh(st.usable), "kWh"));
+    if (st.mode !== "idle") {
+      const [v, u] = fmtPower(st.power);
+      tiles.push(tile(this._t("stPower"), v, u));
+    }
+    if (st.hours != null && Number.isFinite(st.hours)) {
+      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
+      tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
+    }
+    const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
+    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip">${esc(status)}</span></div>
+      <div class="socbar ${st.mode}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %"><i style="width:${st.soc}%"></i>${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
+      <div class="tiles">${tiles.join("")}</div></div>`;
+  }
+
+  /**
+   * The usual base load: the median of the lowest hourly mean of each of the days before (from the long-term
+   * statistics of the house power sensor). Null without such a sensor or with less than three full days.
+   */
+  async _loadBaseRef() {
+    const house = this._cfg.house_power;
+    if (!house || this._baseRefLoading || !this._hass) return;
+    this._baseRefLoading = true;
+    try {
+      const end = new Date(), start = new Date(end.getTime() - 8 * 24 * 3600 * 1000);
+      const res = await this._hass.callWS({
+        type: "recorder/statistics_during_period",
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        statistic_ids: [house],
+        period: "hour",
+        types: ["mean"],
+        units: { power: "W" },
+      });
+      this._baseRef = { w: this._baseRefFrom(res?.[house] || [], end), at: Date.now() };
+    } catch (e) {
+      console.info("Energy Assistant: could not load the statistics of the house power", e);
+      this._baseRef = { w: null, at: Date.now() };
+    } finally {
+      this._baseRefLoading = false;
+      this._render();
+    }
+  }
+
+  _baseRefFrom(rows, now = new Date()) {
+    const key = (t) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+    const today = key(now);
+    const days = new Map();
+    for (const row of rows) {
+      if (row.mean == null || Number.isNaN(row.mean)) continue;
+      const t = typeof row.start === "number" ? row.start : Date.parse(row.start);
+      const k = key(t);
+      if (k === today) continue;
+      const day = days.get(k) || { min: Infinity, n: 0 };
+      day.min = Math.min(day.min, Math.max(0, row.mean));
+      day.n += 1;
+      days.set(k, day);
+    }
+    const mins = [...days.values()].filter((d) => d.n >= 18).map((d) => d.min).sort((a, b) => a - b);
+    if (mins.length < 3) return null;
+    const mid = mins.length >> 1;
+    return mins.length % 2 ? mins[mid] : (mins[mid - 1] + mins[mid]) / 2;
+  }
+
+  _maybeLoadBaseRef() {
+    if (!this._ready || this._baseRefLoading || !this._cfg.house_power) return;
+    if (!this._baseRef || Date.now() - this._baseRef.at > 60 * 60 * 1000) this._loadBaseRef();
+  }
+
+  /**
+   * The notices that apply now: a plant fault of PV Assistant, a negative electricity price (dynamic tariff of
+   * Tariffy), devices that have been running for hours and a base load well above the usual.
+   */
+  _alerts() {
+    const out = [];
+    const lang = this._hass?.language || "en";
+    const ids = this._int?.pv_assistant?.entities;
+    const fault = ids?.string_fault && this._hass?.states?.[ids.string_fault];
+    if (fault?.state === "on") {
+      const plants = Array.isArray(fault.attributes?.plants) && fault.attributes.plants.length ? `: ${fault.attributes.plants.join(", ")}` : "";
+      out.push({ level: "warn", text: this._t("alFault", { plants }) });
+    }
+    const price = this._price();
+    if (price && price.currency && price.value < 0) {
+      const ct = (price.value * 100).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      out.push({ level: "info", text: this._t("alNegPrice", { price: ct }) });
+    }
+    const running = (this._usage?.devices || [])
+      .filter((d) => d.run >= LONG_RUN_MS && d.run < ALWAYS_RUN_MS)
+      .sort((a, b) => b.run - a.run)
+      .slice(0, 3);
+    for (const d of running) {
+      const [v, u] = fmtPower(d.nowW ?? 0);
+      out.push({ level: "warn", text: this._t("alLongRun", { name: d.name, dur: this._duration(d.run / 3600000), power: `${v} ${u}` }) });
+    }
+    const now = this._baseline((this._history || []).map((p) => p.v));
+    const ref = this._baseRef?.w;
+    if (now != null && ref != null && now >= ref * 1.5 && now - ref >= 50) {
+      out.push({ level: "warn", text: this._t("alBase", { now: Math.round(now).toLocaleString(lang), ref: Math.round(ref).toLocaleString(lang) }) });
+    }
+    return out;
+  }
+
+  _renderAlerts() {
+    const list = this._alerts();
+    if (!list.length) return "";
+    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("alTitle"))}</span></div>
+      ${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${a.level === "info" ? "ℹ" : "⚠"} ${esc(a.text)}</div>`).join("")}</div>`;
   }
 
   /** The balance tab exists when at least one energy counter is configured. */
@@ -1495,7 +1706,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   _pvApplied() {
     const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
-    return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : same(v, this._draftList(k))));
+    return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : typeof v === "number" ? this._draft[k] === v : same(v, this._draftList(k))));
   }
 
   /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
@@ -1521,6 +1732,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const out = { house_power: cfg.house_power || null };
     for (const k of LIST_KEYS) out[k] = Array.isArray(cfg[k]) ? [...cfg[k]] : cfg[k] ? [cfg[k]] : [];
     for (const k of BOOL_KEYS) out[k] = !!cfg[k];
+    for (const k of NUMBER_KEYS) out[k] = typeof cfg[k] === "number" && Number.isFinite(cfg[k]) ? cfg[k] : null;
     out.device_names = { ...(cfg.device_names || {}) };
     return out;
   }
@@ -1532,7 +1744,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   _draftAdd(key, id, mode) {
     if (key === "house_power") this._draft.house_power = id;
-    else if (mode === "single") this._draft[key] = [id];
+    else if (mode === "single" || mode === "soc") this._draft[key] = [id];
     else if (!this._draft[key].includes(id)) this._draft[key] = [...this._draft[key], id];
   }
 
@@ -1550,6 +1762,15 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** Power sensors offered in the picker. */
+  /** Charge level sensors for the datalist: battery sensors and sensors in percent. */
+  _socCandidates() {
+    const states = this._hass?.states || {};
+    return Object.entries(states)
+      .filter(([id, st]) => id.startsWith("sensor.") && (st.attributes?.device_class === "battery" || st.attributes?.unit_of_measurement === "%"))
+      .map(([id, st]) => ({ id, name: st.attributes.friendly_name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   /** Energy counters for the datalist: sensors with the device class energy. */
   _energyCandidates() {
     const states = this._hass?.states || {};
@@ -1731,6 +1952,12 @@ class EnergyAssistantPanel extends HTMLElement {
       this._edited();
     } else if (t.dataset?.bool) {
       this._draft[t.dataset.bool] = t.checked;
+      this._edited();
+    } else if (t.dataset?.num) {
+      // A number (kWh, %): empty or unusable means not set.
+      const raw = t.value.trim().replace(",", ".");
+      const n = raw === "" ? NaN : Number(raw);
+      this._draft[t.dataset.num] = Number.isFinite(n) && n >= 0 ? n : null;
       this._edited();
     } else if (t.dataset?.add) {
       const id = t.value.trim();
@@ -1948,9 +2175,14 @@ class EnergyAssistantPanel extends HTMLElement {
     const nameOf = (id) => states[id]?.attributes?.friendly_name || id;
     const options = this._candidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const energyOptions = this._energyCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+    const socOptions = this._socCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const field = ([key, kind]) => {
       if (kind === "energyoffer") return this._renderEnergyOffer(ro);
       const label = this._t(`f_${key}`);
+      if (kind === "number") {
+        const v = this._draft[key];
+        return `<div class="fld"><label>${esc(label)}</label><input type="number" min="0" step="any" inputmode="decimal" data-num="${key}" value="${v == null ? "" : esc(String(v))}" ${ro ? "disabled" : ""}></div>`;
+      }
       if (kind === "bool") {
         return `<label class="sw"><input type="checkbox" data-bool="${key}" ${this._draft[key] ? "checked" : ""} ${ro ? "disabled" : ""}>${esc(label)}</label>`;
       }
@@ -1963,7 +2195,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
@@ -1975,7 +2207,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (this._status === "saving") msg = `<span class="msg">${this._t("saving")}</span>`;
     else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
     else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
-    return `<datalist id="eb-sensors">${options}</datalist><datalist id="eb-energy">${energyOptions}</datalist>
+    return `<datalist id="eb-sensors">${options}</datalist><datalist id="eb-energy">${energyOptions}</datalist><datalist id="eb-soc">${socOptions}</datalist>
       <div class="set">${this._renderIntegrations(ro)}<div class="grid">${sections}</div>
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
@@ -2028,6 +2260,7 @@ class EnergyAssistantPanel extends HTMLElement {
       n("solar_power") ? this._t("pvSolar", { n: n("solar_power") }) : "",
       parts.length ? this._t("pvStorage", { parts: parts.join(", ") }) : "",
       gridParts.length ? this._t("pvGrid", { parts: gridParts.join(", ") }) : "",
+      n("battery_soc") ? this._t("pvSoc", { cap: typeof t.battery_capacity === "number" ? `, ${t.battery_capacity.toLocaleString(this._hass?.language || "en")} kWh` : "" }) : "",
     ].filter(Boolean);
     const done = this._pvApplied();
     return `<p class="pvq">${esc(done ? this._t("pvDone") : this._t("pvAsk"))}</p>
@@ -2504,6 +2737,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._historyChart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
+      ${this._renderAlerts()}
       <div class="eb-card eb-card--glow">
         <div class="row"><span class="eb-title">${this._t("house")}</span>
           <span class="eb-chip">${cur.house == null ? this._t("noData") : this._t("live")}</span></div>
@@ -2526,6 +2760,7 @@ class EnergyAssistantPanel extends HTMLElement {
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
+      ${this._renderStorage(cur)}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 
@@ -2849,7 +3084,8 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
     if (this._tab === "balance") this._maybeLoadBalance();
-    if (this._tab === "usage") this._maybeLoadUsage();
+    if (this._tab === "usage" || (this._tab === "house" && this._usageEnabled())) this._maybeLoadUsage();
+    if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;

@@ -2872,3 +2872,284 @@ test("usage: the virtual wallbox row of EV Assistant is not asked for in the his
   await p._loadUsage();
   assert.deepEqual(calls[0].entity_ids, ["sensor.a", "sensor.b", "sensor.c"]); // no id of the wallbox row
 });
+
+// --- the storage card ---------------------------------------------------------------------------
+function storagePanel({ soc = "60", cfg = {}, cur = {}, lang = "en" } = {}) {
+  const p = panel({ house_power: "h", battery_soc: ["sensor.soc"], battery_capacity: 10, battery_min_soc: 10, ...cfg }, { h: st(1), "sensor.soc": { state: soc, attributes: { unit_of_measurement: "%" } } });
+  p._hass.language = lang;
+  p._cur = { discharge: 0, charge: 0, ...cur };
+  return p;
+}
+
+test("storage: stored and usable energy from the level, capacity and minimum", () => {
+  const p = storagePanel();
+  const st = p._storage(p._cur);
+  assert.equal(st.soc, 60);
+  assert.equal(st.stored, 6); // 10 kWh x 60 %
+  assert.equal(st.usable, 5); // 10 kWh x (60 - 10) %
+  assert.equal(st.mode, "idle");
+  assert.equal(st.hours, null);
+});
+
+test("storage: discharging says when it is empty, charging when it is full", () => {
+  const out = storagePanel({ cur: { discharge: 1000 } });
+  const a = out._storage(out._cur);
+  assert.equal(a.mode, "discharging");
+  assert.equal(a.hours, 5); // 5 kWh usable at 1 kW
+  const into = storagePanel({ cur: { charge: 2000 } });
+  const b = into._storage(into._cur);
+  assert.equal(b.mode, "charging");
+  assert.equal(b.hours, 2); // 4 kWh missing at 2 kW
+  const slow = storagePanel({ cur: { discharge: 10, charge: 10 } }); // below the limit: idle
+  assert.equal(slow._storage(slow._cur).mode, "idle");
+});
+
+test("storage: without a charge level there is no card, without a capacity only the level", () => {
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  assert.equal(none._storage({}), null);
+  assert.equal(none._renderStorage({}), "");
+  const unknown = storagePanel({ soc: "unavailable" });
+  assert.equal(unknown._storage(unknown._cur), null);
+  const noCap = storagePanel({ cfg: { battery_capacity: null }, cur: { discharge: 1000 } });
+  const level = noCap._storage(noCap._cur);
+  assert.equal(level.stored, null);
+  assert.equal(level.hours, null);
+  const html = noCap._renderStorage(noCap._cur);
+  assert.match(html, /Charge level<\/div><div class="eb-value">60<small>%/);
+  assert.doesNotMatch(html, /Stored|Empty at/);
+  const clamped = storagePanel({ soc: "140" });
+  assert.equal(clamped._storage(clamped._cur).soc, 100);
+});
+
+test("storage: the card shows the status, the bar with the minimum and the tiles", () => {
+  const p = storagePanel({ cur: { discharge: 1000 } });
+  const html = p._renderStorage(p._cur);
+  assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip">Discharging<\/span>/);
+  assert.match(html, /class="socbar discharging"[^>]*><i style="width:60%"><\/i><b style="left:10%"><\/b>/);
+  assert.match(html, /Stored<\/div><div class="eb-value">6\.0<small>kWh/);
+  assert.match(html, /Usable<\/div><div class="eb-value">5\.0<small>kWh/);
+  assert.match(html, /Power<\/div><div class="eb-value">1[.,]?000<small>W/);
+  assert.match(html, /Empty at<\/div>[\s\S]*in 5 h 0 min/);
+  const idle = storagePanel();
+  assert.match(idle._renderStorage(idle._cur), /Idle/);
+  assert.doesNotMatch(idle._renderStorage(idle._cur), /Power<\/div>|Empty at|Full at/);
+  const charging = storagePanel({ cur: { charge: 2000 }, cfg: { battery_min_soc: null } });
+  const c = charging._renderStorage(charging._cur);
+  assert.match(c, /Full at<\/div>[\s\S]*in 2 h 0 min/);
+  assert.doesNotMatch(c, /Usable/); // without a minimum usable equals stored
+  assert.doesNotMatch(c, /<b style/); // and no marker
+  const de = storagePanel({ cur: { charge: 2000 }, lang: "de" });
+  assert.match(de._renderStorage(de._cur), /Lädt[\s\S]*Voll um/);
+});
+
+test("storage: the durations read in hours and minutes", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  assert.equal(p._duration(5), "5 h 0 min");
+  assert.equal(p._duration(1.25), "1 h 15 min");
+  assert.equal(p._duration(0.5), "30 min");
+  assert.equal(p._duration(-1), "0 min");
+});
+
+test("storage: the card is part of the Power tab (the settings need a charge level sensor)", () => {
+  const p = storagePanel({ cur: { discharge: 500 } });
+  p._ready = true;
+  p._cfg.battery_discharge = ["d"];
+  p._hass.states.d = st(500);
+  assert.match(p._renderHouse(), /<span class="eb-title">Storage<\/span>/);
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  none._ready = true;
+  assert.doesNotMatch(none._renderHouse(), /socbar/);
+});
+
+test("storage settings: sensor, capacity and minimum are part of the form and the draft", () => {
+  const p = storagePanel();
+  p._ready = true;
+  p._draft = p._normalize({ battery_soc: "sensor.soc", battery_capacity: 10, battery_min_soc: 5 });
+  assert.deepEqual(p._draft.battery_soc, ["sensor.soc"]);
+  assert.equal(p._draft.battery_capacity, 10);
+  assert.equal(p._normalize({ battery_capacity: "abc" }).battery_capacity, null);
+  p._draftAdd("battery_soc", "sensor.soc2", "soc");
+  assert.deepEqual(p._draft.battery_soc, ["sensor.soc2"]); // one sensor only
+  p._edited = () => {};
+  p._hass.user = { is_admin: true };
+  const input = (value) => ({ target: { dataset: { num: "battery_capacity" }, value } });
+  p._onChange(input("12,5"));
+  assert.equal(p._draft.battery_capacity, 12.5);
+  p._onChange(input(""));
+  assert.equal(p._draft.battery_capacity, null);
+  p._onChange(input("-3"));
+  assert.equal(p._draft.battery_capacity, null);
+  p._onChange(input("abc"));
+  assert.equal(p._draft.battery_capacity, null);
+  p._hass.states["sensor.bat"] = { state: "1", attributes: { device_class: "battery", friendly_name: "Akku" } };
+  p._hass.states["sensor.pct"] = { state: "1", attributes: { unit_of_measurement: "%" } };
+  p._hass.states["sensor.x"] = { state: "1", attributes: { unit_of_measurement: "W" } };
+  assert.deepEqual(p._socCandidates().map((c) => c.id).sort(), ["sensor.bat", "sensor.pct", "sensor.soc"]);
+  p._draft.battery_capacity = 12.5;
+  const html = p._renderSettings();
+  assert.match(html, /Storage capacity \(kWh\)/);
+  assert.match(html, /data-num="battery_capacity" value="12\.5"/);
+  assert.match(html, /data-add="battery_soc" data-mode="soc" list="eb-soc"/);
+  assert.match(html, /<datalist id="eb-soc">/);
+});
+
+test("storage settings: PV Assistant offers the sensor, the capacity and the minimum level", async () => {
+  const p = pvPanel({
+    reply: {
+      targets: { solar_power: ["sensor.wr1_pv1"], battery_soc: ["sensor.soc"], battery_capacity: 9.5, battery_min_soc: 10 },
+      notes: {},
+      plants: [],
+    },
+  });
+  await p._loadPv();
+  assert.match(p._renderSettings(), /Storage: charge level sensor, 9\.5 kWh/);
+  p._edited = () => {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-pvapply]" ? {} : null) } });
+  assert.deepEqual(p._draft.battery_soc, ["sensor.soc"]);
+  assert.equal(p._draft.battery_capacity, 9.5);
+  assert.equal(p._draft.battery_min_soc, 10);
+  assert.match(p._renderSettings(), /sensors of PV Assistant are in use/); // numbers count as taken over too
+  p._draft.battery_capacity = 5;
+  assert.doesNotMatch(p._renderSettings(), /sensors of PV Assistant are in use/);
+});
+
+// --- the notices ---------------------------------------------------------------------------------
+function alertPanel(extra = {}) {
+  const p = panel({ house_power: "h", device_power: ["sensor.a", "sensor.b"] }, { h: st(1), ...extra });
+  p._hass.language = "en";
+  p._ready = true;
+  p._render = () => {};
+  return p;
+}
+const H = 3600000;
+
+test("notices: nothing to say shows no card", () => {
+  const p = alertPanel();
+  assert.deepEqual(p._alerts(), []);
+  assert.equal(p._renderAlerts(), "");
+  assert.doesNotMatch(p._renderHouse(), /class="alert/);
+});
+
+test("notices: a plant fault of PV Assistant, with the plants", () => {
+  const p = alertPanel({ "binary_sensor.pv_fault": { state: "on", attributes: { plants: ["Garage", "Carport"] } } });
+  p._int = { pv_assistant: { entities: { string_fault: "binary_sensor.pv_fault" } } };
+  assert.deepEqual(p._alerts(), [{ level: "warn", text: "Plant fault: Garage, Carport" }]);
+  p._hass.states["binary_sensor.pv_fault"].attributes = {};
+  assert.equal(p._alerts()[0].text, "Plant fault");
+  p._hass.states["binary_sensor.pv_fault"].state = "off";
+  assert.deepEqual(p._alerts(), []);
+});
+
+test("notices: a negative live price of a dynamic tariff", () => {
+  const p = alertPanel({ "sensor.t_preis": { state: "0.28", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: -0.034 } } });
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  assert.deepEqual(p._alerts(), [{ level: "info", text: "The electricity price is negative (-3.4 ct/kWh): using power now pays" }]);
+  p._hass.states["sensor.t_preis"].attributes.arbeitspreis_aktuell = 0.12;
+  assert.deepEqual(p._alerts(), []);
+});
+
+test("notices: a device that has been running for hours, but not one that never stops", () => {
+  const p = alertPanel();
+  p._usage = {
+    at: Date.now(),
+    devices: [
+      { id: "sensor.a", name: "Backofen", run: 5.25 * H, nowW: 1800 },
+      { id: "sensor.b", name: "Wärmepumpe", run: 23 * H, nowW: 900 }, // always on
+      { id: "sensor.c", name: "Kaffeemaschine", run: 0.5 * H, nowW: 1200 }, // too short
+      { id: "sensor.d", name: "Heizlüfter", run: 7 * H, nowW: 1500 },
+    ],
+  };
+  const texts = p._alerts().map((a) => a.text);
+  assert.equal(texts.length, 2);
+  assert.match(texts[0], /^Heizlüfter has been running for 7 h 0 min \(1[.,]?500 W\)$/); // the longest first
+  assert.match(texts[1], /^Backofen has been running for 5 h 15 min \(1[.,]?800 W\)$/);
+  p._usage.devices = Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, name: `D${i}`, run: (5 + i) * H, nowW: 300 }));
+  assert.equal(p._alerts().length, 3); // at most three
+});
+
+test("notices: the running time of a device is measured with the history", () => {
+  const p = alertPanel();
+  const t1 = Date.now(), t0 = t1 - 24 * H;
+  const hrows = (pairs) => pairs.map(([h, w]) => ({ lu: (t0 + h * H) / 1000, s: String(w) }));
+  const res = {
+    "sensor.a": hrows([[0, 0], [17, 1800]]), // on for the last 7 hours
+    "sensor.b": hrows([[0, 0], [17, 1800], [23.8, 0]]), // switched off 12 minutes ago: still counts as running
+    "sensor.c": hrows([[0, 0], [17, 1800], [23.0, 0]]), // off for an hour: not running
+    "sensor.d": hrows([[0, 1800], [12, 0], [12.5, 1800], [13, 0], [16, 1800]]), // short breaks of the cycle count
+  };
+  const u = p._usageCompute(res, ["sensor.a", "sensor.b", "sensor.c", "sensor.d"], t0, t1);
+  const by = Object.fromEntries(u.devices.map((d) => [d.id, d]));
+  assert.ok(Math.abs(by["sensor.a"].run / H - 7) < 0.1);
+  assert.ok(by["sensor.b"].run / H > 6.5);
+  assert.equal(by["sensor.c"].run, 0);
+  assert.equal(by["sensor.a"].nowW, 1800);
+  assert.ok(by["sensor.d"].run / H < 9); // the long break at 13-16 h ends the run of the last cycle
+});
+
+test("notices: the base load against the usual one from the statistics", () => {
+  const p = alertPanel();
+  const now = new Date();
+  const rowsFor = (daysAgo, low) => Array.from({ length: 24 }, (_, h) => ({ start: new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, h).getTime(), mean: h === 3 ? low : 400 }));
+  const rows = [1, 2, 3, 4, 5].flatMap((d, i) => rowsFor(d, [150, 180, 170, 160, 190][i]));
+  assert.equal(p._baseRefFrom(rows, now), 170); // the median of the lowest hours
+  assert.equal(p._baseRefFrom(rows.slice(0, 24 * 2), now), null); // less than three full days
+  assert.equal(p._baseRefFrom([...rows, ...rowsFor(0, 20)], now), 170); // today does not count
+  assert.equal(p._baseRefFrom([], now), null);
+  const partial = rows.map((r, i) => (i % 24 > 10 ? { ...r, mean: null } : r)); // too few hours with data
+  assert.equal(p._baseRefFrom(partial, now), null);
+  // the notice: well above the usual (and by at least 50 W)
+  p._baseRef = { w: 170, at: Date.now() };
+  p._history = Array.from({ length: 60 }, (_, k) => ({ t: k * 300000, v: 320 }));
+  assert.match(p._alerts()[0].text, /The base load is high: 320 W, usually about 170 W/);
+  p._history = Array.from({ length: 60 }, (_, k) => ({ t: k * 300000, v: 220 })); // 1.3 times: normal
+  assert.deepEqual(p._alerts(), []);
+  p._baseRef = { w: 30, at: Date.now() };
+  p._history = Array.from({ length: 60 }, (_, k) => ({ t: k * 300000, v: 70 })); // 2.3 times but only 40 W more
+  assert.deepEqual(p._alerts(), []);
+  p._baseRef = { w: null, at: Date.now() };
+  assert.deepEqual(p._alerts(), []);
+});
+
+test("notices: the statistics of the house power are asked for once an hour, only with a house sensor", async () => {
+  const p = alertPanel();
+  const calls = [];
+  p._hass.callWS = async (msg) => { calls.push(msg); return { h: [] }; };
+  p._tab = "house";
+  p._maybeLoadBaseRef();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].type, "recorder/statistics_during_period");
+  assert.deepEqual(calls[0].statistic_ids, ["h"]);
+  assert.equal(calls[0].period, "hour");
+  assert.deepEqual(calls[0].types, ["mean"]);
+  p._maybeLoadBaseRef();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  p._baseRef.at = Date.now() - 61 * 60000;
+  p._maybeLoadBaseRef();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 2);
+  const none = panel({ grid_import: ["gi"] }, { gi: st(1) });
+  none._ready = true;
+  none._hass.callWS = async (msg) => { calls.push(msg); return {}; };
+  none._maybeLoadBaseRef();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 2); // no house sensor: nothing to compare
+  const failing = alertPanel();
+  failing._hass.callWS = async () => { throw new Error("no recorder"); };
+  await failing._loadBaseRef();
+  assert.equal(failing._baseRef.w, null);
+});
+
+test("notices: the card on the Power tab shows warnings and information, escaped", () => {
+  const p = alertPanel({ "binary_sensor.pv_fault": { state: "on", attributes: { plants: ["<b>x</b>"] } }, "sensor.t_preis": { state: "0.28", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: -0.01 } } });
+  p._int = { pv_assistant: { entities: { string_fault: "binary_sensor.pv_fault" } }, tariffy: { price: "sensor.t_preis" } };
+  const html = p._renderHouse();
+  assert.match(html, /<span class="eb-title">Notices<\/span>/);
+  assert.match(html, /<div class="alert">⚠ Plant fault: &lt;b&gt;x&lt;\/b&gt;<\/div>/);
+  assert.match(html, /<div class="alert info">ℹ The electricity price is negative/);
+  assert.ok(html.indexOf("Notices") < html.indexOf("eb-card--glow")); // above the house card
+  p._hass.language = "de";
+  assert.match(p._renderHouse(), /Anlagenstörung/);
+});
