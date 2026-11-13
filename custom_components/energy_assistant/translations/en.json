@@ -134,5 +134,21 @@
       "no_source": "Please provide grid import, grid combined or house consumption.",
       "invalid_pattern": "Only letters, digits, _ . * and ? are allowed."
     }
+  },
+  "entity": {
+    "sensor": {
+      "label_energy_day": {
+        "name": "{label} energy today"
+      },
+      "label_energy_week": {
+        "name": "{label} energy this week"
+      },
+      "label_energy_month": {
+        "name": "{label} energy this month"
+      },
+      "label_energy_year": {
+        "name": "{label} energy this year"
+      }
+    }
   }
 }

@@ -468,3 +468,24 @@ async def test_the_storage_numbers_are_validated_and_stored(
         {"type": "energy_assistant/update_config", "config": {"battery_min_soc": 120}}
     )
     assert not (await client.receive_json())["success"]
+
+
+async def test_label_energy_lists_the_sensors_of_the_selected_labels(
+    hass, hass_ws_client, entry
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.energy_assistant.sensor import PERIODS, unique_id
+
+    hass.config_entries.async_update_entry(entry, options={"label_ids": ["klima"]})
+    registry = er.async_get(hass)
+    for period in PERIODS[:2]:  # only some sensors exist
+        registry.async_get_or_create(
+            "sensor", DOMAIN, unique_id(entry.entry_id, "klima", period)
+        )
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "energy_assistant/label_energy"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert set(msg["result"]["klima"]) == {"day", "week"}
+    assert msg["result"]["klima"]["day"].startswith("sensor.")

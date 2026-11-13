@@ -8,6 +8,7 @@ from pathlib import Path
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
@@ -17,6 +18,7 @@ from .const import DOMAIN, PANEL_URL_PATH, STATIC_URL
 from .settings import normalize
 
 _FRONTEND_DIR = Path(__file__).parent / "frontend"
+PLATFORMS = [Platform.SENSOR]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -57,10 +59,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_panel_domain=DOMAIN,
     )
 
+    # Energy sensors of the selected labels (created and removed with the selection).
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Remove the panel."""
-    frontend.async_remove_panel(hass, PANEL_URL_PATH)
-    return True
+    """Remove the panel and the sensors."""
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        frontend.async_remove_panel(hass, PANEL_URL_PATH)
+    return unloaded

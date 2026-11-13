@@ -217,6 +217,9 @@ const STRINGS = {
     uExplained: "Always-on devices",
     uOfBase: "{pct} % of the base load",
     uTopTitle: "Biggest consumers",
+    uLabelsTitle: "Labels",
+    uLabelsHint: "Energy of the sensors that carry the label, summed up since the start of the period. Energy Assistant creates the sensors when a label is selected in the settings; they count from then on.",
+    uLabelsPast: "The label sensors only count the running period. Go back to the current one to see them.",
     uBaseHintStat: "Lowest hourly mean of the house power in the period (at most the last 31 days).",
     uAlwaysHintStat: "Lowest hourly mean of each device in the period (at most the last 31 days), from 2 W on.",
     uNeedStats: "Past periods come from the long-term statistics: the power sensors need the state class measurement.",
@@ -487,6 +490,9 @@ const STRINGS = {
     uExplained: "Dauerläufer unter den Geräten",
     uOfBase: "{pct} % der Grundlast",
     uTopTitle: "Größte Verbraucher",
+    uLabelsTitle: "Labels",
+    uLabelsHint: "Energie der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
+    uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",
     uNeedStats: "Vergangene Zeiträume kommen aus der Langzeitstatistik: die Leistungssensoren brauchen die State Class measurement.",
@@ -847,6 +853,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._render();
       this._maybeLoadHistory();
       this._loadLabels();
+      this._loadLabelEnergy();
       this._loadPv();
       this._loadIntegrations();
       this._loadEnergyOffer();
@@ -1349,8 +1356,42 @@ class EnergyAssistantPanel extends HTMLElement {
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div></div>`; // the hint sits below the list so both lists start at the same height
+    // 4) energy per selected label, from the sensors Energy Assistant creates for them
+    const labelsCard = this._renderLabelEnergy({ range, off, price, currency, money, num });
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
-    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${note}</div>`;
+    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}</div>`;
+  }
+
+  /**
+   * Card with the energy (kWh) of every selected label for the shown period, from its energy sensor.
+   * The sensors only count the running period, so another one shows a hint. Empty without selected labels.
+   */
+  _renderLabelEnergy({ range, off, price, currency, money, num }) {
+    const selected = this._cfg.label_ids || [];
+    if (!selected.length) return "";
+    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span></div>`;
+    if (off !== 0) {
+      return `<div class="eb-card">${title}<div class="hint">${esc(this._t("uLabelsPast"))}</div></div>`;
+    }
+    const rows = selected
+      .map((id) => {
+        const entityId = this._labelEnergy?.[id]?.[range];
+        const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
+        return { id, name: names[id] || id, kwh: value };
+      })
+      .filter((r) => Number.isFinite(r.kwh))
+      .sort((a, b) => b.kwh - a.kwh);
+    const max = Math.max(0, ...rows.map((r) => r.kwh));
+    const html = rows
+      .map((r) => {
+        const cost = !Number.isNaN(price) ? `<small class="cnt">${esc(money(r.kwh * price))}</small>` : "";
+        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span> ${cost}</span>
+          <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
+          <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
+      })
+      .join("");
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t("uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
   }
 
   /**
@@ -2002,6 +2043,19 @@ class EnergyAssistantPanel extends HTMLElement {
     return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : typeof v === "number" ? this._draft[k] === v : same(v, this._draftList(k))));
   }
 
+  /** The energy sensors (day, week, month, year) of the selected labels: {label_id: {period: entity_id}}. */
+  async _loadLabelEnergy() {
+    if (!this._hass) return;
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/label_energy" });
+      this._labelEnergy = res && typeof res === "object" ? res : {};
+    } catch (e) {
+      console.warn("Energy Assistant: could not load the label sensors", e);
+      this._labelEnergy = this._labelEnergy || {};
+    }
+    this._render();
+  }
+
   /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
   async _loadLabels() {
     if (this._labelsLoading || !this._hass) return;
@@ -2093,6 +2147,9 @@ class EnergyAssistantPanel extends HTMLElement {
       this._status = "saved";
       this._error = "";
       this._maybeLoadHistory();
+      // A newly selected label gets its sensors now; they show up a moment later.
+      this._loadLabelEnergy();
+      setTimeout(() => this._loadLabelEnergy(), 2000);
     } catch (e) {
       this._status = "error";
       this._error = e?.code === "no_source" ? this._t("noSource") : e?.message || String(e);
@@ -3360,6 +3417,7 @@ class EnergyAssistantPanel extends HTMLElement {
           this._settingsDirty = true;
           this._render();
           this._loadLabels();
+          this._loadLabelEnergy();
         }
       });
       this._built = true;

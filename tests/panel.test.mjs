@@ -2907,6 +2907,48 @@ test("usage: the bar of a standby device is its share of the base load", () => {
   assert.ok(Math.abs(widths[1] - (12 / 120) * 100) < 0.01);
 });
 
+function labelEnergyPanel(range = "day", off = 0) {
+  const p = loadedUsage({
+    "sensor.l1_day": { state: "1.25", attributes: {} },
+    "sensor.l2_day": { state: "4.5", attributes: {} },
+    "sensor.l2_week": { state: "20.1", attributes: {} },
+    "sensor.l3_day": { state: "unavailable", attributes: {} },
+  });
+  p._cfg.label_ids = ["klima", "licht", "kaputt"];
+  p._labelData = { labels: [{ label_id: "klima", name: "Klima" }, { label_id: "licht", name: "Licht" }, { label_id: "kaputt", name: "Kaputt" }], entities: {} };
+  p._labelEnergy = { klima: { day: "sensor.l1_day" }, licht: { day: "sensor.l2_day", week: "sensor.l2_week" }, kaputt: { day: "sensor.l3_day" } };
+  p._usRange = range;
+  p._usOff = off;
+  p._usageView = { range, off, devices: p._usage.devices, houseBase: 150 }; // the data of another period
+  return p;
+}
+
+test("usage: the labels card shows the kWh of every selected label for the shown period, biggest first", () => {
+  const html = labelEnergyPanel()._renderUsage();
+  const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
+  assert.ok(card.indexOf("Licht") < card.indexOf("Klima"));
+  assert.match(card, /Licht[\s\S]*4[.,]50<small>kWh/);
+  assert.match(card, /Klima[\s\S]*1[.,]25<small>kWh/);
+  assert.doesNotMatch(card, /Kaputt/); // an unavailable sensor is left out
+  assert.match(card, /width:100%/); // the biggest label fills the bar
+  assert.match(card, /creates the sensors/);
+});
+
+test("usage: the labels card follows the period picker and says when only the running period exists", () => {
+  const week = labelEnergyPanel("week", 0)._renderUsage();
+  assert.match(week, /Licht[\s\S]*20[.,]10<small>kWh/);
+  assert.doesNotMatch(week.slice(week.indexOf('<span class="eb-title">Labels</span>')), /Klima/); // no weekly sensor for it
+  const past = labelEnergyPanel("day", -1)._renderUsage();
+  assert.match(past, /only count the running period/);
+  assert.doesNotMatch(past, /4[.,]50<small>kWh/);
+});
+
+test("usage: without selected labels there is no labels card", () => {
+  const p = labelEnergyPanel();
+  p._cfg.label_ids = [];
+  assert.doesNotMatch(p._renderUsage(), /<span class="eb-title">Labels<\/span>/);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();
