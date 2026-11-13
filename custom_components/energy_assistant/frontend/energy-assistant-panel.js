@@ -158,6 +158,9 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .seg.on small{color:var(--eb-muted)}
 .mbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .mbar .btn{padding:7px 12px;font-size:12.5px}
+.devgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px;align-items:start}
+.devgrid .empty,.devgrid .dev.wide{grid-column:1/-1}
+@media (max-width:800px){.devgrid{grid-template-columns:minmax(0,1fr)}}
 .devlist{max-height:480px;overflow:auto}
 .linkbtn{border:0;background:none;color:var(--eb-green);font:600 13px var(--eb-font);cursor:pointer;padding:6px 0}
 .hint{color:var(--eb-muted);font-size:12.5px;margin-top:6px}
