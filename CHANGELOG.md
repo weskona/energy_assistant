@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-14
+
 ### Changed
 
 - **Balance and consumption in one tab:** the Balance tab is gone; its figures (energy of the period from your energy counters, change to the period before, self-consumption, self-sufficiency, costs and the bars) now sit at the top of the Consumption tab, followed by the devices. One period picker (day, week, month, year, with arrows) on top acts on everything below it. The tab exists with energy counters, with devices, or both. An old stored selection of the Balance tab leads to the Consumption tab.
