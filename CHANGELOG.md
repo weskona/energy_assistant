@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-13
+
+### Changed
+
+- The line under the tile **Solar used directly** now shows where the solar production goes instead of the share of the direct use alone: for example `40 % House · 60 % Storage` (parts: house, storage, grid). The percentages add up to 100, parts that round to 0 % are left out. The storage part is the solar share of the charging, so charging from the grid does not count as solar.
+
 ## [0.14.1] - 2026-11-12
 
 ### Fixed

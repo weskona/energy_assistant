@@ -154,7 +154,6 @@ const STRINGS = {
     menu: "Menu",
     solar: "Solar",
     solarDirect: "Solar used directly",
-    ofProduction: "{pct} % of production",
     gridImport: "Grid import",
     gridExport: "Grid export",
     fromStorage: "From storage",
@@ -325,7 +324,6 @@ const STRINGS = {
     menu: "Menü",
     solar: "PV",
     solarDirect: "PV direkt verbraucht",
-    ofProduction: "{pct} % der Erzeugung",
     gridImport: "Netzbezug",
     gridExport: "Einspeisung",
     fromStorage: "Vom Speicher",
@@ -1522,6 +1520,34 @@ class EnergyAssistantPanel extends HTMLElement {
     return Math.max(0, Math.min(d, solar, house ?? solar));
   }
 
+  /**
+   * Where the solar production goes, in whole percent that add up to 100: straight to the house, into the
+   * storage (solar share of the charging) and into the grid. Parts that round to 0 % are left out, the house
+   * part always stays. Null without production.
+   */
+  _pvSplit({ solar, gridOut, charge, gridCharge }, direct) {
+    if (solar == null || !(solar > 0) || direct == null) return null;
+    const parts = [
+      { key: "house", w: Math.max(0, direct) },
+      { key: "storage", w: Math.max(0, (charge ?? 0) - (gridCharge ?? 0)) },
+      { key: "grid", w: Math.max(0, gridOut ?? 0) },
+    ];
+    const total = parts.reduce((a, p) => a + p.w, 0);
+    if (!(total > 0)) return null;
+    // Largest remainder: whole percentages that add up to exactly 100.
+    for (const p of parts) {
+      p.exact = (p.w / total) * 100;
+      p.pct = Math.floor(p.exact);
+    }
+    let missing = 100 - parts.reduce((a, p) => a + p.pct, 0);
+    for (const p of [...parts].sort((a, b) => b.exact - b.pct - (a.exact - a.pct))) {
+      if (missing <= 0) break;
+      p.pct += 1;
+      missing -= 1;
+    }
+    return parts.filter((p) => p.key === "house" || p.pct > 0).map((p) => ({ key: p.key, pct: p.pct }));
+  }
+
   /** Source of consumption as shares (solar, storage, grid). */
   _mix({ house, gridIn, discharge, direct }) {
     if (!house || house <= 0) return null;
@@ -1669,7 +1695,8 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const [val, unit] = fmtPower(cur.house);
     const mix = this._mix(cur);
-    const sharePv = cur.direct != null && cur.solar > 0 ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${this._t("ofProduction", { pct: Math.round((cur.direct / cur.solar) * 100) })}</div>` : "";
+    const split = this._pvSplit(cur, cur.direct);
+    const sharePv = split ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(split.map((p) => `${p.pct} % ${this._t(p.key)}`).join(" · "))}</div>` : "";
     const tile = (label, w, extra = "") => {
       if (w == null) return "";
       const [v, u] = fmtPower(Math.abs(w));

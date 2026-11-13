@@ -187,7 +187,6 @@ test("UI strings: English by default, German for German Home Assistant", () => {
   assert.equal(p._t("house"), "House");
   p._hass = { language: "de" };
   assert.equal(p._t("house"), "Haus");
-  assert.equal(p._t("ofProduction", { pct: 74 }), "74 % der Erzeugung");
   p._hass = { language: "de-AT" };
   assert.equal(p._t("gridImport"), "Netzbezug");
   p._hass = { language: "fr" };
@@ -2081,4 +2080,64 @@ test("tabs: the Power tab holds the house, history and lists only", () => {
   const html = p._renderHouse();
   assert.doesNotMatch(html, /Costs right now|Wallbox|Payback|PV today and tomorrow|PV by plant/);
   assert.match(html, /Devices/);
+});
+
+
+// --- where the solar production goes ------------------------------------------------------------
+const splitOf = (cfg, states) => {
+  const p = panel(cfg, states);
+  const cur = p._current();
+  return p._pvSplit(cur, cur.direct);
+};
+
+test("pv split: the production goes to the house, the storage and the grid, adding up to 100 %", () => {
+  // PV 4329 W, house 1782 W, 50 W from the grid, 2597 W into the storage: 40 % house, 60 % storage
+  const split = splitOf(
+    { solar_power: ["pv"], grid_import: ["gi"], battery_charge: ["bc"], house_power: "h" },
+    { pv: st(4329), gi: st(50), bc: st(2597), h: st(1782) },
+  );
+  assert.deepEqual(split, [{ key: "house", pct: 40 }, { key: "storage", pct: 60 }]);
+});
+
+test("pv split: export shows as grid, grid charging of the storage does not count as solar", () => {
+  const withExport = splitOf(
+    { solar_power: ["pv"], grid_export: ["ge"], grid_import: ["gi"], battery_charge: ["bc"], house_power: "h" },
+    { pv: st(4000), ge: st(1000), gi: st(0), bc: st(1000), h: st(2000) },
+  );
+  assert.deepEqual(withExport, [{ key: "house", pct: 50 }, { key: "storage", pct: 25 }, { key: "grid", pct: 25 }]);
+  const gridCharged = splitOf(
+    { solar_power: ["pv"], grid_import: ["gi"], battery_charge: ["bc"], battery_grid_charge: ["bgc"], house_power: "h" },
+    { pv: st(2000), gi: st(500), bc: st(1000), bgc: st(500), h: st(1500) },
+  );
+  assert.deepEqual(gridCharged, [{ key: "house", pct: 75 }, { key: "storage", pct: 25 }]); // 1500 W solar to the house, 500 W solar into the storage
+});
+
+test("pv split: whole percentages always add up to 100, parts that round to 0 % are left out", () => {
+  const split = splitOf(
+    { solar_power: ["pv"], grid_export: ["ge"], grid_import: ["gi"], battery_charge: ["bc"], house_power: "h" },
+    { pv: st(3000), ge: st(1000), gi: st(0), bc: st(1000), h: st(1000) },
+  );
+  assert.equal(split.reduce((a, p) => a + p.pct, 0), 100); // 33.3 / 33.3 / 33.3
+  const tiny = splitOf(
+    { solar_power: ["pv"], grid_export: ["ge"], grid_import: ["gi"], house_power: "h" },
+    { pv: st(3000), ge: st(3), gi: st(0), h: st(2997) },
+  );
+  assert.deepEqual(tiny, [{ key: "house", pct: 100 }]);
+});
+
+test("pv split: nothing without production", () => {
+  assert.equal(splitOf({ grid_import: ["gi"], house_power: "h" }, { gi: st(500), h: st(500) }), null);
+  assert.equal(splitOf({ solar_power: ["pv"], grid_import: ["gi"], house_power: "h" }, { pv: st(0), gi: st(500), h: st(500) }), null);
+});
+
+test("pv split: shows as the line under the direct tile", () => {
+  const p = panel(
+    { solar_power: ["pv"], grid_import: ["gi"], battery_charge: ["bc"], house_power: "h" },
+    { pv: st(4329), gi: st(50), bc: st(2597), h: st(1782) },
+  );
+  p._ready = true;
+  p._hass.language = "en";
+  assert.match(p._renderHouse(), /1[.,]?732<small>W<\/small><\/div> <div class="eb-label"[^>]*>40 % House · 60 % Storage</);
+  p._hass.language = "de";
+  assert.match(p._renderHouse(), />40 % Haus · 60 % Speicher</);
 });
