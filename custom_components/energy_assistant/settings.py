@@ -8,6 +8,7 @@ from typing import Any
 
 from .const import (
     BOOL_KEYS,
+    CONF_AREA_TARIFFS,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
     CONF_HOUSE_POWER,
@@ -104,7 +105,7 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         key: clean_patterns(data.get(key))
         if key in TEXT_KEYS
         else clean_label_tariffs(data.get(key))
-        if key == CONF_LABEL_TARIFFS
+        if key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS)
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
@@ -138,7 +139,7 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             items = as_list(value)
             if items:
                 stored[key] = items[0]
-        elif key == CONF_LABEL_TARIFFS:
+        elif key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS):
             if tariffs := clean_label_tariffs(value):
                 stored[key] = tariffs
         elif key in DICT_KEYS:

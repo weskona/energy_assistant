@@ -14,6 +14,7 @@ from homeassistant.helpers import label_registry as lr
 
 from .const import (
     BOOL_KEYS,
+    CONF_AREA_TARIFFS,
     CONF_DEVICE_NAMES,
     CONF_HOUSE_POWER,
     CONF_LABEL_TARIFFS,
@@ -61,6 +62,9 @@ _CONFIG_SCHEMA = vol.Schema(
         vol.Optional(CONF_LABEL_TARIFFS): {
             vol.All(cv.string, vol.Match(ID_REGEX)): cv.entity_id
         },
+        vol.Optional(CONF_AREA_TARIFFS): {
+            vol.All(cv.string, vol.Match(ID_REGEX)): cv.entity_id
+        },
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }
 )
@@ -76,6 +80,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_integrations)
     websocket_api.async_register_command(hass, ws_energy_suggestion)
     websocket_api.async_register_command(hass, ws_label_energy)
+    websocket_api.async_register_command(hass, ws_area_energy)
 
 
 def _entry(hass: HomeAssistant):
@@ -128,21 +133,13 @@ def ws_labels(
     connection.send_result(msg["id"], {"labels": labels, "entities": entities})
 
 
-@websocket_api.websocket_command(
-    {vol.Required("type"): "energy_assistant/label_energy"}
-)
-@callback
-def ws_label_energy(
-    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
-) -> None:
-    """Return the energy and cost sensors of the selected labels: day, week, month, year, cost_day, ...
-
-    Only entity ids: the panel reads the values from the states.
-    """
+def _group_energy(hass: HomeAssistant, kind: str) -> dict[str, dict[str, str]]:
+    """The energy and cost sensors of the selected labels or areas: day, week, ..., cost_day, ..."""
     registry = er.async_get(hass)
     result: dict[str, dict[str, str]] = {}
     for entry in hass.config_entries.async_entries(DOMAIN):
-        for label_id in normalize({**entry.data, **entry.options})["label_ids"]:
+        selected = normalize({**entry.data, **entry.options})[f"{kind}_ids"]
+        for group_id in selected:
             sensors = {
                 f"{prefix}{period}": entity_id
                 for prefix in ("", COST)
@@ -151,13 +148,36 @@ def ws_label_energy(
                     entity_id := registry.async_get_entity_id(
                         "sensor",
                         DOMAIN,
-                        unique_id(entry.entry_id, label_id, prefix + period),
+                        unique_id(entry.entry_id, group_id, prefix + period, kind),
                     )
                 )
             }
             if sensors:
-                result[label_id] = sensors
-    connection.send_result(msg["id"], result)
+                result[group_id] = sensors
+    return result
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "energy_assistant/label_energy"}
+)
+@callback
+def ws_label_energy(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy and cost sensors of the selected labels.
+
+    Only entity ids: the panel reads the values from the states.
+    """
+    connection.send_result(msg["id"], _group_energy(hass, "label"))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "energy_assistant/area_energy"})
+@callback
+def ws_area_energy(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy and cost sensors of the selected areas (like the ones of the labels)."""
+    connection.send_result(msg["id"], _group_energy(hass, "area"))
 
 
 @websocket_api.websocket_command(

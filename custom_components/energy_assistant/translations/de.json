@@ -160,6 +160,30 @@
       },
       "label_cost_year": {
         "name": "{label} Kosten jährlich"
+      },
+      "area_energy_day": {
+        "name": "{area} Verbrauch täglich"
+      },
+      "area_energy_week": {
+        "name": "{area} Verbrauch wöchentlich"
+      },
+      "area_energy_month": {
+        "name": "{area} Verbrauch monatlich"
+      },
+      "area_energy_year": {
+        "name": "{area} Verbrauch jährlich"
+      },
+      "area_cost_day": {
+        "name": "{area} Kosten täglich"
+      },
+      "area_cost_week": {
+        "name": "{area} Kosten wöchentlich"
+      },
+      "area_cost_month": {
+        "name": "{area} Kosten monatlich"
+      },
+      "area_cost_year": {
+        "name": "{area} Kosten jährlich"
       }
     }
   }

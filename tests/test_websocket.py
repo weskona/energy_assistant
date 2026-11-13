@@ -505,3 +505,45 @@ async def test_update_config_stores_the_tariff_per_label(
     assert msg["success"]
     assert msg["result"]["label_tariffs"] == {"waermepumpe": "sensor.wp_preis"}
     assert entry.options["label_tariffs"] == {"waermepumpe": "sensor.wp_preis"}
+
+
+async def test_area_energy_lists_the_sensors_of_the_selected_areas(
+    hass, hass_ws_client, entry
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.energy_assistant.sensor import COST, PERIODS, unique_id
+
+    hass.config_entries.async_update_entry(entry, options={"area_ids": ["wohnzimmer"]})
+    registry = er.async_get(hass)
+    for period in PERIODS[:2]:
+        registry.async_get_or_create(
+            "sensor", DOMAIN, unique_id(entry.entry_id, "wohnzimmer", period, "area")
+        )
+    registry.async_get_or_create(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "wohnzimmer", COST + "day", "area")
+    )
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "energy_assistant/area_energy"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert set(msg["result"]["wohnzimmer"]) == {"day", "week", "cost_day"}
+    # the labels command does not see them
+    await client.send_json_auto_id({"type": "energy_assistant/label_energy"})
+    assert (await client.receive_json())["result"] == {}
+
+
+async def test_update_config_stores_the_tariff_per_area(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"area_tariffs": {"keller": "sensor.wp_preis"}},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["area_tariffs"] == {"keller": "sensor.wp_preis"}
+    assert entry.options["area_tariffs"] == {"keller": "sensor.wp_preis"}

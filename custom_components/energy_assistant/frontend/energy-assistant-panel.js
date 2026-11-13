@@ -244,6 +244,13 @@ const STRINGS = {
     uTopTitle: "Biggest consumers",
     uLabelsTitle: "Labels",
     costsPeriod: "Costs in the period",
+    uAreasTitle: "Areas",
+    uAreasHint: "Energy of the sensors in the area in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per selected area for dashboards and automations, they count from the moment they were created.",
+    areaCostTitle: "Cost per area",
+    h_label_sensors: "Every selected label gets four consumption sensors (day, week, month, year) and, with Tariffy, four cost sensors. Nothing is selected at first, so no sensors are created: select only the labels you need.",
+    h_area_sensors: "Every selected area gets four consumption sensors (day, week, month, year) and, with Tariffy, four cost sensors. Nothing is selected at first, so no sensors are created; with no selection the Areas card on the Power tab shows all areas, but no sensors exist.",
+    f_area_tariffs: "Tariff per area (for the cost sensors)",
+    h_area_tariffs: "Which Tariffy electricity contract prices the cost of an area. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     labelCostTitle: "Cost per label",
     labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created. This table always shows the running day, week, month and year, whatever period is chosen above.",
     uLabelsHint: "Energy of the sensors that carry the label in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per label for dashboards and automations, they count from the moment they were created.",
@@ -535,6 +542,13 @@ const STRINGS = {
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
     costsPeriod: "Kosten im Zeitraum",
+    uAreasTitle: "Bereiche",
+    uAreasHint: "Verbrauch der Sensoren im Bereich im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro ausgewähltem Bereich für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
+    areaCostTitle: "Kosten pro Bereich",
+    h_label_sensors: "Jedes ausgewählte Label bekommt vier Verbrauchssensoren (Tag, Woche, Monat, Jahr) und mit Tariffy vier Kostensensoren. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle nur die Labels, die du brauchst.",
+    h_area_sensors: "Jeder ausgewählte Bereich bekommt vier Verbrauchssensoren (Tag, Woche, Monat, Jahr) und mit Tariffy vier Kostensensoren. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt; ohne Auswahl zeigt die Bereichskarte im Leistung-Tab alle Bereiche, es entstehen aber keine Sensoren.",
+    f_area_tariffs: "Tarif pro Bereich (für die Kostensensoren)",
+    h_area_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Bereichs bewertet. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     labelCostTitle: "Kosten pro Label",
     labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen. Diese Tabelle zeigt immer den laufenden Tag, die laufende Woche, den laufenden Monat und das laufende Jahr, egal welcher Zeitraum oben gewählt ist.",
     uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro Label für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
@@ -823,8 +837,8 @@ const SETTINGS_SECTIONS = [
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
-  { title: "sectionAreas", fields: [["area_ids", "areas"]] },
-  { title: "sectionLabels", fields: [["label_ids", "labels"], ["label_tariffs", "labeltariffs"]] },
+  { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
+  { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
 ];
 const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
@@ -914,7 +928,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._render();
       this._maybeLoadHistory();
       this._loadLabels();
-      this._loadLabelEnergy();
+      this._loadGroupEnergy();
       this._loadPv();
       this._loadIntegrations();
       this._loadEnergyOffer();
@@ -1043,7 +1057,7 @@ class EnergyAssistantPanel extends HTMLElement {
       case "usage": return this._renderConsumption();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
-      case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderLabelCosts(), this._renderContract());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderGroupCosts("area"), this._renderGroupCosts("label"), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
@@ -1418,25 +1432,27 @@ class EnergyAssistantPanel extends HTMLElement {
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div></div>`; // the hint sits below the list so both lists start at the same height
-    // 4) energy per selected label, from the sensors Energy Assistant creates for them
-    const labelsCard = this._renderLabelEnergy({ range, off, num });
+    // 4) energy per selected area and label, from the long-term statistics of their sensors
+    const areasCard = this._renderGroupEnergy("area", { range, off, num });
+    const labelsCard = this._renderGroupEnergy("label", { range, off, num });
+    const groups = areasCard && labelsCard ? `<div class="pair">${areasCard}${labelsCard}</div>` : areasCard || labelsCard;
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
-    return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}`);
+    return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${groups}${note}`);
   }
 
   /**
-   * Card with the energy (kWh) of every selected label for the shown period, from its energy sensor.
-   * The sensors only count the running period, so another one shows a hint. Empty without selected labels.
+   * Card with the energy (kWh) of every selected label or area for the shown period, from the long-term
+   * statistics of its sensors (see _loadGroupUsage). Empty without a selection.
    */
-  _renderLabelEnergy({ range, off, num }) {
-    const selected = this._cfg.label_ids || [];
+  _renderGroupEnergy(kind, { range, off, num }) {
+    const selected = this._cfg[`${kind}_ids`] || [];
     if (!selected.length) return "";
-    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
-    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span>${this._labelUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
-    const u = this._labelUsage;
-    if (!u || u.key !== this._labelUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
+    const nameOf = (id) => this._groupName(kind, id);
+    const title = `<div class="row"><span class="eb-title">${esc(this._t(kind === "area" ? "uAreasTitle" : "uLabelsTitle"))}</span>${this._groupUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
+    const u = this._groupUsage;
+    if (!u || u.key !== this._groupUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
     const rows = selected
-      .map((id) => ({ id, name: names[id] || id, ...(u.rows?.[id] || { kwh: 0, covered: 0, total: 0 }) }))
+      .map((id) => ({ id, name: nameOf(id), ...(u.rows?.[`${kind}:${id}`] || { kwh: 0, covered: 0, total: 0 }) }))
       .filter((r) => r.covered > 0)
       .sort((a, b) => b.kwh - a.kwh);
     const max = Math.max(0, ...rows.map((r) => r.kwh));
@@ -1448,48 +1464,56 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t(kind === "area" ? "uAreasHint" : "uLabelsHint"))}</div></div>`;
   }
 
-  /** The selected labels with the power sensors that carry them: {label_id: [entity_id]}. */
-  _labelMemberMap() {
+  /** Display name of a label or an area. */
+  _groupName(kind, id) {
+    if (kind === "area") return this._hass?.areas?.[id]?.name || id;
+    return (this._labelData?.labels || []).find((l) => l.label_id === id)?.name || id;
+  }
+
+  /** The selected labels and areas with the power sensors that belong to them: {"label:id" | "area:id": [entity_id]}. */
+  _groupMemberMap() {
     const out = {};
-    for (const id of this._cfg.label_ids || []) out[id] = this._labelMembers(id);
+    for (const id of this._cfg.label_ids || []) out[`label:${id}`] = this._labelMembers(id);
+    for (const id of this._cfg.area_ids || []) out[`area:${id}`] = this._areaMembers(id);
     return out;
   }
 
-  _labelUsageKey(range, off) {
-    return `${range}:${off}:${Object.entries(this._labelMemberMap()).map(([l, m]) => `${l}=${m.join(",")}`).join(";")}`;
+  _groupUsageKey(range, off) {
+    return `${range}:${off}:${Object.entries(this._groupMemberMap()).map(([g, m]) => `${g}=${m.join(",")}`).join(";")}`;
   }
 
-  _maybeLoadLabelUsage() {
-    if (!this._ready || this._labelUsageLoading || !this._labelData || !(this._cfg.label_ids || []).length) return;
+  _maybeLoadGroupUsage() {
+    const labels = (this._cfg.label_ids || []).length, areas = (this._cfg.area_ids || []).length;
+    if (!this._ready || this._groupUsageLoading || (!labels && !areas) || (labels && !this._labelData)) return;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    const v = this._labelUsage;
-    if (!v || v.key !== this._labelUsageKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadLabelUsage();
+    const v = this._groupUsage;
+    if (!v || v.key !== this._groupUsageKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadGroupUsage();
   }
 
-  /** Energy per label for the shown period: the statistics of the sensors that carry it, summed up. */
-  async _loadLabelUsage() {
-    if (!this._hass || this._labelUsageLoading) return;
-    this._labelUsageLoading = true;
+  /** Energy per label and area for the shown period: the statistics of their sensors, summed up (one request). */
+  async _loadGroupUsage() {
+    if (!this._hass || this._groupUsageLoading) return;
+    this._groupUsageLoading = true;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    const key = this._labelUsageKey(range, off);
+    const key = this._groupUsageKey(range, off);
     try {
-      const map = this._labelMemberMap();
+      const map = this._groupMemberMap();
       const ids = [...new Set(Object.values(map).flat())];
       const kwh = await this._statsKwh(ids, this._balWindow(range, off), range);
-      this._labelUsage = kwh == null
+      this._groupUsage = kwh == null
         ? { key, rows: null, failed: true, at: Date.now() }
         : {
           key, at: Date.now(),
-          rows: Object.fromEntries(Object.entries(map).map(([label, members]) => {
+          rows: Object.fromEntries(Object.entries(map).map(([group, members]) => {
             const have = members.filter((m) => kwh.has(m));
-            return [label, { kwh: have.reduce((a, m) => a + kwh.get(m), 0), covered: have.length, total: members.length }];
+            return [group, { kwh: have.reduce((a, m) => a + kwh.get(m), 0), covered: have.length, total: members.length }];
           })),
         };
     } finally {
-      this._labelUsageLoading = false;
+      this._groupUsageLoading = false;
       this._render();
     }
   }
@@ -2180,21 +2204,21 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * Cost per selected label for today, this week, this month and this year, from the cost sensors that
+   * Cost per selected label or area for today, this week, this month and this year, from the cost sensors that
    * Energy Assistant creates (priced step by step, so a tariff change never recalculates the past).
-   * Labels without cost sensors are left out; empty when there are none.
+   * Entries without cost sensors are left out; empty when there are none.
    */
-  _renderLabelCosts() {
-    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+  _renderGroupCosts(kind) {
     const periods = [["day", "bDay"], ["week", "bWeek"], ["month", "bMonth"], ["year", "bYear"]];
-    const rows = (this._cfg.label_ids || [])
+    const sensors = kind === "area" ? this._areaEnergy : this._labelEnergy;
+    const rows = (this._cfg[`${kind}_ids`] || [])
       .map((id) => {
         const cells = periods.map(([p]) => {
-          const state = this._hass?.states?.[this._labelEnergy?.[id]?.[`cost_${p}`]];
+          const state = this._hass?.states?.[sensors?.[id]?.[`cost_${p}`]];
           const v = state ? parseFloat(state.state) : NaN;
           return Number.isFinite(v) ? this._money(v, state.attributes?.unit_of_measurement || "EUR").join(" ") : "–";
         });
-        return { id, name: names[id] || id, cells, any: cells.some((c) => c !== "–") };
+        return { id, name: this._groupName(kind, id), cells, any: cells.some((c) => c !== "–") };
       })
       .filter((r) => r.any);
     if (!rows.length) return "";
@@ -2202,7 +2226,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const body = rows
       .map((r) => `<div class="lc"><span class="nm" title="${esc(r.name)}">${esc(r.name)}</span>${r.cells.map((c) => `<span class="n">${esc(c)}</span>`).join("")}</div>`)
       .join("");
-    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t(kind === "area" ? "areaCostTitle" : "labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
   }
 
   /** Contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end. */
@@ -2253,16 +2277,22 @@ class EnergyAssistantPanel extends HTMLElement {
     return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : typeof v === "number" ? this._draft[k] === v : same(v, this._draftList(k))));
   }
 
-  /** The energy sensors (day, week, month, year) of the selected labels: {label_id: {period: entity_id}}. */
-  async _loadLabelEnergy() {
+  /** The energy and cost sensors of the selected labels and areas: {id: {period: entity_id}} for each. */
+  async _loadGroupEnergy() {
     if (!this._hass) return;
-    try {
-      const res = await this._hass.callWS({ type: "energy_assistant/label_energy" });
-      this._labelEnergy = res && typeof res === "object" ? res : {};
-    } catch (e) {
-      console.warn("Energy Assistant: could not load the label sensors", e);
-      this._labelEnergy = this._labelEnergy || {};
-    }
+    const ask = async (type, current) => {
+      try {
+        const res = await this._hass.callWS({ type });
+        return res && typeof res === "object" ? res : {};
+      } catch (e) {
+        console.warn("Energy Assistant: could not load the sensors of the labels and areas", e);
+        return current || {};
+      }
+    };
+    [this._labelEnergy, this._areaEnergy] = await Promise.all([
+      ask("energy_assistant/label_energy", this._labelEnergy),
+      ask("energy_assistant/area_energy", this._areaEnergy),
+    ]);
     this._render();
   }
 
@@ -2292,6 +2322,7 @@ class EnergyAssistantPanel extends HTMLElement {
     for (const k of NUMBER_KEYS) out[k] = typeof cfg[k] === "number" && Number.isFinite(cfg[k]) ? cfg[k] : null;
     out.device_names = { ...(cfg.device_names || {}) };
     out.label_tariffs = { ...(cfg.label_tariffs || {}) };
+    out.area_tariffs = { ...(cfg.area_tariffs || {}) };
     return out;
   }
 
@@ -2359,8 +2390,8 @@ class EnergyAssistantPanel extends HTMLElement {
       this._error = "";
       this._maybeLoadHistory();
       // A newly selected label gets its sensors now; they show up a moment later.
-      this._loadLabelEnergy();
-      setTimeout(() => this._loadLabelEnergy(), 2000);
+      this._loadGroupEnergy();
+      setTimeout(() => this._loadGroupEnergy(), 2000);
     } catch (e) {
       this._status = "error";
       this._error = e?.code === "no_source" ? this._t("noSource") : e?.message || String(e);
@@ -2509,12 +2540,13 @@ class EnergyAssistantPanel extends HTMLElement {
       const rest = this._draft.area_ids.filter((x) => x !== id);
       this._draft.area_ids = t.checked ? [...rest, id] : rest;
       this._edited();
-    } else if (t.dataset?.labeltariff) {
-      const id = t.dataset.labeltariff;
-      const next = { ...(this._draft.label_tariffs || {}) };
+    } else if (t.dataset?.labeltariff || t.dataset?.areatariff) {
+      const kind = t.dataset.areatariff ? "area" : "label";
+      const id = t.dataset[`${kind}tariff`];
+      const next = { ...(this._draft[`${kind}_tariffs`] || {}) };
       if (t.value) next[id] = t.value;
       else delete next[id];
-      this._draft.label_tariffs = next;
+      this._draft[`${kind}_tariffs`] = next;
       this._edited();
     } else if (t.dataset?.label) {
       const id = t.dataset.label;
@@ -2728,26 +2760,26 @@ class EnergyAssistantPanel extends HTMLElement {
   _renderLabelPicker(ro) { return this._renderPicker("label", ro); }
 
   /**
-   * Tariff per selected label (Tariffy): which electricity contract prices the cost sensors of the label,
-   * e.g. the heat pump tariff for the heat pump label. Only offered when Tariffy has more than one electricity
-   * contract; the first contract is the default.
+   * Tariff per selected label or area (Tariffy): which electricity contract prices the cost sensors, e.g. the
+   * heat pump tariff for the heat pump label. Only offered when Tariffy has more than one electricity contract;
+   * the first contract is the default.
    */
-  _renderLabelTariffs(ro) {
+  _renderGroupTariffs(kind, ro) {
     const prices = this._int?.tariffy?.prices;
-    const selected = this._draft.label_ids || [];
+    const selected = this._draft[`${kind}_ids`] || [];
     if (!Array.isArray(prices) || prices.length < 2 || !selected.length) return "";
-    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
-    const chosen = this._draft.label_tariffs || {};
+    const chosen = this._draft[`${kind}_tariffs`] || {};
     const rows = selected
       .map((id) => {
+        const name = this._groupName(kind, id);
         const options = [
           `<option value="">${esc(this._t("tariffDefault", { name: prices[0].name }))}</option>`,
           ...prices.map((p) => `<option value="${esc(p.entity)}"${chosen[id] === p.entity ? " selected" : ""}>${esc(p.name)}</option>`),
         ].join("");
-        return `<div class="trow"><span class="tn" title="${esc(names[id] || id)}">${esc(names[id] || id)}</span><select data-labeltariff="${esc(id)}" ${ro ? "disabled" : ""}>${options}</select></div>`;
+        return `<div class="trow"><span class="tn" title="${esc(name)}">${esc(name)}</span><select data-${kind}tariff="${esc(id)}" ${ro ? "disabled" : ""}>${options}</select></div>`;
       })
       .join("");
-    return `<div class="fld span"><label>${esc(this._t("f_label_tariffs"))}</label>${rows}<div class="hint">${esc(this._t("h_label_tariffs"))}</div></div>`;
+    return `<div class="fld span"><label>${esc(this._t(`f_${kind}_tariffs`))}</label>${rows}<div class="hint">${esc(this._t(`h_${kind}_tariffs`))}</div></div>`;
   }
 
   _renderMatches(ro) {
@@ -2778,7 +2810,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const field = ([key, kind]) => {
       if (kind === "energyoffer") return this._renderEnergyOffer(ro);
       if (kind === "note") return `<div class="fld span note">${esc(this._t(key))}</div>`;
-      if (kind === "labeltariffs") return this._renderLabelTariffs(ro);
+      if (kind === "labeltariffs") return this._renderGroupTariffs("label", ro);
+      if (kind === "areatariffs") return this._renderGroupTariffs("area", ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
         const v = this._draft[key];
@@ -3665,7 +3698,7 @@ class EnergyAssistantPanel extends HTMLElement {
           this._settingsDirty = true;
           this._render();
           this._loadLabels();
-          this._loadLabelEnergy();
+          this._loadGroupEnergy();
         }
       });
       this._built = true;
@@ -3709,7 +3742,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if ((this._tab === "usage" || (this._tab === "costs" && this._int?.tariffy)) && this._balEnabled()) this._maybeLoadBalance();
     if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
-    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadLabelUsage();
+    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadGroupUsage();
     if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {

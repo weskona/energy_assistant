@@ -2841,15 +2841,15 @@ function labelEnergyPanel(range = "day", off = 0) {
 }
 
 function withLabelUsage(p, rows, range = "day", off = 0) {
-  p._labelUsage = { key: p._labelUsageKey(range, off), at: Date.now(), rows };
+  p._groupUsage = { key: p._groupUsageKey(range, off), at: Date.now(), rows };
   return p;
 }
 
 test("usage: the labels card shows the kWh of every selected label for the shown period, biggest first", () => {
   const p = withLabelUsage(labelEnergyPanel(), {
-    klima: { kwh: 1.25, covered: 1, total: 2 },
-    licht: { kwh: 4.5, covered: 3, total: 3 },
-    kaputt: { kwh: 0, covered: 0, total: 2 },
+    "label:klima": { kwh: 1.25, covered: 1, total: 2 },
+    "label:licht": { kwh: 4.5, covered: 3, total: 3 },
+    "label:kaputt": { kwh: 0, covered: 0, total: 2 },
   });
   const html = p._renderUsage();
   const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
@@ -2863,7 +2863,7 @@ test("usage: the labels card shows the kWh of every selected label for the shown
 });
 
 test("usage: the labels card waits for the data of the shown period", () => {
-  const p = withLabelUsage(labelEnergyPanel(), { licht: { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
+  const p = withLabelUsage(labelEnergyPanel(), { "label:licht": { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
   p._usRange = "week"; // another period than the data
   p._usageView = { range: "week", off: 0, devices: p._usage.devices, houseBase: 150 };
   const html = p._renderUsage();
@@ -2895,13 +2895,13 @@ test("label usage: today is the finished hours plus the running hour from the 5-
     },
     "5minute": { "sensor.klimaanlage_leistung": [minRow("2026-11-13T14:00:00Z", 1200), minRow("2026-11-13T14:05:00Z", 1200)] }, // 0.2 kWh
   });
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["hour", "5minute"]);
   assert.equal(calls[0].from, "2026-11-12T23:00:00.000Z"); // midnight of Berlin
   assert.equal(calls[0].to, "2026-11-13T14:00:00.000Z"); // up to the running hour
   assert.equal(calls[1].from, "2026-11-13T14:00:00.000Z");
   assert.equal(calls[1].to, "2026-11-13T14:20:00.000Z");
-  const klima = p._labelUsage.rows.klima;
+  const klima = p._groupUsage.rows["label:klima"];
   assert.ok(Math.abs(klima.kwh - (1.5 + 0.1 + 0.2)) < 1e-9);
   assert.equal(klima.covered, 2); // two of the three sensors of the label have statistics
   assert.equal(klima.total, 3);
@@ -2913,30 +2913,30 @@ test("label usage: a month uses daily statistics, today's hours and the running 
     day: { "sensor.klimaanlage_leistung": [{ start: Date.parse("2026-10-31T23:00:00Z"), end: Date.parse("2026-11-01T23:00:00Z"), mean: 240 }] }, // 5.76 kWh
   });
   p._usRange = "month";
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["day", "hour", "5minute"]);
   assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z"); // the day statistics end at the start of today
   assert.equal(calls[1].from, "2026-11-12T23:00:00.000Z"); // today by the hour
-  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 5.76) < 1e-9);
+  assert.ok(Math.abs(p._groupUsage.rows["label:klima"].kwh - 5.76) < 1e-9);
 });
 
 test("label usage: a past period needs the finished statistics only", async () => {
   const calls = [];
   const p = statsPanel(calls, { hour: { "sensor.klimaanlage_leistung": [hourRow("2026-11-12T10:00:00Z", 2000)] } });
   p._usOff = -1;
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["hour"]);
   assert.equal(calls[0].from, "2026-11-11T23:00:00.000Z");
   assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z");
-  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 2) < 1e-9);
+  assert.ok(Math.abs(p._groupUsage.rows["label:klima"].kwh - 2) < 1e-9);
 });
 
 test("label usage: a failed request says so instead of showing zeros", async () => {
   const p = statsPanel([], {});
   p._hass.callWS = async () => { throw new Error("no recorder"); };
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
-  assert.equal(p._labelUsage.failed, true);
-  assert.match(p._renderLabelEnergy({ range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
+  assert.equal(p._groupUsage.failed, true);
+  assert.match(p._renderGroupEnergy("label", { range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
 });
 
 test("usage: the labels card shows kWh only, the cost belongs to the Costs tab", () => {
@@ -2963,7 +2963,7 @@ function labelCostPanel() {
 }
 
 test("costs: every selected label with its cost sensors shows today, week, month and year", () => {
-  const html = labelCostPanel()._renderLabelCosts();
+  const html = labelCostPanel()._renderGroupCosts("label");
   assert.match(html, /Cost per label/);
   assert.match(html, /Day<\/span><span class="n">Week<\/span><span class="n">Month<\/span><span class="n">Year/);
   assert.match(html, /Klima[\s\S]*0[.,]40[^<]*€[\s\S]*2[.,]10[^<]*€[\s\S]*8[.,]00[^<]*€[\s\S]*95[.,]50[^<]*€/);
@@ -2973,9 +2973,9 @@ test("costs: every selected label with its cost sensors shows today, week, month
 
 test("costs: no card without cost sensors", () => {
   const p = labelCostPanel();
-  assert.match(p._renderLabelCosts(), /Cost per label/);
+  assert.match(p._renderGroupCosts("label"), /Cost per label/);
   p._labelEnergy = {};
-  assert.equal(p._renderLabelCosts(), "");
+  assert.equal(p._renderGroupCosts("label"), "");
 });
 
 test("usage: without selected labels there is no labels card", () => {
@@ -3730,7 +3730,7 @@ function tariffPanel(extra = {}) {
 
 test("settings: a tariff can be chosen per selected label when Tariffy has several contracts", () => {
   const p = tariffPanel({ label_tariffs: { wp: "sensor.wp" } });
-  const html = p._renderLabelTariffs(false);
+  const html = p._renderGroupTariffs("label", false);
   assert.match(html, /Tariff per label/);
   assert.match(html, /Wärmepumpe[\s\S]*<option value="sensor\.wp" selected>/);
   assert.match(html, /Default \(Haushalt\)/);
@@ -3740,10 +3740,10 @@ test("settings: a tariff can be chosen per selected label when Tariffy has sever
 test("settings: no tariff choice with a single contract or without selected labels", () => {
   const p = tariffPanel();
   p._int.tariffy.prices = [{ entity: "sensor.haus", name: "Haushalt" }];
-  assert.equal(p._renderLabelTariffs(false), "");
+  assert.equal(p._renderGroupTariffs("label", false), "");
   const q = tariffPanel();
   q._draft.label_ids = [];
-  assert.equal(q._renderLabelTariffs(false), "");
+  assert.equal(q._renderGroupTariffs("label", false), "");
 });
 
 test("settings: choosing a tariff changes the draft and the default removes it again", () => {
@@ -3899,4 +3899,98 @@ test("settings: a click on the header of the matches opens the list and redraws 
   assert.equal(p._open.has("settings:matches"), false);
   assert.equal(p._settingsDirty, true);
   assert.doesNotMatch(p._renderSettings(), /data-device="sensor\.herd_leistung"/);
+});
+
+// --- consumption and cost per area (like per label) ---------------------------------------------------
+function areaGroupPanel(config = {}) {
+  const p = areaPanel({ device_patterns: ["*_leistung"], area_ids: ["kueche", "wohnzimmer"], label_ids: ["klima"], ...config });
+  p._hass.language = "en";
+  p._hass.config = { time_zone: "Europe/Berlin" };
+  p._ready = true;
+  p._render = () => {};
+  p._labelData = { labels: [{ label_id: "klima", name: "Klima" }], entities: { "sensor.media_leistung": ["klima"] } };
+  return p;
+}
+
+test("area usage: labels and areas share one request, the sensors of an area come from the registry", () => {
+  const p = areaGroupPanel();
+  const map = p._groupMemberMap();
+  assert.deepEqual(Object.keys(map).sort(), ["area:kueche", "area:wohnzimmer", "label:klima"]);
+  assert.deepEqual(map["area:kueche"], ["sensor.herd_leistung", "sensor.kuehl_leistung"]);
+  assert.deepEqual(map["area:wohnzimmer"], ["sensor.media_leistung"]);
+  assert.deepEqual(map["label:klima"], ["sensor.media_leistung"]); // one sensor can be in a label and an area
+});
+
+test("area usage: the energy of an area is summed up from the statistics of its sensors", async () => {
+  const calls = [];
+  const p = areaGroupPanel();
+  p._hass.callWS = async (m) => {
+    calls.push(m);
+    return m.period === "hour"
+      ? { "sensor.herd_leistung": [hourRow("2026-11-13T00:00:00Z", 1000)], "sensor.kuehl_leistung": [hourRow("2026-11-13T00:00:00Z", 500)], "sensor.media_leistung": [hourRow("2026-11-13T00:00:00Z", 100)] }
+      : {};
+  };
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
+  assert.equal(calls.filter((c) => c.period === "hour").length, 1); // the same sensors are asked for once
+  assert.equal(new Set(calls[0].statistic_ids).size, 3);
+  const rows = p._groupUsage.rows;
+  assert.ok(Math.abs(rows["area:kueche"].kwh - 1.5) < 1e-9);
+  assert.ok(Math.abs(rows["area:wohnzimmer"].kwh - 0.1) < 1e-9);
+  assert.ok(Math.abs(rows["label:klima"].kwh - 0.1) < 1e-9);
+});
+
+test("area usage: the Areas card names the areas and sits next to the Labels card", () => {
+  const p = areaGroupPanel();
+  p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: {
+    "area:kueche": { kwh: 1.5, covered: 2, total: 2 },
+    "area:wohnzimmer": { kwh: 0.1, covered: 1, total: 1 },
+    "label:klima": { kwh: 0.1, covered: 1, total: 1 },
+  } };
+  const num = (v) => v.toFixed(2);
+  const html = p._renderGroupEnergy("area", { range: "day", off: 0, num });
+  assert.match(html, /<span class="eb-title">Areas<\/span>/);
+  assert.ok(html.indexOf("Küche") < html.indexOf("Wohnzimmer")); // biggest first
+  assert.match(html, /Küche[\s\S]*1\.50<small>kWh/);
+  assert.match(html, /selected area|selected area for dashboards|per selected area/);
+  assert.equal(p._renderGroupEnergy("area", { range: "day", off: 0, num }).includes("Klima"), false);
+  const none = areaGroupPanel({ area_ids: [] }); // no selection: no card and nothing to load
+  assert.equal(none._renderGroupEnergy("area", { range: "day", off: 0, num }), "");
+});
+
+test("area cost: the Costs tab lists the cost sensors of the selected areas", () => {
+  const p = areaGroupPanel();
+  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.k_week"] = { state: "3.40", attributes: { unit_of_measurement: "EUR" } };
+  p._areaEnergy = { kueche: { cost_day: "sensor.k_day", cost_week: "sensor.k_week" } };
+  const html = p._renderGroupCosts("area");
+  assert.match(html, /Cost per area/);
+  assert.match(html, /Küche[\s\S]*0[.,]62[^<]*€[\s\S]*3[.,]40[^<]*€/);
+  assert.doesNotMatch(html, /Wohnzimmer/); // no cost sensor
+  assert.equal(p._renderGroupCosts("label"), ""); // labels have their own table and sensors
+});
+
+test("area tariff: a contract can be chosen per selected area, also in the draft", () => {
+  const p = areaGroupPanel();
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
+  p._draft = p._normalize({ house_power: "h", area_ids: ["kueche"], area_tariffs: { kueche: "sensor.wp" } });
+  const html = p._renderGroupTariffs("area", false);
+  assert.match(html, /Tariff per area/);
+  assert.match(html, /Küche[\s\S]*<option value="sensor\.wp" selected>/);
+  assert.equal((html.match(/data-areatariff=/g) || []).length, 1);
+  p._hass.user = { is_admin: true };
+  p._edited = () => {};
+  p._onChange({ target: { dataset: { areatariff: "kueche" }, value: "sensor.haus" } });
+  assert.deepEqual(p._draft.area_tariffs, { kueche: "sensor.haus" });
+  assert.deepEqual(p._draft.label_tariffs, {}); // the labels are not touched
+  p._onChange({ target: { dataset: { areatariff: "kueche" }, value: "" } });
+  assert.deepEqual(p._draft.area_tariffs, {});
+});
+
+test("settings: labels and areas say that nothing is selected at first and what a selection creates", () => {
+  const p = areaGroupPanel();
+  p._draft = p._normalize({ house_power: "h" });
+  p._labelData = { labels: [], entities: {} };
+  const html = p._renderSettings();
+  assert.match(html, /Nothing is selected at first, so no sensors are created: select only the labels you need/);
+  assert.match(html, /Nothing is selected at first, so no sensors are created; with no selection the Areas card/);
 });

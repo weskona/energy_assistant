@@ -160,6 +160,30 @@
       },
       "label_cost_year": {
         "name": "{label} cost this year"
+      },
+      "area_energy_day": {
+        "name": "{area} energy today"
+      },
+      "area_energy_week": {
+        "name": "{area} energy this week"
+      },
+      "area_energy_month": {
+        "name": "{area} energy this month"
+      },
+      "area_energy_year": {
+        "name": "{area} energy this year"
+      },
+      "area_cost_day": {
+        "name": "{area} cost today"
+      },
+      "area_cost_week": {
+        "name": "{area} cost this week"
+      },
+      "area_cost_month": {
+        "name": "{area} cost this month"
+      },
+      "area_cost_year": {
+        "name": "{area} cost this year"
       }
     }
   }
