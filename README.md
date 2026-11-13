@@ -153,6 +153,8 @@ The **Consumption** tab appears as soon as devices are set up (single sensors or
 
 Devices that are unavailable now still count with their history; the wallbox row of EV Assistant has no history of its own and is not part of it.
 
+**Period picker:** like in the Balance tab, **Day, Week, Month and Year** with arrows. *Day / today* is read from the history in 5-minute steps (as described above). Every other period comes from the long-term statistics of Home Assistant (the power sensors need the state class `measurement`): the energy of a device is its hourly means (daily means for a month or a year) times their duration, and the base load is the lowest hourly mean of the house and of every device in the period (at most the last 31 days of it). Without a house power sensor the house power is the balance of the separate sensors per hour, like the live value.
+
 ### Energy counters and the Balance tab
 
 For the **Balance** tab enter your energy counters in the Settings tab (section *Energy counters (kWh)*): PV production, grid import, grid export, to storage, from storage and, if you have one, the house consumption. These are cumulative kWh counters or utility meters; several counters per field are summed. If the **Energy dashboard** of Home Assistant is set up, a notice offers its counters with one button (read only, nothing is changed in the dashboard); save as usual.
