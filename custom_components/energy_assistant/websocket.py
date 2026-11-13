@@ -29,6 +29,7 @@ from .const import (
 from .energy_prefs import async_energy_suggestion
 from .providers import available
 from .pv_assistant import suggestion
+from .sensor import COST, PERIODS, unique_id
 from .settings import has_source, normalize, to_storage
 
 _CONFIG_SCHEMA = vol.Schema(
@@ -70,6 +71,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_pv_suggestion)
     websocket_api.async_register_command(hass, ws_integrations)
     websocket_api.async_register_command(hass, ws_energy_suggestion)
+    websocket_api.async_register_command(hass, ws_label_energy)
 
 
 def _entry(hass: HomeAssistant):
@@ -120,6 +122,38 @@ def ws_labels(
         if ids:
             entities[entry.entity_id] = sorted(ids)
     connection.send_result(msg["id"], {"labels": labels, "entities": entities})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "energy_assistant/label_energy"}
+)
+@callback
+def ws_label_energy(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy and cost sensors of the selected labels: day, week, month, year, cost_day, ...
+
+    Only entity ids: the panel reads the values from the states.
+    """
+    registry = er.async_get(hass)
+    result: dict[str, dict[str, str]] = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        for label_id in normalize({**entry.data, **entry.options})["label_ids"]:
+            sensors = {
+                f"{prefix}{period}": entity_id
+                for prefix in ("", COST)
+                for period in PERIODS
+                if (
+                    entity_id := registry.async_get_entity_id(
+                        "sensor",
+                        DOMAIN,
+                        unique_id(entry.entry_id, label_id, prefix + period),
+                    )
+                )
+            }
+            if sensors:
+                result[label_id] = sensors
+    connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command(

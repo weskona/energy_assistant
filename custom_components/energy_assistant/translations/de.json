@@ -134,5 +134,33 @@
       "no_source": "Bitte Netzbezug, Netz kombiniert oder Hausverbrauch angeben.",
       "invalid_pattern": "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?."
     }
+  },
+  "entity": {
+    "sensor": {
+      "label_energy_day": {
+        "name": "{label} Verbrauch heute"
+      },
+      "label_energy_week": {
+        "name": "{label} Verbrauch diese Woche"
+      },
+      "label_energy_month": {
+        "name": "{label} Verbrauch diesen Monat"
+      },
+      "label_energy_year": {
+        "name": "{label} Verbrauch dieses Jahr"
+      },
+      "label_cost_day": {
+        "name": "{label} Kosten heute"
+      },
+      "label_cost_week": {
+        "name": "{label} Kosten diese Woche"
+      },
+      "label_cost_month": {
+        "name": "{label} Kosten diesen Monat"
+      },
+      "label_cost_year": {
+        "name": "{label} Kosten dieses Jahr"
+      }
+    }
   }
 }

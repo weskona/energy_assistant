@@ -66,6 +66,11 @@ const STYLE = `
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
 .alert.info{border-color:var(--eb-green);background:rgba(52,211,153,.12)}
 .alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
+.lc{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(4,minmax(0,1fr));gap:8px;align-items:baseline;padding:9px 0;border-top:1px solid var(--eb-line);font-size:14px}
+.lc.head{border-top:0;padding-bottom:2px;color:var(--eb-muted);font-size:12px;margin-top:10px}
+.lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc .n{text-align:right;font-weight:600;white-space:nowrap}
+.lc.head .n{font-weight:500}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
@@ -217,6 +222,11 @@ const STRINGS = {
     uExplained: "Always-on devices",
     uOfBase: "{pct} % of the base load",
     uTopTitle: "Biggest consumers",
+    uLabelsTitle: "Labels",
+    labelCostTitle: "Cost per label",
+    labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created.",
+    uLabelsHint: "Energy of the sensors that carry the label, summed up since the start of the period. Energy Assistant creates the sensors when a label is selected in the settings; they count from then on.",
+    uLabelsPast: "The label sensors only count the running period. Go back to the current one to see them.",
     uBaseHintStat: "Lowest hourly mean of the house power in the period (at most the last 31 days).",
     uAlwaysHintStat: "Lowest hourly mean of each device in the period (at most the last 31 days), from 2 W on.",
     uNeedStats: "Past periods come from the long-term statistics: the power sensors need the state class measurement.",
@@ -487,6 +497,11 @@ const STRINGS = {
     uExplained: "Dauerläufer unter den Geräten",
     uOfBase: "{pct} % der Grundlast",
     uTopTitle: "Größte Verbraucher",
+    uLabelsTitle: "Labels",
+    labelCostTitle: "Kosten pro Label",
+    labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen.",
+    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
+    uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",
     uNeedStats: "Vergangene Zeiträume kommen aus der Langzeitstatistik: die Leistungssensoren brauchen die State Class measurement.",
@@ -847,6 +862,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._render();
       this._maybeLoadHistory();
       this._loadLabels();
+      this._loadLabelEnergy();
       this._loadPv();
       this._loadIntegrations();
       this._loadEnergyOffer();
@@ -976,7 +992,7 @@ class EnergyAssistantPanel extends HTMLElement {
       case "balance": return this._renderBalance();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
-      case "costs": return stack(this._renderCosts(this._current()), this._renderContract());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderLabelCosts(), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
@@ -1347,10 +1363,43 @@ class EnergyAssistantPanel extends HTMLElement {
       return row("always", d, d.name, v, unit, null, houseBase > 0 ? (d.baseW / houseBase) * 100 : 0, text); // bar = share of the base load
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
-      <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
-      <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}</div>`;
+      <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
+      <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div></div>`; // the hint sits below the list so both lists start at the same height
+    // 4) energy per selected label, from the sensors Energy Assistant creates for them
+    const labelsCard = this._renderLabelEnergy({ range, off, num });
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
-    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${note}</div>`;
+    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}</div>`;
+  }
+
+  /**
+   * Card with the energy (kWh) of every selected label for the shown period, from its energy sensor.
+   * The sensors only count the running period, so another one shows a hint. Empty without selected labels.
+   */
+  _renderLabelEnergy({ range, off, num }) {
+    const selected = this._cfg.label_ids || [];
+    if (!selected.length) return "";
+    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span></div>`;
+    if (off !== 0) {
+      return `<div class="eb-card">${title}<div class="hint">${esc(this._t("uLabelsPast"))}</div></div>`;
+    }
+    const rows = selected
+      .map((id) => {
+        const entityId = this._labelEnergy?.[id]?.[range];
+        const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
+        return { id, name: names[id] || id, kwh: value };
+      })
+      .filter((r) => Number.isFinite(r.kwh))
+      .sort((a, b) => b.kwh - a.kwh);
+    const max = Math.max(0, ...rows.map((r) => r.kwh));
+    const html = rows
+      .map((r) => {
+        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span></span>
+          <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
+          <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
+      })
+      .join("");
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t("uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
   }
 
   /**
@@ -1954,6 +2003,32 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("costsNow"))}</span></div><div class="tiles">${tiles.join("")}</div></div>`;
   }
 
+  /**
+   * Cost per selected label for today, this week, this month and this year, from the cost sensors that
+   * Energy Assistant creates (priced step by step, so a tariff change never recalculates the past).
+   * Labels without cost sensors are left out; empty when there are none.
+   */
+  _renderLabelCosts() {
+    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+    const periods = [["day", "bDay"], ["week", "bWeek"], ["month", "bMonth"], ["year", "bYear"]];
+    const rows = (this._cfg.label_ids || [])
+      .map((id) => {
+        const cells = periods.map(([p]) => {
+          const state = this._hass?.states?.[this._labelEnergy?.[id]?.[`cost_${p}`]];
+          const v = state ? parseFloat(state.state) : NaN;
+          return Number.isFinite(v) ? this._money(v, state.attributes?.unit_of_measurement || "EUR").join(" ") : "–";
+        });
+        return { id, name: names[id] || id, cells, any: cells.some((c) => c !== "–") };
+      })
+      .filter((r) => r.any);
+    if (!rows.length) return "";
+    const head = `<div class="lc head"><span></span>${periods.map(([, k]) => `<span class="n">${esc(this._t(k))}</span>`).join("")}</div>`;
+    const body = rows
+      .map((r) => `<div class="lc"><span class="nm" title="${esc(r.name)}">${esc(r.name)}</span>${r.cells.map((c) => `<span class="n">${esc(c)}</span>`).join("")}</div>`)
+      .join("");
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
+  }
+
   /** Contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end. */
   _renderContract() {
     const t = this._int?.tariffy;
@@ -2000,6 +2075,19 @@ class EnergyAssistantPanel extends HTMLElement {
   _pvApplied() {
     const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
     return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : typeof v === "number" ? this._draft[k] === v : same(v, this._draftList(k))));
+  }
+
+  /** The energy sensors (day, week, month, year) of the selected labels: {label_id: {period: entity_id}}. */
+  async _loadLabelEnergy() {
+    if (!this._hass) return;
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/label_energy" });
+      this._labelEnergy = res && typeof res === "object" ? res : {};
+    } catch (e) {
+      console.warn("Energy Assistant: could not load the label sensors", e);
+      this._labelEnergy = this._labelEnergy || {};
+    }
+    this._render();
   }
 
   /** Labels of Home Assistant and the sensors that carry them (also refreshed on tab change). */
@@ -2093,6 +2181,9 @@ class EnergyAssistantPanel extends HTMLElement {
       this._status = "saved";
       this._error = "";
       this._maybeLoadHistory();
+      // A newly selected label gets its sensors now; they show up a moment later.
+      this._loadLabelEnergy();
+      setTimeout(() => this._loadLabelEnergy(), 2000);
     } catch (e) {
       this._status = "error";
       this._error = e?.code === "no_source" ? this._t("noSource") : e?.message || String(e);
@@ -3360,6 +3451,7 @@ class EnergyAssistantPanel extends HTMLElement {
           this._settingsDirty = true;
           this._render();
           this._loadLabels();
+          this._loadLabelEnergy();
         }
       });
       this._built = true;

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-13
+
+### Added
+
+- **Energy per label:** for every selected label four energy sensors (kWh) are created: today, this week, this month, this year. They integrate the power of the label's sensors, follow the time zone of Home Assistant, survive a restart and are created and removed with the label selection, without a reload. The Consumption tab has a new *Labels* card with the kWh of each label for the selected period (the running period only, the sensors have no history).
+- **Cost per label:** with a Tariffy price, four cost sensors per label (today, week, month, year). The cost is priced step by step with the unit price valid at each moment, so a tariff change never recalculates what was already counted. The Costs tab has a *Cost per label* card with today, week, month and year per label.
+- **Protected counters:** implausible readings (text, NaN, infinity, negative, above 100 kW), pauses longer than 5 minutes, bad prices and bad stored values never reach the label sensors.
+
+### Fixed
+
+- In the Consumption tab the rows of *Biggest consumers* and *Always on (standby)* line up: the hint of the standby card moved below its list, so both lists start at the same height.
+
 ## [0.23.0] - 2026-11-13
 
 ### Fixed
