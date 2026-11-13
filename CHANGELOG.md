@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-13
+
+### Added
+
+- **Storage card** on the Power tab: the charge level as a bar with the minimum level marked, the status (charging, discharging, idle), what is stored and usable (with the capacity) and, from the current power, when the storage is empty or full. New settings in the section *Solar and storage*: charge level sensor, storage capacity (kWh) and minimum charge level (%). PV Assistant offers its charge level sensor, capacity and minimum level with the button of the notice (also in the config flow).
+- **Notices** card at the top of the Power tab, only when something applies: a plant fault of PV Assistant, a negative electricity price of a dynamic tariff in Tariffy, devices that have been running for hours (not those that never stopped) and a base load well above the usual one (needs a house power sensor with three full days of statistics). The device history is now also loaded on the Power tab for this.
+- The settings accept numbers (`battery_capacity`, `battery_min_soc`); empty means not set.
+
+## [0.19.0] - 2026-11-13
+
+### Added
+
+- **Consumption tab** (appears as soon as devices are set up, no extra setting): the **base load** of the house (the lowest 30-minute average of the last 24 hours) extrapolated to kWh per year and, with Tariffy, to the cost per year, with the share the always-on devices explain; the **biggest consumers of today** in kWh with their share and, with Tariffy, the cost; the **always-on devices** (standby, lowest 30-minute average of the last 24 hours from 2 W on) with kWh and cost per year. The energy of a device is its power of the 5-minute steps since midnight, read from the history of Home Assistant.
+
 ## [0.18.0] - 2026-11-13
 
 ### Added

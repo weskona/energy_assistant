@@ -12,9 +12,12 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CHARGE,
     CONF_BATTERY_DISCHARGE,
+    CONF_BATTERY_MIN_SOC,
     CONF_BATTERY_POWER,
+    CONF_BATTERY_SOC,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
@@ -35,7 +38,9 @@ def _ids(value: Any) -> list[str]:
     return []
 
 
-def targets_from(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, bool]]:
+def targets_from(
+    data: dict[str, Any], general: dict[str, Any] | None = None
+) -> tuple[dict[str, Any], dict[str, bool]]:
     """Settings of Energy Assistant from the configuration of PV Assistant, plus notes.
 
     Storage: combined sensors count "+ = from the storage" in both integrations, inverted on request.
@@ -57,6 +62,24 @@ def targets_from(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, bool]]
         targets[CONF_BATTERY_CHARGE] = charge
     if discharge:
         targets[CONF_BATTERY_DISCHARGE] = discharge
+
+    # The charge level sensor, and the capacity and the minimum level from the settings of PV Assistant.
+    if soc := _ids(data.get("battery_soc_sensor")):
+        targets[CONF_BATTERY_SOC] = soc[:1]
+    capacity = (general or {}).get("storage_capacity_kwh")
+    if (
+        isinstance(capacity, (int, float))
+        and not isinstance(capacity, bool)
+        and capacity > 0
+    ):
+        targets[CONF_BATTERY_CAPACITY] = float(capacity)
+        minimum = (general or {}).get("battery_min_soc")
+        if (
+            isinstance(minimum, (int, float))
+            and not isinstance(minimum, bool)
+            and 0 <= minimum <= 100
+        ):
+            targets[CONF_BATTERY_MIN_SOC] = float(minimum)
 
     feed_in = _ids(data.get("feed_in_power_sensor"))
     negative = bool(data.get("invert_feed_in_power")) and bool(feed_in)
@@ -117,10 +140,10 @@ def suggestion(hass: HomeAssistant) -> dict[str, Any] | None:
     if not entries:
         return None
     data = {**entries[0].data, **entries[0].options}
-    targets, notes = targets_from(data)
+    settings = hass.data.get(PV_DOMAIN, {}).get("settings", {})
+    targets, notes = targets_from(data, settings.get("general"))
     if not targets:
         return None
-    settings = hass.data.get(PV_DOMAIN, {}).get("settings", {})
     friendly = {
         state.entity_id: state.attributes.get("friendly_name")
         for state in hass.states.async_all("sensor")

@@ -26,6 +26,14 @@ CONF_BATTERY_POWER = "battery_power"  # storage: discharge positive, charge nega
 CONF_INVERT_GRID = "invert_grid"
 CONF_INVERT_BATTERY = "invert_battery"
 
+# Storage: charge level sensor (%), capacity (kWh) and minimum charge level (%) for the storage card.
+CONF_BATTERY_SOC = "battery_soc"  # one sensor
+CONF_BATTERY_CAPACITY = "battery_capacity"  # kWh
+CONF_BATTERY_MIN_SOC = "battery_min_soc"  # %
+# Numbers (kWh, %): empty means not set. Upper limits for the settings API.
+NUMBER_KEYS = (CONF_BATTERY_CAPACITY, CONF_BATTERY_MIN_SOC)
+NUMBER_MAX = {CONF_BATTERY_CAPACITY: 100000.0, CONF_BATTERY_MIN_SOC: 100.0}
+
 # Energy counters (kWh, cumulative or utility meters) for the balance tab; one or more each, summed.
 CONF_ENERGY_SOLAR = "energy_solar"
 CONF_ENERGY_GRID_IMPORT = "energy_grid_import"
@@ -51,6 +59,7 @@ LIST_KEYS = (
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_CHARGE,
     CONF_BATTERY_GRID_CHARGE,
+    CONF_BATTERY_SOC,
     CONF_DEVICE_POWER,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
@@ -71,9 +80,21 @@ DICT_KEYS = (CONF_DEVICE_NAMES,)
 # Longest allowed display name.
 NAME_MAX_LEN = 80
 # Keys that hold exactly one entity in storage (the panel always sees lists).
-SINGLE_KEYS = (CONF_GRID_IMPORT, CONF_GRID_EXPORT, CONF_BATTERY_GRID_CHARGE)
+SINGLE_KEYS = (
+    CONF_GRID_IMPORT,
+    CONF_GRID_EXPORT,
+    CONF_BATTERY_GRID_CHARGE,
+    CONF_BATTERY_SOC,
+)
 BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
-CONFIG_KEYS = (CONF_HOUSE_POWER, *LIST_KEYS, *ID_KEYS, *DICT_KEYS, *BOOL_KEYS)
+CONFIG_KEYS = (
+    CONF_HOUSE_POWER,
+    *LIST_KEYS,
+    *ID_KEYS,
+    *DICT_KEYS,
+    *BOOL_KEYS,
+    *NUMBER_KEYS,
+)
 
 # Allowed characters in a label or area id (a slug).
 ID_REGEX = r"^[a-z0-9_]+$"

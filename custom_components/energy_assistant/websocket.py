@@ -21,6 +21,8 @@ from .const import (
     ID_REGEX,
     LIST_KEYS,
     NAME_MAX_LEN,
+    NUMBER_KEYS,
+    NUMBER_MAX,
     PATTERN_REGEX,
     TEXT_KEYS,
 )
@@ -41,6 +43,12 @@ _CONFIG_SCHEMA = vol.Schema(
             for key in TEXT_KEYS
         },
         **{vol.Optional(key): cv.boolean for key in BOOL_KEYS},
+        **{
+            vol.Optional(key): vol.Any(
+                None, vol.All(vol.Coerce(float), vol.Range(min=0, max=NUMBER_MAX[key]))
+            )
+            for key in NUMBER_KEYS
+        },
         **{
             vol.Optional(key): [vol.All(cv.string, vol.Match(ID_REGEX))]
             for key in ID_KEYS

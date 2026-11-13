@@ -230,3 +230,34 @@ async def test_options_flow_offers_to_replace_the_sensors(hass) -> None:
     assert schema["solar_power"].description == {
         "suggested_value": PV["production_power_sensors"]
     }
+
+
+def test_the_storage_level_sensor_capacity_and_minimum_are_offered() -> None:
+    targets, _ = targets_from(
+        {**PV, "battery_soc_sensor": "sensor.soc"},
+        {"storage_capacity_kwh": 10, "battery_min_soc": 10},
+    )
+    assert targets["battery_soc"] == ["sensor.soc"]
+    assert targets["battery_capacity"] == 10.0
+    assert targets["battery_min_soc"] == 10.0
+    # without a capacity there is no minimum either, and unusable values are ignored
+    targets, _ = targets_from(
+        {**PV, "battery_soc_sensor": "sensor.soc"}, {"battery_min_soc": 10}
+    )
+    assert "battery_capacity" not in targets and "battery_min_soc" not in targets
+    targets, _ = targets_from(PV, {"storage_capacity_kwh": 0, "battery_min_soc": 10})
+    assert "battery_capacity" not in targets
+    targets, _ = targets_from(PV, {"storage_capacity_kwh": 8, "battery_min_soc": 150})
+    assert targets["battery_capacity"] == 8.0 and "battery_min_soc" not in targets
+
+
+async def test_the_offer_reads_the_general_settings_of_pv_assistant(hass) -> None:
+    MockConfigEntry(
+        domain="pv_assistant", data={**PV, "battery_soc_sensor": "sensor.soc"}
+    ).add_to_hass(hass)
+    hass.data["pv_assistant"] = {
+        "settings": {"general": {"storage_capacity_kwh": 9.5, "battery_min_soc": 5}}
+    }
+    offer = suggestion(hass)
+    assert offer["targets"]["battery_capacity"] == 9.5
+    assert offer["targets"]["battery_min_soc"] == 5.0

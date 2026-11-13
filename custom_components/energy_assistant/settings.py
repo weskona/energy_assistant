@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -14,6 +15,7 @@ from .const import (
     DICT_KEYS,
     ID_KEYS,
     LIST_KEYS,
+    NUMBER_KEYS,
     PATTERN_REGEX,
     SINGLE_KEYS,
     TEXT_KEYS,
@@ -59,6 +61,23 @@ def clean_names(value: Any) -> dict[str, str]:
     return names
 
 
+def clean_number(value: Any) -> float | None:
+    """A number or None: texts with a decimal comma work, anything unusable (and negative values) means not set."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = (
+            float(str(value).replace(",", "."))
+            if isinstance(value, str)
+            else float(value)
+        )
+    except ValueError:
+        return None
+    return (
+        None if math.isnan(number) or number < 0 else number
+    )  # NaN and negatives are not set
+
+
 def valid_patterns(patterns: list[str]) -> bool:
     """Patterns may only contain entity id characters, * and ?."""
     return all(re.fullmatch(PATTERN_REGEX[1:-1], p) for p in patterns)
@@ -77,6 +96,8 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         if key in LIST_KEYS
         else bool(data.get(key))
         if key in BOOL_KEYS
+        else clean_number(data.get(key))
+        if key in NUMBER_KEYS
         else data.get(key) or None
         for key in CONFIG_KEYS
     }
@@ -107,6 +128,9 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             stored[key] = as_list(value)
         elif key in BOOL_KEYS:
             stored[key] = bool(value)
+        elif key in NUMBER_KEYS:
+            if (number := clean_number(value)) is not None:
+                stored[key] = number
         elif value:
             stored[key] = value
     return stored
