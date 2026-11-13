@@ -121,7 +121,7 @@ Without a house consumption sensor Energy Assistant calculates:
 
 Without the optional "storage charged from grid" sensor the storage is assumed to be charged entirely from solar.
 If it actually charges from the grid, the value is too low then.
-The panel shows it as a tile with its share of production, in the source bar and as a second line in the history.
+The panel shows it as a tile, in the source bar and as a second line in the history. Under the tile the production is split up: how many percent go straight to the house, into the storage (the solar share of the charging) and into the grid, for example `40 % House · 60 % Storage`. The whole percentages add up to 100; parts that round to 0 % are left out.
 
 ### PV Assistant (optional)
 
