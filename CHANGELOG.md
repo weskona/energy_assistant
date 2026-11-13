@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-13
+
+### Changed
+
+- The history card shows the power chart in the style of PV Assistant, computed from our own sensors (PV Assistant is not needed): lines for production (with a light area), feed-in, storage (turquoise from the storage, pink into the storage, drawn through the zero line), solar used directly, grid import and house consumption, an axis with round values in watts (also below zero for the charging), time ticks every 3 hours, the names at the line ends, a legend, a tooltip with all values at the pointer and **Show as table** with the hourly means. Series without data are left out. The chart is drawn at the real width, so the text stays readable on a phone (no end labels on a narrow chart). Before there were only the house power and the direct solar use.
+- The tooltip stays at the pointer while new values arrive; the table stays open.
+
 ## [0.16.0] - 2026-11-13
 
 ### Added

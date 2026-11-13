@@ -53,7 +53,29 @@ const STYLE = `
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .bar{margin-top:16px}
 .bar>div{transition:width .6s}
-svg.chart{width:100%;height:auto;display:block;margin-top:12px}
+svg.hsvg{display:block;max-width:100%;touch-action:pan-y}
+.hchart{margin-top:12px}
+.hchart .legend{margin:0 0 8px}
+.hchart .legend i{border-radius:50%;width:9px;height:9px}
+.chartwrap{position:relative}
+svg .hgrid{stroke:var(--eb-line);stroke-width:1}
+svg .haxis{stroke:var(--eb-dim);stroke-width:1;opacity:.7}
+svg .htick,svg .hend{fill:var(--eb-muted);font-size:11px}
+svg .hair{stroke:var(--eb-muted);stroke-width:1;stroke-dasharray:3 3}
+svg .hdot{stroke:var(--eb-panel);stroke-width:2}
+.tip{position:absolute;pointer-events:none;z-index:2;background:var(--eb-panel);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap}
+.tip[hidden]{display:none}
+.tip .tt{color:var(--eb-muted);margin-bottom:4px}
+.tip .tr{display:flex;align-items:center;gap:8px}
+.tip .tr b{font-weight:600;color:var(--eb-text)}
+.tip .tr span{color:var(--eb-muted)}
+.tip .tr i{width:9px;height:9px;border-radius:50%;display:inline-block}
+details.tableview{margin-top:8px;font-size:12.5px;color:var(--eb-muted)}
+details.tableview summary{cursor:pointer}
+details.tableview table{border-collapse:collapse;margin-top:6px;width:100%}
+details.tableview th,details.tableview td{text-align:right;padding:3px 8px;border-top:1px solid var(--eb-line)}
+details.tableview th:first-child{text-align:left;font-weight:400}
+:host{--ea-prod:#ff9800;--ea-feed:#8353d1;--ea-bout:#4db6ac;--ea-bin:#f06292;--ea-direct:#ffd700;--ea-grid:#488fc2;--ea-house:#cfd8dc}
 .axis{fill:var(--eb-dim);font-size:11px}
 .empty{padding:40px 0;text-align:center;color:var(--eb-muted)}
 .state{color:var(--eb-green)}
@@ -152,7 +174,20 @@ const STRINGS = {
     history: "History",
     historyLoading: "Loading history …",
     noHistory: "No history available yet",
-    chartLabel: "House power over the last 24 hours",
+    chartLabel: "Power over the last 24 hours (W)",
+    hProd: "Production",
+    hFeed: "Feed-in",
+    hFromStorage: "From storage (+)",
+    hToStorage: "To storage (−)",
+    hStorage: "Storage",
+    hDirect: "Used directly",
+    hDirectShort: "Direct",
+    hGrid: "Grid import",
+    hGridShort: "Grid",
+    hHouse: "House consumption",
+    hHouseShort: "House",
+    hTable: "Show as table",
+    hTime: "Time",
     notConfigured:
       "No sensors configured. Open Settings → Devices & services → Energy Assistant.",
     menu: "Menu",
@@ -165,7 +200,6 @@ const STRINGS = {
     storageFromGrid: "Storage from grid",
     storage: "Storage",
     grid: "Grid",
-    legendSolarDirect: "Solar used directly",
     devices: "Devices",
     otherDevices: "Other (not measured)",
     idleDevices: "{n} idle",
@@ -322,7 +356,20 @@ const STRINGS = {
     history: "Verlauf",
     historyLoading: "Verlauf wird geladen …",
     noHistory: "Noch kein Verlauf verfügbar",
-    chartLabel: "Hausleistung der letzten 24 Stunden",
+    chartLabel: "Leistung der letzten 24 Stunden (W)",
+    hProd: "Erzeugung",
+    hFeed: "Einspeisung",
+    hFromStorage: "Aus Speicher (+)",
+    hToStorage: "In Speicher (−)",
+    hStorage: "Speicher",
+    hDirect: "Direkt verbraucht",
+    hDirectShort: "Direkt",
+    hGrid: "Netzbezug",
+    hGridShort: "Netz",
+    hHouse: "Hausverbrauch",
+    hHouseShort: "Haus",
+    hTable: "Als Tabelle anzeigen",
+    hTime: "Zeit",
     notConfigured:
       "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energy Assistant auswählen.",
     menu: "Menü",
@@ -335,7 +382,6 @@ const STRINGS = {
     storageFromGrid: "Speicher aus Netz",
     storage: "Speicher",
     grid: "Netz",
-    legendSolarDirect: "PV direkt verbraucht",
     devices: "Geräte",
     otherDevices: "Sonstiges (nicht gemessen)",
     idleDevices: "{n} inaktiv",
@@ -1669,56 +1715,146 @@ class EnergyAssistantPanel extends HTMLElement {
     for (let k = 0; k <= n; k++) {
       const parts = this._split(Object.fromEntries(Object.entries(g).map(([key, arr]) => [key, arr ? arr[k] : null])));
       const v = house ? house[k] : this._calcHouse(parts);
-      pts.push({ t: t0 + k * step, v, d: v == null ? null : this._calcDirect(parts, v) });
+      const net = parts.discharge == null && parts.charge == null ? null : (parts.discharge ?? 0) - (parts.charge ?? 0);
+      pts.push({
+        t: t0 + k * step, v, d: v == null ? null : this._calcDirect(parts, v),
+        solar: parts.solar, gridOut: parts.gridOut, gridIn: parts.gridIn, net,
+      });
     }
     return pts;
   }
 
-  _chart(points) {
-    const valid = points.filter((p) => p.v != null);
-    if (valid.length < 2) return `<div class="empty">${this._t("noHistory")}</div>`;
-    const W = 640, H = 220, L = 8, R = 8, T = 10, B = 24;
-    const max = Math.max(500, ...valid.map((p) => p.v)) * 1.1;
-    const t0 = points[0].t, t1 = points[points.length - 1].t;
-    const x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
-    const y = (v) => T + (1 - v / max) * (H - T - B);
-    let d = "", pen = false;
-    for (const p of points) {
-      if (p.v == null) { pen = false; continue; }
-      d += `${pen ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`;
-      pen = true;
+  /**
+   * The series of the history chart, in the order and with the colors of the power chart of PV Assistant
+   * (but computed from our own sensors, PV Assistant is not needed): production, feed-in, storage (from +,
+   * to −), solar used directly, grid import and the house consumption. A series without any value is left out.
+   */
+  _historySeries(points) {
+    const has = (key) => points.some((p) => p[key] != null);
+    const pts = (key) => points.filter((p) => p[key] != null).map((p) => [p.t, p[key]]);
+    const list = [];
+    if (has("solar")) list.push({ key: "prod", name: this._t("hProd"), short: this._t("hProd"), color: "--ea-prod", points: pts("solar") });
+    if (has("gridOut")) list.push({ key: "feed", name: this._t("hFeed"), short: this._t("hFeed"), color: "--ea-feed", points: pts("gridOut") });
+    if (has("net")) {
+      list.push({
+        key: "net", name: this._t("hStorage"), short: this._t("hStorage"), color: "--ea-bout", colorNeg: "--ea-bin",
+        legendItems: [{ name: this._t("hFromStorage"), color: "--ea-bout" }, { name: this._t("hToStorage"), color: "--ea-bin" }],
+        points: pts("net"),
+      });
     }
-    const dline = (key) => {
-      let out = "", on = false;
-      for (const p of points) {
-        if (p[key] == null) { on = false; continue; }
-        out += `${on ? "L" : "M"}${x(p.t).toFixed(1)},${y(p[key]).toFixed(1)}`;
-        on = true;
+    if (has("d")) list.push({ key: "direct", name: this._t("hDirect"), short: this._t("hDirectShort"), color: "--ea-direct", points: pts("d") });
+    if (has("gridIn")) list.push({ key: "grid", name: this._t("hGrid"), short: this._t("hGridShort"), color: "--ea-grid", points: pts("gridIn") });
+    if (has("v")) list.push({ key: "house", name: this._t("hHouse"), short: this._t("hHouseShort"), color: "--ea-house", points: pts("v") });
+    return list;
+  }
+
+  /** Round axis values: 0, 5,000, 10,000 ... (also with negative values for the storage charging). */
+  _niceTicks(min, max, count = 4) {
+    if (!(max > min)) max = min + 1;
+    const raw = (max - min) / count;
+    const pow = 10 ** Math.floor(Math.log10(raw));
+    const f = raw / pow;
+    const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pow;
+    const lo = Math.floor(min / step) * step;
+    const hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  /**
+   * The history chart of the last 24 hours: lines per series, the production as a light area, a legend,
+   * direct labels at the line ends (on wide charts), a tooltip with all values (wired after the redraw, see
+   * _wireChart) and the same data as an hourly table. The model of the drawing is kept in this._hv.
+   */
+  _historyChart(points) {
+    const series = this._historySeries(points);
+    const withData = points.filter((p) => p.v != null || p.solar != null);
+    if (series.length === 0 || withData.length < 2) {
+      this._hv = null;
+      return `<div class="empty">${this._t("noHistory")}</div>`;
+    }
+    const lang = this._hass?.language || "en";
+    const W = Math.max(280, Math.round(this._chartW || 900)), H = 280;
+    const M = { l: 52, r: 8, t: 10, b: 24 };
+    const labelW = W > 520 ? 84 : 0;
+    const pw = W - M.l - M.r - labelW, ph = H - M.t - M.b;
+    const t0 = points[0].t, t1 = points[points.length - 1].t;
+    const step = Math.max(1, points[1].t - points[0].t);
+    const values = series.flatMap((s) => s.points.map((p) => p[1]));
+    const ticks = this._niceTicks(Math.min(0, ...values), Math.max(0, ...values));
+    const lo = ticks[0], hi = ticks[ticks.length - 1];
+    const x = (t) => M.l + ((t - t0) / (t1 - t0)) * pw;
+    const y = (v) => M.t + (1 - (v - lo) / (hi - lo)) * ph;
+    const f1 = (n) => n.toFixed(1);
+    let svg = "";
+    for (const v of ticks) {
+      svg += `<line x1="${M.l}" x2="${M.l + pw}" y1="${f1(y(v))}" y2="${f1(y(v))}" class="${v === 0 ? "haxis" : "hgrid"}"/>`;
+      svg += `<text class="htick" x="${M.l - 6}" y="${f1(y(v) + 4)}" text-anchor="end">${Math.round(v).toLocaleString(lang)}</text>`;
+    }
+    // time axis: full hours, every 3 hours (every 6 on a narrow chart)
+    const hours = pw < 420 ? 6 : 3;
+    const d = new Date(t0);
+    d.setMinutes(0, 0, 0);
+    while (d.getTime() < t0 || d.getHours() % hours !== 0) d.setHours(d.getHours() + 1);
+    for (; d.getTime() <= t1; d.setHours(d.getHours() + hours)) {
+      svg += `<text class="htick" x="${f1(x(d.getTime()))}" y="${H - 6}" text-anchor="middle">${d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}</text>`;
+    }
+    let clip = "";
+    series.forEach((s, i) => {
+      // the line breaks where data is missing for more than 1.5 buckets
+      const segs = [];
+      let cur = [];
+      s.points.forEach((p, k) => {
+        if (k && p[0] - s.points[k - 1][0] > step * 1.5) { segs.push(cur); cur = []; }
+        cur.push(p);
+      });
+      segs.push(cur);
+      for (const seg of segs) {
+        const path = seg.map((p, k) => `${k ? "L" : "M"}${f1(x(p[0]))},${f1(y(p[1]))}`).join("");
+        if (i === 0 && seg.length > 1) {
+          svg += `<path d="${path}L${f1(x(seg[seg.length - 1][0]))},${f1(y(0))}L${f1(x(seg[0][0]))},${f1(y(0))}Z" fill="var(${s.color})" opacity=".12"/>`;
+        }
+        if (s.colorNeg) {
+          // the same line twice, clipped above and below the zero line (from storage / to storage)
+          clip = `<defs><clipPath id="ea-clip-p"><rect x="0" y="0" width="${W}" height="${f1(y(0))}"/></clipPath><clipPath id="ea-clip-n"><rect x="0" y="${f1(y(0))}" width="${W}" height="${f1(H - y(0))}"/></clipPath></defs>`;
+          svg += `<path d="${path}" fill="none" stroke="var(${s.color})" stroke-width="2" stroke-linejoin="round" clip-path="url(#ea-clip-p)"/>`;
+          svg += `<path d="${path}" fill="none" stroke="var(${s.colorNeg})" stroke-width="2" stroke-linejoin="round" clip-path="url(#ea-clip-n)"/>`;
+        } else {
+          svg += `<path d="${path}" fill="none" stroke="var(${s.color})" stroke-width="2" stroke-linejoin="round"/>`;
+        }
       }
-      return out;
-    };
-    const hasDirect = points.some((p) => p.d != null);
-    const lastX = x(valid[valid.length - 1].t), firstX = x(valid[0].t);
-    const area = `${d}L${lastX.toFixed(1)},${y(0)}L${firstX.toFixed(1)},${y(0)}Z`;
-    const grid = [0.5, 1].map((f) => {
-      const yy = y(max * f / 1.1);
-      return `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--eb-line)"/>
-        <text class="axis" x="${W - R}" y="${yy - 4}" text-anchor="end">${fmtPower(max * f / 1.1).join(" ")}</text>`;
-    }).join("");
-    const ticks = [0, 6, 12, 18, 24].map((h) => {
-      const t = t0 + (h / HISTORY_HOURS) * (t1 - t0);
-      const label = new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      return `<text class="axis" x="${x(t)}" y="${H - 6}" text-anchor="${h === 0 ? "start" : h === 24 ? "end" : "middle"}">${label}</text>`;
-    }).join("");
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${this._t("chartLabel")}">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#34d399" stop-opacity=".35"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/>
-      </linearGradient></defs>
-      ${grid}<path d="${area}" fill="url(#g)"/>
-      <path d="${d}" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round"/>
-      ${hasDirect ? `<path d="${dline("d")}" fill="none" stroke="#ff9800" stroke-width="2" stroke-linejoin="round"/>` : ""}
-      ${ticks}</svg>
-      <div class="legend"><span><i style="background:var(--eb-green)"></i>${this._t("house")}</span>${hasDirect ? `<span><i style="background:var(--eb-solar)"></i>${this._t("legendSolarDirect")}</span>` : ""}</div>`;
+    });
+    if (labelW) {
+      const ends = series.map((s) => ({ s, y: y(s.points[s.points.length - 1][1]) })).sort((a, b) => a.y - b.y);
+      for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+      const over = ends[ends.length - 1].y - (M.t + ph + 8); // keep the labels inside the chart
+      if (over > 0) ends.forEach((e) => { e.y -= over; });
+      for (const e of ends) svg += `<text class="hend" x="${f1(M.l + pw + 6)}" y="${f1(e.y + 4)}">${esc(e.s.short)}</text>`;
+    }
+    svg += `<line class="hair" y1="${M.t}" y2="${M.t + ph}" visibility="hidden"/>`;
+    svg += series.map((s) => `<circle class="hdot" r="4" fill="var(${s.color})" visibility="hidden"/>`).join("");
+    svg += `<rect class="hit" x="${M.l}" y="${M.t}" width="${pw}" height="${ph}" fill="transparent"/>`;
+    const legend = series.flatMap((s) => s.legendItems || [s])
+      .map((s) => `<span><i style="background:var(${s.color})"></i>${esc(s.name)}</span>`).join("");
+    // table: hourly means
+    const byHour = new Map();
+    series.forEach((s, i) => s.points.forEach(([ts, v]) => {
+      const h = ts - (ts % 3600000);
+      const e = byHour.get(h) || series.map(() => [0, 0]);
+      e[i][0] += v;
+      e[i][1] += 1;
+      byHour.set(h, e);
+    }));
+    const fmtTime = (ts) => new Date(ts).toLocaleString(lang, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    const rows = [...byHour.entries()].sort((a, b) => a[0] - b[0]).map(([h, e]) =>
+      `<tr><th>${esc(fmtTime(h))}</th>${e.map(([sum, n]) => `<td>${n ? Math.round(sum / n).toLocaleString(lang) : "–"}</td>`).join("")}</tr>`).join("");
+    const times = [...new Set(series.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
+    this._hv = { W, H, M, pw, ph, t0, t1, lo, hi, series, lang, fmtTime, labelW, times, maps: series.map((s) => new Map(s.points)), x, y };
+    return `<div class="hchart"><div class="legend">${legend}</div>
+      <div class="chartwrap"><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("chartLabel"))}">${clip}${svg}</svg><div class="tip" hidden></div></div>
+      <details class="tableview"${this._tableOpen ? " open" : ""}><summary>${esc(this._t("hTable"))}</summary>
+        <table><tr><th>${esc(this._t("hTime"))}</th>${series.map((s) => `<th>${esc(s.name)}</th>`).join("")}</tr>${rows}</table></details></div>`;
   }
 
   _renderHouse() {
@@ -1742,7 +1878,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const devices = this._renderDevices(cur.house, limit);
     // Devices, areas and labels share one row, in this order. Missing cards leave more room for the others.
     const lists = `${devices}${areas}${labels}`;
-    const hist = this._history ? this._chart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
+    const hist = this._history ? this._historyChart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
       <div class="eb-card eb-card--glow">
         <div class="row"><span class="eb-title">${this._t("house")}</span>
@@ -2093,7 +2229,105 @@ class EnergyAssistantPanel extends HTMLElement {
       this._html = html;
       this._swapMarkup(content, html);
       this._applyCollapse(content);
+      this._wireChart(content);
     }
+  }
+
+  /**
+   * What the tooltip shows at a time: the bucket nearest to `t` with the value of every series (the storage
+   * says "from" or "to" depending on its sign). Null without a chart.
+   */
+  _tipAt(t) {
+    const hv = this._hv;
+    if (!hv || !hv.times.length) return null;
+    let lo = 0, hi = hv.times.length - 1;
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (hv.times[m] < t) lo = m;
+      else hi = m;
+    }
+    const ts = Math.abs(hv.times[lo] - t) <= Math.abs(hv.times[hi] - t) ? hv.times[lo] : hv.times[hi];
+    const rows = hv.series.map((s, i) => {
+      const v = hv.maps[i].get(ts);
+      const item = s.legendItems ? (v != null && v < 0 ? s.legendItems[1] : s.legendItems[0]) : s;
+      return { name: item.name, color: item.color, value: v ?? null };
+    });
+    return { ts, title: hv.fmtTime(ts), rows };
+  }
+
+  /**
+   * After every redraw of the page: tooltip and crosshair of the history chart, the open/closed state of the
+   * table, and one redraw when the chart box has another width than the drawing (a viewBox in real pixels
+   * keeps the text readable on a phone).
+   */
+  _wireChart(content) {
+    const wrap = content.querySelector?.(".chartwrap");
+    const hv = this._hv;
+    if (!wrap || !hv) return;
+    const box = Math.max(280, Math.round(wrap.clientWidth || 0));
+    if (wrap.clientWidth && Math.abs(box - hv.W) > 24) {
+      this._chartW = box;
+      this._html = null;
+      this._render();
+      return;
+    }
+    const svg = wrap.querySelector("svg"), tip = wrap.querySelector(".tip"), hit = svg.querySelector(".hit");
+    const hair = svg.querySelector(".hair"), dots = [...svg.querySelectorAll(".hdot")];
+    const hide = () => {
+      this._hover = null;
+      tip.hidden = true;
+      hair.setAttribute("visibility", "hidden");
+      dots.forEach((d) => d.setAttribute("visibility", "hidden"));
+    };
+    const show = (clientX, clientY) => {
+      const r = svg.getBoundingClientRect();
+      const px = ((clientX - r.left) / r.width) * hv.W;
+      const info = this._tipAt(hv.t0 + ((px - hv.M.l) / hv.pw) * (hv.t1 - hv.t0));
+      if (!info) return;
+      this._hover = { x: clientX, y: clientY };
+      const cx = hv.x(info.ts);
+      hair.setAttribute("x1", cx);
+      hair.setAttribute("x2", cx);
+      hair.setAttribute("visibility", "visible");
+      info.rows.forEach((row, i) => {
+        dots[i].setAttribute("visibility", row.value == null ? "hidden" : "visible");
+        if (row.value != null) {
+          dots[i].setAttribute("cx", cx);
+          dots[i].setAttribute("cy", hv.y(row.value));
+          dots[i].setAttribute("fill", `var(${row.color})`);
+        }
+      });
+      tip.replaceChildren();
+      const title = document.createElement("div");
+      title.className = "tt";
+      title.textContent = info.title;
+      tip.append(title);
+      for (const row of info.rows) {
+        const line = document.createElement("div");
+        line.className = "tr";
+        const key = document.createElement("i");
+        key.style.background = `var(${row.color})`;
+        const val = document.createElement("b");
+        val.textContent = row.value == null ? "–" : `${Math.round(row.value).toLocaleString(hv.lang)} W`;
+        const name = document.createElement("span");
+        name.textContent = row.name;
+        line.append(key, val, name);
+        tip.append(line);
+      }
+      tip.hidden = false;
+      const left = (cx / hv.W) * r.width + 14;
+      tip.style.left = `${Math.max(0, left + tip.offsetWidth > wrap.clientWidth ? left - tip.offsetWidth - 28 : left)}px`;
+      tip.style.top = `${Math.max(0, Math.min(clientY - r.top - tip.offsetHeight / 2, wrap.clientHeight - tip.offsetHeight))}px`;
+    };
+    hit.addEventListener("pointermove", (e) => show(e.clientX, e.clientY));
+    hit.addEventListener("pointerleave", hide);
+    // The page is redrawn with every new value; a pointer that rests on the chart keeps its tooltip.
+    if (this._hover) {
+      const { x, y } = this._hover;
+      requestAnimationFrame(() => { if (hit.matches(":hover")) show(x, y); else this._hover = null; });
+    }
+    const details = content.querySelector("details.tableview");
+    if (details) details.addEventListener("toggle", () => { this._tableOpen = details.open; });
   }
 
   /** Titles of the cards the user folded, remembered in the browser (only a convenience, it may be unavailable). */
