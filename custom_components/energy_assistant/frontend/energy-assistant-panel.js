@@ -66,6 +66,11 @@ const STYLE = `
 .amo-bar>div{height:100%;border-radius:3px;background:var(--eb-green)}
 .alert.info{border-color:var(--eb-green);background:rgba(52,211,153,.12)}
 .alert{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font-size:14px}
+.lc{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(4,minmax(0,1fr));gap:8px;align-items:baseline;padding:9px 0;border-top:1px solid var(--eb-line);font-size:14px}
+.lc.head{border-top:0;padding-bottom:2px;color:var(--eb-muted);font-size:12px;margin-top:10px}
+.lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc .n{text-align:right;font-weight:600;white-space:nowrap}
+.lc.head .n{font-weight:500}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
@@ -218,6 +223,8 @@ const STRINGS = {
     uOfBase: "{pct} % of the base load",
     uTopTitle: "Biggest consumers",
     uLabelsTitle: "Labels",
+    labelCostTitle: "Cost per label",
+    labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created.",
     uLabelsHint: "Energy of the sensors that carry the label, summed up since the start of the period. Energy Assistant creates the sensors when a label is selected in the settings; they count from then on.",
     uLabelsPast: "The label sensors only count the running period. Go back to the current one to see them.",
     uBaseHintStat: "Lowest hourly mean of the house power in the period (at most the last 31 days).",
@@ -491,6 +498,8 @@ const STRINGS = {
     uOfBase: "{pct} % der Grundlast",
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
+    labelCostTitle: "Kosten pro Label",
+    labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen.",
     uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
     uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
@@ -983,7 +992,7 @@ class EnergyAssistantPanel extends HTMLElement {
       case "balance": return this._renderBalance();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
-      case "costs": return stack(this._renderCosts(this._current()), this._renderContract());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderLabelCosts(), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
@@ -1378,20 +1387,14 @@ class EnergyAssistantPanel extends HTMLElement {
       .map((id) => {
         const entityId = this._labelEnergy?.[id]?.[range];
         const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
-        // The cost comes from the cost sensor (priced step by step), never from today's price times the energy.
-        const costId = this._labelEnergy?.[id]?.[`cost_${range}`];
-        const costState = costId && this._hass?.states?.[costId];
-        const cost = costState ? parseFloat(costState.state) : NaN;
-        const currency = String(costState?.attributes?.unit_of_measurement || "EUR");
-        return { id, name: names[id] || id, kwh: value, cost, currency };
+        return { id, name: names[id] || id, kwh: value };
       })
       .filter((r) => Number.isFinite(r.kwh))
       .sort((a, b) => b.kwh - a.kwh);
     const max = Math.max(0, ...rows.map((r) => r.kwh));
     const html = rows
       .map((r) => {
-        const cost = Number.isFinite(r.cost) ? `<small class="cnt">${esc(this._money(r.cost, r.currency).join(" "))}</small>` : "";
-        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span> ${cost}</span>
+        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span></span>
           <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
@@ -1998,6 +2001,32 @@ class EnergyAssistantPanel extends HTMLElement {
     money(this._t("tFeedIn"), perHour(cur.gridOut, feedIn));
     money(this._t("tPvSaves"), perHour(cur.direct, price.value));
     return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("costsNow"))}</span></div><div class="tiles">${tiles.join("")}</div></div>`;
+  }
+
+  /**
+   * Cost per selected label for today, this week, this month and this year, from the cost sensors that
+   * Energy Assistant creates (priced step by step, so a tariff change never recalculates the past).
+   * Labels without cost sensors are left out; empty when there are none.
+   */
+  _renderLabelCosts() {
+    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+    const periods = [["day", "bDay"], ["week", "bWeek"], ["month", "bMonth"], ["year", "bYear"]];
+    const rows = (this._cfg.label_ids || [])
+      .map((id) => {
+        const cells = periods.map(([p]) => {
+          const state = this._hass?.states?.[this._labelEnergy?.[id]?.[`cost_${p}`]];
+          const v = state ? parseFloat(state.state) : NaN;
+          return Number.isFinite(v) ? this._money(v, state.attributes?.unit_of_measurement || "EUR").join(" ") : "–";
+        });
+        return { id, name: names[id] || id, cells, any: cells.some((c) => c !== "–") };
+      })
+      .filter((r) => r.any);
+    if (!rows.length) return "";
+    const head = `<div class="lc head"><span></span>${periods.map(([, k]) => `<span class="n">${esc(this._t(k))}</span>`).join("")}</div>`;
+    const body = rows
+      .map((r) => `<div class="lc"><span class="nm" title="${esc(r.name)}">${esc(r.name)}</span>${r.cells.map((c) => `<span class="n">${esc(c)}</span>`).join("")}</div>`)
+      .join("");
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
   }
 
   /** Contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end. */

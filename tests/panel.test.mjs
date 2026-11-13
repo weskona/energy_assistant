@@ -2935,17 +2935,43 @@ test("usage: the labels card shows the kWh of every selected label for the shown
   assert.doesNotMatch(card, /€/); // no cost sensor, so no cost (never today's price times the energy)
 });
 
-test("usage: the cost of a label comes from its cost sensor, not from the current price", () => {
+test("usage: the labels card shows kWh only, the cost belongs to the Costs tab", () => {
   const p = labelEnergyPanel();
   p._hass.states["sensor.c_licht_day"] = { state: "1.37", attributes: { unit_of_measurement: "EUR" } };
   p._labelEnergy.licht.cost_day = "sensor.c_licht_day";
-  p._int = { tariffy: { price: "sensor.t_preis" } };
-  p._hass.states["sensor.t_preis"] = { state: "9.99", attributes: { unit_of_measurement: "EUR/kWh" } };
   const html = p._renderUsage();
-  const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
-  assert.match(card, /Licht[\s\S]*1[.,]37[^<]*€/);
-  assert.doesNotMatch(card, /44[.,]9/); // 4.5 kWh x 9.99 would be 44.96
-  assert.doesNotMatch(card.slice(card.indexOf("Klima")), /€/); // Klima has no cost sensor
+  assert.doesNotMatch(html.slice(html.indexOf('<span class="eb-title">Labels</span>')), /€/);
+});
+
+function labelCostPanel() {
+  const p = labelEnergyPanel();
+  const eur = (v) => ({ state: v, attributes: { unit_of_measurement: "EUR" } });
+  Object.assign(p._hass.states, {
+    "sensor.c1_day": eur("0.40"), "sensor.c1_week": eur("2.10"), "sensor.c1_month": eur("8.00"), "sensor.c1_year": eur("95.5"),
+    "sensor.c2_day": eur("1.37"),
+  });
+  p._labelEnergy.klima.cost_day = "sensor.c1_day";
+  p._labelEnergy.klima.cost_week = "sensor.c1_week";
+  p._labelEnergy.klima.cost_month = "sensor.c1_month";
+  p._labelEnergy.klima.cost_year = "sensor.c1_year";
+  p._labelEnergy.licht.cost_day = "sensor.c2_day";
+  return p;
+}
+
+test("costs: every selected label with its cost sensors shows today, week, month and year", () => {
+  const html = labelCostPanel()._renderLabelCosts();
+  assert.match(html, /Cost per label/);
+  assert.match(html, /Day<\/span><span class="n">Week<\/span><span class="n">Month<\/span><span class="n">Year/);
+  assert.match(html, /Klima[\s\S]*0[.,]40[^<]*€[\s\S]*2[.,]10[^<]*€[\s\S]*8[.,]00[^<]*€[\s\S]*95[.,]50[^<]*€/);
+  assert.match(html, /Licht[\s\S]*1[.,]37[^<]*€[\s\S]*–/); // the other periods of Licht have no sensor
+  assert.doesNotMatch(html, /Kaputt/); // no cost sensor at all
+});
+
+test("costs: no card without cost sensors", () => {
+  const p = labelCostPanel();
+  assert.match(p._renderLabelCosts(), /Cost per label/);
+  p._labelEnergy = {};
+  assert.equal(p._renderLabelCosts(), "");
 });
 
 test("usage: the labels card follows the period picker and says when only the running period exists", () => {
