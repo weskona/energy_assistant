@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Period picker in the Costs tab:** a new card *Costs in the period* shows the grid cost, the feed-in revenue and the balance of the chosen day, week, month or year with the change to the period before. It uses the same period as the Consumption tab. The three money tiles moved there from the balance of the Consumption tab. The *Cost per label* table keeps showing the running day, week, month and year.
+
 ## [0.26.0] - 2026-11-13
 
 ### Changed

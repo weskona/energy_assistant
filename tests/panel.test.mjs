@@ -2592,13 +2592,16 @@ test("balance: tiles with totals, the change to the period before and the shares
   assert.doesNotMatch(html, /Grid cost/); // without Tariffy no money
 });
 
-test("balance: with Tariffy the grid cost, the feed-in revenue and the balance are shown", () => {
+test("costs: the grid cost, the feed-in revenue and the balance of the shown period are in the Costs tab", () => {
   const p = loadedBalance({
     "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: 0.99 } },
     "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } },
   });
   p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
-  const html = p._renderBalance();
+  assert.doesNotMatch(p._renderBalance(), /Grid cost|Feed-in revenue/); // the money moved to the Costs tab
+  const html = p._renderPeriodCosts();
+  assert.match(html, /<span class="eb-title">Costs in the period<\/span>/);
+  assert.match(html, /data-urange="week"/); // the same period picker
   assert.match(html, /Grid cost<\/div><div class="eb-value">1\.80<small>[^<]*</); // 6 kWh x 0.30 (contract price, not the live price)
   assert.match(html, /Feed-in revenue<\/div><div class="eb-value">0\.56/); // 7 x 0.08
   assert.match(html, /Balance<\/div><div class="eb-value">-1\.24/);
@@ -3862,4 +3865,22 @@ test("settings: a sensor list keeps its chips and its input in one box", () => {
   p._draft.device_standby = ["sensor.herd_leistung"];
   const html = p._renderSettings();
   assert.match(html, /<div class="tags"><span class="chip"[^>]*>[^<]*<button data-remove="device_standby"[\s\S]*?<input type="text" data-add="device_standby"/);
+});
+
+test("costs: the period costs compare with the period before and wait for the data", () => {
+  const p = loadedBalance({
+    "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } },
+    "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } },
+  });
+  p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
+  p._bal.before = { imp: 8, exp: 5 };
+  const html = p._renderPeriodCosts();
+  assert.match(html, /Grid cost[\s\S]*▼ 25 % vs\. previous period/); // 1.80 against 2.40
+  p._usOff = -1; // another period than the data: loading
+  assert.match(p._renderPeriodCosts(), /Loading/);
+  const none = loadedBalance();
+  assert.equal(none._renderPeriodCosts(), ""); // without Tariffy
+  const noCounters = usagePanel();
+  noCounters._int = { tariffy: { price: "x" } };
+  assert.equal(noCounters._renderPeriodCosts(), ""); // without energy counters
 });

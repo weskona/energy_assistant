@@ -242,8 +242,9 @@ const STRINGS = {
     uOfBase: "{pct} % of the base load",
     uTopTitle: "Biggest consumers",
     uLabelsTitle: "Labels",
+    costsPeriod: "Costs in the period",
     labelCostTitle: "Cost per label",
-    labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created.",
+    labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created. This table always shows the running day, week, month and year, whatever period is chosen above.",
     uLabelsHint: "Energy of the sensors that carry the label in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per label for dashboards and automations, they count from the moment they were created.",
     uLabelsCoverage: "{n} of {m} sensors",
     uLabelsCoverageTip: "Only these sensors have statistics; the others are not counted.",
@@ -525,8 +526,9 @@ const STRINGS = {
     uOfBase: "{pct} % der Grundlast",
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
+    costsPeriod: "Kosten im Zeitraum",
     labelCostTitle: "Kosten pro Label",
-    labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen.",
+    labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen. Diese Tabelle zeigt immer den laufenden Tag, die laufende Woche, den laufenden Monat und das laufende Jahr, egal welcher Zeitraum oben gewählt ist.",
     uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro Label für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
     uLabelsCoverage: "{n} von {m} Sensoren",
     uLabelsCoverageTip: "Nur diese Sensoren haben Statistik; die anderen zählen nicht mit.",
@@ -1026,7 +1028,7 @@ class EnergyAssistantPanel extends HTMLElement {
       case "usage": return this._renderConsumption();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
-      case "costs": return stack(this._renderCosts(this._current()), this._renderLabelCosts(), this._renderContract());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderLabelCosts(), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
@@ -1874,6 +1876,47 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="stack">${parts.join("")}</div>`;
   }
 
+  /**
+   * Costs of the shown period (needs Tariffy and energy counters): what the grid import cost, what the feed-in
+   * earned and the balance of both, from the totals of the balance, with the change to the period before. The
+   * period picker is the one of the consumption tab (same period). Valued with the price of the Tariffy
+   * contract, the average of a dynamic tariff and not the live price. Empty without counters or Tariffy.
+   */
+  _renderPeriodCosts() {
+    const tariffy = this._int?.tariffy;
+    if (!tariffy || !this._balEnabled()) return "";
+    const lang = this._hass?.language || "en";
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const b = this._bal;
+    const win = b?.win && b.range === range && b.off === off ? b.win : this._balWindow(range, off);
+    const head = `<div class="row"><span class="eb-title">${esc(this._t("costsPeriod"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>${this._rangePicker("u", range, off, win)}`;
+    const card = (body) => `<div class="eb-card">${head}${body}</div>`;
+    if (!b || b.range !== range || b.off !== off) return card(`<div class="empty">${this._t("loading")}</div>`);
+    const priceState = tariffy.price && this._hass?.states?.[tariffy.price];
+    const price = priceState ? parseFloat(priceState.state) : NaN;
+    const t = b.totals, prev = b.before;
+    if (b.failed || Number.isNaN(price) || t.imp == null) return card(`<div class="empty">${this._t("bNoData")}</div>`);
+    const currency = String(priceState.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
+    const feed = this._feedInTariff();
+    const tile = (label, amount, before) => {
+      const [n, sym] = this._money(amount, currency);
+      let extra = "";
+      if (before != null && Math.abs(before) > 0.005) {
+        const pct = Math.round(((amount - before) / Math.abs(before)) * 100);
+        extra = `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("bVsPrev", { arrow: pct > 0 ? "▲" : pct < 0 ? "▼" : "•", pct: Math.abs(pct) }))}</div>`;
+      }
+      return `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div>${extra}</div>`;
+    };
+    const cost = t.imp * price;
+    const tiles = [tile(this._t("bCost"), cost, prev?.imp != null ? prev.imp * price : null)];
+    if (t.exp != null && feed != null) {
+      const revenue = t.exp * feed;
+      tiles.push(tile(this._t("bRevenue"), revenue, prev?.exp != null ? prev.exp * feed : null));
+      tiles.push(tile(this._t("bSaldo"), revenue - cost, prev?.imp != null && prev?.exp != null ? prev.exp * feed - prev.imp * price : null));
+    }
+    return card(`<div class="tiles">${tiles.join("")}</div><div class="hint">${esc(this._t("bPriceNote"))}</div>`);
+  }
+
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
   _renderBalance({ bare = false } = {}) {
     // bare: the cards only, the period picker and the stack come from the consumption tab
@@ -1902,27 +1945,7 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
     if (t.self != null) tiles.push(tile(this._t("bSelf"), Math.round(t.self), "%", delta(t.self, prev?.self)));
-    // Money: valued with the price of the Tariffy contract (the average of a dynamic tariff, not the live price).
-    const tariffy = this._int?.tariffy;
-    const priceState = tariffy?.price && this._hass?.states?.[tariffy.price];
-    const price = priceState ? parseFloat(priceState.state) : NaN;
-    const feed = this._feedInTariff();
-    let money = "";
-    if (!Number.isNaN(price) && t.imp != null) {
-      const currency = String(priceState.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
-      const m = (label, amount) => {
-        const [n, sym] = this._money(amount, currency);
-        return tile(this._t(label), n, sym);
-      };
-      const cost = t.imp * price, revenue = t.exp != null && feed != null ? t.exp * feed : null;
-      tiles.push(m("bCost", cost));
-      if (revenue != null) {
-        tiles.push(m("bRevenue", revenue));
-        tiles.push(m("bSaldo", revenue - cost));
-      }
-      money = `<div class="hint">${esc(this._t("bPriceNote"))}</div>`;
-    }
-    const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>${money}` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
+    const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
     return wrap(`${first}${this._balanceChart(b)}`);
   }
 
@@ -3661,7 +3684,7 @@ class EnergyAssistantPanel extends HTMLElement {
     // While a name is being typed the page is not redrawn, live updates would wipe the text field.
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
-    if (this._tab === "usage" && this._balEnabled()) this._maybeLoadBalance();
+    if ((this._tab === "usage" || (this._tab === "costs" && this._int?.tariffy)) && this._balEnabled()) this._maybeLoadBalance();
     if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadLabelUsage();
