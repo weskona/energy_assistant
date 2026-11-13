@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-13
+
 ### Added
 
 - **Energy per label:** for every selected label four energy sensors (kWh) are created: today, this week, this month, this year. They integrate the power of the label's sensors, follow the time zone of Home Assistant, survive a restart and are created and removed with the label selection, without a reload. The Consumption tab has a new *Labels* card with the kWh of each label for the selected period (the running period only, the sensors have no history).
