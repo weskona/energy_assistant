@@ -491,7 +491,7 @@ const STRINGS = {
     uOfBase: "{pct} % der Grundlast",
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
-    uLabelsHint: "Energie der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
+    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
     uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",

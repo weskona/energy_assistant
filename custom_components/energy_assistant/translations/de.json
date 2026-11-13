@@ -138,16 +138,16 @@
   "entity": {
     "sensor": {
       "label_energy_day": {
-        "name": "{label} Energie heute"
+        "name": "{label} Verbrauch heute"
       },
       "label_energy_week": {
-        "name": "{label} Energie diese Woche"
+        "name": "{label} Verbrauch diese Woche"
       },
       "label_energy_month": {
-        "name": "{label} Energie diesen Monat"
+        "name": "{label} Verbrauch diesen Monat"
       },
       "label_energy_year": {
-        "name": "{label} Energie dieses Jahr"
+        "name": "{label} Verbrauch dieses Jahr"
       },
       "label_cost_day": {
         "name": "{label} Kosten heute"
