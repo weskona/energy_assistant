@@ -123,9 +123,19 @@ def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
         if "home_kwh" not in keys and "kwh_day" not in keys:
             continue
         config_entry = hass.config_entries.async_get_entry(entry_id)
+        wallbox = (
+            {**config_entry.data, **config_entry.options}.get("home_entity")
+            if config_entry
+            else None
+        )
         result.append(
             {
                 "name": config_entry.title if config_entry else "EV",
+                # The power sensor of the wallbox that EV Assistant was set up with, so Energy Assistant
+                # does not list the same wallbox twice when it is one of the device sensors.
+                "wallbox_power": wallbox
+                if isinstance(wallbox, str) and wallbox.startswith("sensor.")
+                else None,
                 "live": keys.get("home_kwh"),
                 "kwh_today": keys.get("kwh_day"),
                 "cost_today": keys.get("cost_day"),

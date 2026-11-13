@@ -1858,7 +1858,7 @@ test("ev assistant: the EV tab contains the wallbox block, the Power tab does no
   p._ready = true;
   p._tab = "ev";
   assert.match(p._renderPage(), /<span class="eb-title">Wallbox<\/span>/);
-  assert.doesNotMatch(p._renderHouse(), /Wallbox/);
+  assert.doesNotMatch(p._renderHouse(), /<span class="eb-title">Wallbox<\/span>/); // only as a row of the device list
 });
 
 // --- optional data from PV Assistant (day figures, forecast, plant fault) -----------------------
@@ -2140,4 +2140,152 @@ test("pv split: shows as the line under the direct tile", () => {
   assert.match(p._renderHouse(), /1[.,]?732<small>W<\/small><\/div> <div class="eb-label"[^>]*>40 % House · 60 % Storage</);
   p._hass.language = "de";
   assert.match(p._renderHouse(), />40 % Haus · 60 % Speicher</);
+});
+
+
+// --- the wallbox as a row of the device list ------------------------------------------------------
+function evDevicePanel({ cfg = {}, vehicles, live = { charge_power: 7.4, charging: true, session_solar_pct: 72 }, extraStates = {} } = {}) {
+  const states = {
+    "sensor.herd_leistung": { state: "900", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Herd" } },
+    "sensor.ev_home": { state: "812", attributes: { evcc_live: live } },
+    h: st(10000),
+    ...extraStates,
+  };
+  const p = panel({ house_power: "h", device_power: ["sensor.herd_leistung"], ...cfg }, states);
+  p._hass.language = "en";
+  p._hass.user = { is_admin: true };
+  p._int = { ev_assistant: { vehicles: vehicles ?? [{ name: "ID.3", live: "sensor.ev_home", wallbox_power: "sensor.wallbox_leistung" }] } };
+  return p;
+}
+
+test("ev rows: the wallbox is a row of the device list, with its solar share as tooltip", () => {
+  const p = evDevicePanel();
+  const rows = p._devices();
+  assert.deepEqual(rows.map((d) => [d.name, Math.round(d.w)]), [["Wallbox · ID.3", 7400], ["Herd", 900]]);
+  const html = p._renderDevices(10000);
+  assert.match(html, /Wallbox · ID\.3/);
+  assert.match(html, /Solar share 72 %/);
+});
+
+test("ev rows: the total in the header still equals the house power and the rest shrinks", () => {
+  const p = evDevicePanel();
+  const html = p._renderDevices(10000);
+  assert.match(html, /10[.,\s]?000 W/); // 7400 + 900 + rest 1700
+  assert.match(html, /1[.,\s]?700<small>W/); // "Other (not measured)" without the wallbox would be 9100
+});
+
+test("ev rows: nothing is counted twice when the wallbox sensor is already a device", () => {
+  const p = evDevicePanel({ cfg: { device_power: ["sensor.herd_leistung", "sensor.wallbox_leistung"] }, extraStates: { "sensor.wallbox_leistung": { state: "7400", attributes: { device_class: "power", unit_of_measurement: "W", friendly_name: "Wallbox" } } } });
+  assert.deepEqual(p._devices().map((d) => d.name), ["Wallbox", "Herd"]);
+});
+
+test("ev rows: an excluded wallbox sensor stays out, also the virtual row", () => {
+  assert.deepEqual(evDevicePanel({ cfg: { device_exclude: ["sensor.wallbox_leistung"] } })._devices().map((d) => d.name), ["Herd"]);
+  assert.deepEqual(evDevicePanel({ cfg: { device_exclude_patterns: ["*wallbox*"] } })._devices().map((d) => d.name), ["Herd"]);
+});
+
+test("ev rows: no row without live data, an idle wallbox shows as idle, the row works without configured devices", () => {
+  assert.deepEqual(evDevicePanel({ live: {} })._devices().map((d) => d.name), ["Herd"]);
+  const idle = evDevicePanel({ live: { charge_power: 0, charging: false } });
+  assert.deepEqual(idle._devices().map((d) => d.name), ["Herd", "Wallbox · ID.3"]);
+  assert.match(idle._renderDevices(2000), /1 idle|idle/); // 0 W is counted as idle, not listed
+  const alone = evDevicePanel({ cfg: { device_power: [] } });
+  assert.match(alone._renderDevices(10000), /Wallbox · ID\.3/);
+  const gone = evDevicePanel({ cfg: { device_power: [] }, vehicles: [] });
+  assert.equal(gone._renderDevices(10000), "");
+});
+
+// --- cards can be folded -------------------------------------------------------------------------
+function foldCard(title, { glow = false, noRow = false } = {}) {
+  const classes = new Set(glow ? ["eb-card", "eb-card--glow"] : ["eb-card"]);
+  const attrs = {};
+  const card = {
+    classes,
+    classList: {
+      contains: (c) => classes.has(c),
+      toggle: (c, on) => {
+        const next = on === undefined ? !classes.has(c) : on;
+        if (next) classes.add(c);
+        else classes.delete(c);
+      },
+    },
+    querySelector: (sel) => (sel === ":scope > .row" && !noRow ? row : null),
+  };
+  const row = {
+    attrs,
+    setAttribute: (k, v) => { attrs[k] = v; },
+    querySelector: (sel) => (sel === ".eb-title" ? { textContent: `  ${title}  ` } : null),
+    closest: () => card,
+  };
+  return { card, row };
+}
+
+function withStorage(initial, fn) {
+  const store = { ...initial };
+  const old = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  try { return fn(store); } finally { globalThis.localStorage = old; }
+}
+
+test("fold: every card with a title row can be folded, the house card stays open", () => {
+  withStorage({}, () => {
+    const p = new Panel();
+    const house = foldCard("Haus", { glow: true });
+    const devices = foldCard("Devices");
+    const plain = foldCard("x", { noRow: true });
+    p._applyCollapse({ querySelectorAll: () => [house.card, devices.card, plain.card] });
+    assert.equal(devices.row.attrs["data-collapse-toggle"], "");
+    assert.equal(devices.row.attrs["aria-expanded"], "true");
+    assert.equal(devices.row.attrs.role, "button");
+    assert.equal(house.row.attrs["data-collapse-toggle"], undefined);
+    assert.equal(devices.card.classes.has("collapsed"), false);
+  });
+});
+
+test("fold: a click folds the card and the choice is remembered, also after a redraw", () => {
+  withStorage({}, (store) => {
+    const p = new Panel();
+    const devices = foldCard("Devices");
+    p._toggleCollapse(devices.row);
+    assert.equal(devices.card.classes.has("collapsed"), true);
+    assert.equal(devices.row.attrs["aria-expanded"], "false");
+    assert.deepEqual(JSON.parse(store["energy_assistant.collapsed"]), ["Devices"]);
+    // a redraw delivers new markup: the state is applied again
+    const fresh = foldCard("Devices");
+    p._applyCollapse({ querySelectorAll: () => [fresh.card] });
+    assert.equal(fresh.card.classes.has("collapsed"), true);
+    // a second click unfolds again
+    p._toggleCollapse(fresh.row);
+    assert.equal(fresh.card.classes.has("collapsed"), false);
+    assert.deepEqual(JSON.parse(store["energy_assistant.collapsed"]), []);
+  });
+});
+
+test("fold: the remembered state is read from the browser storage", () => {
+  withStorage({ "energy_assistant.collapsed": JSON.stringify(["Areas", 5, null]) }, () => {
+    const p = new Panel();
+    const areas = foldCard("Areas");
+    const labels = foldCard("Labels");
+    p._applyCollapse({ querySelectorAll: () => [areas.card, labels.card] });
+    assert.equal(areas.card.classes.has("collapsed"), true);
+    assert.equal(labels.card.classes.has("collapsed"), false);
+  });
+});
+
+test("fold: without usable storage everything still works for the session", () => {
+  const old = globalThis.localStorage;
+  globalThis.localStorage = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
+  try {
+    const p = new Panel();
+    const devices = foldCard("Devices");
+    p._applyCollapse({ querySelectorAll: () => [devices.card] });
+    p._toggleCollapse(devices.row);
+    assert.equal(devices.card.classes.has("collapsed"), true);
+  } finally {
+    globalThis.localStorage = old;
+  }
+  const none = new Panel(); // no storage at all
+  const card = foldCard("Devices");
+  none._toggleCollapse(card.row);
+  assert.equal(card.card.classes.has("collapsed"), true);
 });

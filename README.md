@@ -14,6 +14,8 @@ The UI is English with a German translation (follows your Home Assistant languag
 | **Payback** (German: Amortisation) | Only with Amortix: savings, investment, progress, remaining amount, savings per day, time left and payback date |
 | **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the Power tab. |
 
+**Folding:** every card except the house card folds with a click on its title (arrow in front of it). The choice is remembered in the browser.
+
 **Layout:** the first row shows the house card and the history. Below it **Devices**, **Areas** and **Labels** sit side by
 side in one row, in this order and with the same height (missing cards leave more room to the others). On narrow screens
 they stack. Areas and labels show their Home Assistant icon in front of the name (labels tinted with their color).
@@ -51,6 +53,7 @@ Separate and combined sensors can be mixed.
 | Storage combined | Discharge | Charge | yes |
 
 **Devices** (step 3): the Power tab lists the power of individual devices with a bar, highest first.
+With EV Assistant the wallbox is a row of this list as well (**Wallbox · vehicle**, with the solar share of the session as tooltip). It is left out when the wallbox sensor is already one of the devices or was excluded.
 
 - **Name patterns:** enter patterns with `*` as wildcard, e.g. `*_power` (or `*_leistung` for German entity names).
   Every power sensor whose name matches is listed, so new devices appear automatically.
@@ -157,6 +160,10 @@ and press **Save**. The changes apply immediately, no restart or reload is neede
 
 The panel talks to the integration over two WebSocket commands, `energy_assistant/get_config` and
 `energy_assistant/update_config` (admin only), and stores the result in the options of the config entry.
+
+## Working together
+
+Energy Assistant is meant to work as a team with [PV Assistant](https://github.com/weskona/pv-assistant), [Tariffy](https://github.com/weskona/tariffy), [EV Assistant](https://github.com/weskona/ev_assistant) and [Amortix](https://github.com/weskona/amortix): it reads them when they are installed (read only) and shows their data in its own tabs, and every one of them runs on its own. Which data is read, and the rules, are in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ## Development
 
