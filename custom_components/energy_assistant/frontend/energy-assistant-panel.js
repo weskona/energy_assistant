@@ -163,6 +163,8 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .mtoggle .chev.on{transform:rotate(90deg)}
 .mtoggle .go{margin-left:auto;color:var(--eb-green);font-weight:600;font-size:13px}
 .trow{display:flex;align-items:center;gap:12px;margin:6px 0}
+.snorm{margin-right:10px;padding:3px 10px;font-size:12px}
+.snorm.on{border-color:var(--eb-dim);color:var(--eb-muted)}
 .msens{margin-left:auto;flex:none;align-self:center}
 .mrow .msens.on{border-color:var(--eb-green);color:var(--eb-green)}
 .trow.dsetup input[type=text]{flex:1 1 180px;min-width:0;max-width:300px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:7px 10px;font:14px var(--eb-font)}
@@ -257,6 +259,14 @@ const STRINGS = {
     h_device_setup: "The name is the display name of the device and is part of the sensor names. Leave it empty for the name of the sensor without the word Leistung. A name changed later changes the name of the sensors, but not their entity id. A device whose source is gone or excluded keeps its sensors until you untick it.",
     deviceNameLabel: "Name of the device",
     deviceCostTitle: "Cost per device",
+    uNormal: "Normal",
+    uNormalTip: "This standby load is wanted (it should run all the time): it does not count as avoidable.",
+    uNormalOnTip: "Marked as normal. Click to count it as avoidable again.",
+    uNormalHint: "Mark the loads that are meant to run all the time (server, fridge) as Normal; the rest is what you could switch off.",
+    uAvoidableCost: "Avoidable: {w} · {kwh} kWh · {cost} per year",
+    uAvoidableKwh: "Avoidable: {w} · {kwh} kWh per year",
+    uAvoidableTip: "The standby loads that are not marked as normal, extrapolated to a year.",
+    uAvoidableTile: "Avoidable standby",
     uAreasTitle: "Areas",
     uAreasHint: "Energy of the sensors in the area in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per selected area for dashboards and automations, they count from the moment they were created.",
     areaCostTitle: "Cost per area",
@@ -565,6 +575,14 @@ const STRINGS = {
     h_device_setup: "Der Name ist der Anzeigename des Geräts und Teil der Sensornamen. Leer lassen für den Namen des Sensors ohne das Wort Leistung. Ein später geänderter Name ändert den Namen der Sensoren, aber nicht ihre Entity-ID. Ein Gerät, dessen Quelle fehlt oder ausgeschlossen wurde, behält seine Sensoren, bis du es abwählst.",
     deviceNameLabel: "Name des Geräts",
     deviceCostTitle: "Kosten pro Gerät",
+    uNormal: "Normal",
+    uNormalTip: "Diese Dauerlast ist gewollt (sie soll immer laufen): sie zählt nicht als vermeidbar.",
+    uNormalOnTip: "Als normal markiert. Klicken, damit sie wieder als vermeidbar zählt.",
+    uNormalHint: "Markiere die Lasten, die immer laufen sollen (Server, Kühlschrank), als Normal; der Rest ist das, was du abschalten könntest.",
+    uAvoidableCost: "Vermeidbar: {w} · {kwh} kWh · {cost} pro Jahr",
+    uAvoidableKwh: "Vermeidbar: {w} · {kwh} kWh pro Jahr",
+    uAvoidableTip: "Die Dauerlasten, die nicht als normal markiert sind, auf ein Jahr hochgerechnet.",
+    uAvoidableTile: "Vermeidbare Dauerlast",
     uAreasTitle: "Bereiche",
     uAreasHint: "Verbrauch der Sensoren im Bereich im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro ausgewähltem Bereich für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
     areaCostTitle: "Kosten pro Bereich",
@@ -863,7 +881,7 @@ const SETTINGS_SECTIONS = [
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "standby_normal", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -1392,6 +1410,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const always = defined.size
       ? u.devices.filter((d) => defined.has(d.id) && d.baseW != null).sort((a, b) => b.baseW - a.baseW)
       : u.devices.filter((d) => d.baseW != null && d.baseW >= 2).sort((a, b) => b.baseW - a.baseW);
+    // Standby loads marked as normal (meant to run all the time: server, fridge) are not avoidable.
+    const normal = new Set(this._cfg.standby_normal || []);
     const baseTiles = [];
     if (houseBase != null) {
       const perYear = (houseBase / 1000) * 8760;
@@ -1407,6 +1427,12 @@ class EnergyAssistantPanel extends HTMLElement {
       const sum = always.reduce((a, d) => a + d.baseW, 0);
       const [sv, su] = fmtPower(sum);
       baseTiles.push(tile(this._t("uExplained"), sv, su, houseBase > 0 ? sub(this._t("uOfBase", { pct: Math.round((sum / houseBase) * 100) })) : ""));
+      const avW = always.filter((d) => !normal.has(d.id)).reduce((a, d) => a + d.baseW, 0);
+      if (avW > 0) {
+        const [av, au] = fmtPower(avW);
+        const yearKwh = (avW / 1000) * 8760;
+        baseTiles.push(tile(this._t("uAvoidableTile"), av, au, sub(!Number.isNaN(price) ? this._t("uYear", { kwh: num(yearKwh, 0), cost: money(yearKwh * price) }) : this._t("uYearKwh", { kwh: num(yearKwh, 0) }))));
+      }
     }
     const baseCard = `<div class="eb-card">${head}${baseTiles.length ? `<div class="tiles">${baseTiles.join("")}</div>` : `<div class="empty">${this._t("uNone")}</div>`}</div>`;
     // 2) biggest consumers today
@@ -1422,15 +1448,15 @@ class EnergyAssistantPanel extends HTMLElement {
       return f;
     };
     // A row opens to the line of the device and its figures (the line also sits in the row, small).
-    const row = (scope, d, name, value, unit, share, width, subtitle = "") => {
+    const row = (scope, d, name, value, unit, share, width, subtitle = "", opts = {}) => {
       const key = `usage:${scope}:${d.id}`; // each list opens its rows on its own
       const isOpen = this._open?.has(key);
       const detail = isOpen
         ? `<div class="subs">${this._sparkline(d.spark, { w: 320, h: 56, big: true })}${facts(d).map(([k, val]) => `<div class="s"><span class="sn">${esc(k)}</span><b>${esc(val)}</b></div>`).join("")}</div>`
         : "";
       return `<div class="dev"><div class="line open" data-open="${esc(key)}" role="button" tabindex="0" aria-expanded="${isOpen ? "true" : "false"}"><span class="name"><span class="nt" title="${esc(name)}">${esc(name)}</span>${subtitle ? ` <small class="cnt">${esc(subtitle)}</small>` : ""}</span>
-      <span class="val">${this._sparkline(d.spark)}${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
-      <div class="track"><div class="fill" style="width:${Math.min(100, width)}%"></div></div>${detail}</div>`;
+      <span class="val">${opts.action || ""}${this._sparkline(d.spark)}${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
+      <div class="track"><div class="fill${opts.muted ? " other" : ""}" style="width:${Math.min(100, width)}%"></div></div>${detail}</div>`;
     };
     // Both lists show as many rows as the shorter one has (within MIN_ROWS and MAX_ROWS); the rest unfolds per list.
     const lens = [top.length, ...(always.length ? [always.length] : [])];
@@ -1449,15 +1475,26 @@ class EnergyAssistantPanel extends HTMLElement {
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
       <div class="devgrid${topFold.cls}">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${topFold.button}</div>`;
     // 3) always on
+    // The rest of the standby loads is avoidable.
+    const avoidable = always.filter((d) => !normal.has(d.id));
+    const avoidableW = avoidable.reduce((a, d) => a + d.baseW, 0);
+    const avoidableYear = (avoidableW / 1000) * 8760;
+    const avoidableText = avoidable.length && avoidableW > 0
+      ? this._t(!Number.isNaN(price) ? "uAvoidableCost" : "uAvoidableKwh", { w: fmtPower(avoidableW).join(" "), kwh: num(avoidableYear, 0), cost: !Number.isNaN(price) ? money(avoidableYear * price) : "" })
+      : "";
     const alwaysRows = alwaysFold.shown.map((d) => {
       const year = (d.baseW / 1000) * 8760;
       const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
       const [v, unit] = fmtPower(d.baseW);
-      return row("always", d, d.name, v, unit, null, houseBase > 0 ? (d.baseW / houseBase) * 100 : 0, text); // bar = share of the base load
+      const isNormal = normal.has(d.id);
+      const action = d.id
+        ? `<button type="button" class="seg snorm${isNormal ? " on" : ""}" data-standbynormal="${esc(d.id)}" aria-pressed="${isNormal}" ${this._isAdmin ? "" : "disabled"} title="${esc(this._t(isNormal ? "uNormalOnTip" : "uNormalTip"))}">${esc(this._t("uNormal"))}</button>`
+        : "";
+      return row("always", d, d.name, v, unit, null, houseBase > 0 ? (d.baseW / houseBase) * 100 : 0, text, { action, muted: isNormal }); // bar = share of the base load
     }).join("");
-    const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
+    const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span>${avoidableText ? `<span class="eb-label" title="${esc(this._t("uAvoidableTip"))}">${esc(avoidableText)}</span>` : ""}</div>
       <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
-      <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div></div>`; // the hint sits below the list so both lists start at the same height
+      <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))} ${esc(this._t("uNormalHint"))}</div></div>`; // the hint sits below the list so both lists start at the same height
     // 4) energy per selected area and label, from the long-term statistics of their sensors
     const areasCard = this._renderGroupEnergy("area", { range, off, num });
     const labelsCard = this._renderGroupEnergy("label", { range, off, num });
@@ -2429,6 +2466,28 @@ class EnergyAssistantPanel extends HTMLElement {
     this._render();
   }
 
+  /** Mark a standby load as normal or avoidable and save it at once; taken back when saving fails. */
+  async _toggleStandbyNormal(id) {
+    if (!this._isAdmin || !id) return;
+    const before = [...(this._cfg.standby_normal || [])];
+    const next = before.includes(id) ? before.filter((x) => x !== id) : [...before, id];
+    this._config = { ...this._cfg, standby_normal: next };
+    if (this._draft) this._draft.standby_normal = [...next];
+    this._html = null;
+    this._render();
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/update_config", config: { standby_normal: next } });
+      this._config = res;
+      if (this._draft) this._draft.standby_normal = [...(res.standby_normal || [])];
+    } catch (e) {
+      console.warn("Energy Assistant: could not save the standby marking", e);
+      this._config = { ...this._cfg, standby_normal: before };
+      if (this._draft) this._draft.standby_normal = [...before];
+    }
+    this._html = null;
+    this._render();
+  }
+
   /** Start renaming a sensor in the device list. The row turns into a text field. */
   _startRename(id) {
     if (!this._isAdmin) return;
@@ -2520,6 +2579,10 @@ class EnergyAssistantPanel extends HTMLElement {
     } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
       Object.assign(this._draft, this._pvTargets());
       this._edited();
+    } else if (e.target.closest("[data-standbynormal]")) {
+      // Mark a standby load as normal (or not): saved at once, no settings page needed.
+      e.preventDefault();
+      this._toggleStandbyNormal(e.target.closest("[data-standbynormal]").dataset.standbynormal);
     } else if (e.target.closest("[data-devsel]")) {
       // A device gets (or loses) its own energy and cost sensors; nothing happens before Save.
       e.preventDefault();

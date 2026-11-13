@@ -584,3 +584,27 @@ async def test_device_energy_and_the_tariff_per_device(
     assert msg["success"]
     assert msg["result"]["device_tariffs"] == {"sensor.wp_power": "sensor.wp_preis"}
     assert len(msg["result"]["device_ids"]) == 20  # cut to the limit
+
+
+async def test_update_config_stores_the_standby_loads_marked_as_normal(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {
+                "standby_normal": ["sensor.server_power", "sensor.fridge_power"]
+            },
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["standby_normal"] == [
+        "sensor.server_power",
+        "sensor.fridge_power",
+    ]
+    assert entry.options["standby_normal"] == [
+        "sensor.server_power",
+        "sensor.fridge_power",
+    ]

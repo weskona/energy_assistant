@@ -4089,3 +4089,65 @@ test("device sensors: a name without the word Leistung stays, 'Leistung' alone i
   p._hass.states["sensor.d"] = { state: "1", attributes: { friendly_name: "Leistungsmesser Keller" } };
   assert.deepEqual(["a", "b", "c", "d"].map((k) => p._groupName("device", `sensor.${k}`)), ["Wallbox 3EM Phase A", "Oven", "Leistung", "Leistungsmesser Keller"]);
 });
+
+// --- standby loads that are meant to run all the time ------------------------------------------------------
+test("standby: every standby load has a Normal button, nothing is marked at first", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  const html = p._renderUsage();
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.equal((card.match(/data-standbynormal="/g) || []).length, 2); // Kühlschrank and Router
+  assert.doesNotMatch(card, /snorm on/);
+  assert.match(card, /Avoidable: 52 W · 456 kWh per year/); // 40 + 12 W, all of it avoidable at first
+  assert.match(html, /Avoidable standby<\/div><div class="eb-value">52<small>W/);
+});
+
+test("standby: a load marked as normal is muted and no longer counts as avoidable", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  p._cfg.standby_normal = ["sensor.a"]; // the fridge
+  const html = p._renderUsage();
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.match(card, /snorm on" data-standbynormal="sensor\.a" aria-pressed="true"/);
+  assert.match(card, /aria-pressed="false"[^>]*>Normal<\/button>/); // the router is not marked
+  assert.equal((card.match(/class="fill other"/g) || []).length, 1); // only the normal one has the grey bar
+  assert.match(card, /Avoidable: 12 W · 105 kWh per year/); // only the router
+  assert.match(html, /Avoidable standby<\/div><div class="eb-value">12<small>W/);
+});
+
+test("standby: with the price the avoidable standby shows its cost and with everything normal nothing is avoidable", () => {
+  const p = loadedUsage({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } } });
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  p._cfg.standby_normal = ["sensor.a"];
+  assert.match(p._renderUsage(), /Avoidable: 12 W · 105 kWh · 31[.,]54[^<]* per year/); // 105.12 kWh x 0.30
+  p._cfg.standby_normal = ["sensor.a", "sensor.b"];
+  const html = p._renderUsage();
+  assert.doesNotMatch(html, /Avoidable/);
+});
+
+test("standby: the buttons of non-admins are disabled", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: false };
+  const card = p._renderUsage();
+  assert.match(card.slice(card.indexOf("Always on (standby)")), /data-standbynormal="sensor\.a" aria-pressed="false" disabled/);
+});
+
+test("standby: a click marks the load at once and saves it, a failing save takes it back", async () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  p._render = () => {};
+  const calls = [];
+  p._hass.callWS = async (m) => { calls.push(m); return { ...p._cfg, standby_normal: m.config.standby_normal }; };
+  p._onClick({ preventDefault() {}, ...click("[data-standbynormal]", { standbynormal: "sensor.a" }) });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls[0], { type: "energy_assistant/update_config", config: { standby_normal: ["sensor.a"] } });
+  assert.deepEqual(p._cfg.standby_normal, ["sensor.a"]);
+  await p._toggleStandbyNormal("sensor.a"); // a second click unmarks it
+  assert.deepEqual(p._cfg.standby_normal, []);
+  p._hass.callWS = async () => { throw new Error("denied"); };
+  await p._toggleStandbyNormal("sensor.b");
+  assert.deepEqual(p._cfg.standby_normal, []); // taken back
+  p._hass.user = { is_admin: false };
+  p._hass.callWS = async () => { throw new Error("must not be called"); };
+  await p._toggleStandbyNormal("sensor.b"); // only admins change settings
+});
