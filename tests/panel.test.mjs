@@ -3153,3 +3153,143 @@ test("notices: the card on the Power tab shows warnings and information, escaped
   p._hass.language = "de";
   assert.match(p._renderHouse(), /Anlagenstörung/);
 });
+
+// --- the period picker of the consumption tab -----------------------------------------------------
+const hourRows = (start, means) => means.map((m, i) => ({ start: start + i * 3600000, end: start + (i + 1) * 3600000, mean: m }));
+
+test("usage picker: the same picker as in the balance, with its own data attributes", () => {
+  const p = usagePanel();
+  const html = p._renderUsage();
+  assert.match(html, /<button type="button" class="seg on" data-urange="day">Day<\/button>/);
+  for (const r of ["week", "month", "year"]) assert.match(html, new RegExp(`data-urange="${r}"`));
+  assert.match(html, /data-unav="-1"/);
+  assert.match(html, /data-unav="1"[^>]*disabled/);
+  assert.doesNotMatch(html, /data-brange|data-bnav/);
+  const bal = balPanel();
+  bal._bal = null;
+  assert.match(bal._renderBalance(), /data-brange="day"/); // the balance keeps its attributes
+});
+
+test("usage picker: clicks change the period, 'next' never goes into the future", () => {
+  const p = usagePanel();
+  const click = (attr, key, value) => p._onClick({ target: { closest: (sel) => (sel === `[${attr}]` ? { dataset: { [key]: value } } : null) } });
+  click("data-urange", "urange", "week");
+  assert.equal(p._usRange, "week");
+  assert.equal(p._usOff, 0);
+  click("data-unav", "unav", "-1");
+  click("data-unav", "unav", "-1");
+  assert.equal(p._usOff, -2);
+  click("data-unav", "unav", "1");
+  click("data-unav", "unav", "1");
+  click("data-unav", "unav", "1");
+  assert.equal(p._usOff, 0);
+  click("data-urange", "urange", "month");
+  assert.equal(p._usOff, 0);
+  assert.match(p._renderUsage(), /Loading/); // another period: loading until its data is there
+});
+
+test("usage statistics: the energy of a device is its hourly means times their duration", () => {
+  const p = usagePanel();
+  const t = new Date(2026, 10, 9).getTime();
+  const energy = { "sensor.a": hourRows(t, [1000, 1000, 500, null, -20]), __period: "hour" }; // 2.5 kWh, a gap and a negative reading do not count
+  const base = { "sensor.a": hourRows(t, Array(12).fill(40)), h: hourRows(t, Array(12).fill(150)) };
+  const r = p._usageFromStats(energy, base, ["sensor.a", "sensor.b"]);
+  assert.deepEqual(r.devices.map((d) => d.id), ["sensor.a"]); // b has no statistics
+  assert.ok(Math.abs(r.devices[0].kwh - 2.5) < 1e-9);
+  assert.equal(r.devices[0].baseW, 40);
+  assert.equal(r.houseBase, 150); // the house power sensor
+  // daily means count 24 hours each
+  const daily = { "sensor.a": [{ start: t, end: t + 86400000, mean: 100 }, { start: t + 86400000, mean: 50 }], __period: "day" };
+  assert.ok(Math.abs(p._usageFromStats(daily, {}, ["sensor.a"]).devices[0].kwh - 3.6) < 1e-9); // 2.4 + 1.2
+  // less than twelve hours: no base load
+  assert.equal(p._usageFromStats(energy, { "sensor.a": hourRows(t, [40, 40, 40]) }, ["sensor.a"]).devices[0].baseW, null);
+});
+
+test("usage statistics: without a house sensor the house power is the balance of the other sensors per hour", () => {
+  const p = panel({ solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_discharge: ["bd"], battery_charge: ["bc"], device_power: ["sensor.a"] }, {});
+  const t = new Date(2026, 10, 9).getTime();
+  const n = 12;
+  const res = {
+    pv: hourRows(t, Array(n).fill(1000)),
+    gi: hourRows(t, Array(n).fill(200)),
+    ge: hourRows(t, Array(n).fill(300)),
+    bd: hourRows(t, Array(n).fill(100)),
+    bc: hourRows(t, Array(n).fill(-500)), // the magnitude counts
+  };
+  assert.deepEqual(p._houseStatIds().sort(), ["bc", "bd", "ge", "gi", "pv"]);
+  const house = p._houseHourly(res);
+  assert.equal(house.length, n);
+  assert.equal(house[0], 1000 + 200 + 100 - 300 - 500); // 500 W
+  assert.equal(p._usageFromStats({ __period: "hour" }, res, []).houseBase, 500);
+  // a combined meter with a sign (inverted) works too
+  const combined = panel({ grid_power: ["g"], invert_grid: true, solar_power: ["pv"] }, {});
+  const hh = combined._houseHourly({ pv: hourRows(t, Array(n).fill(1000)), g: hourRows(t, Array(n).fill(-400)) });
+  assert.equal(hh[0], 1000 + 400); // inverted: -400 is import
+  const sensor = panel({ house_power: "h" }, {});
+  assert.deepEqual(sensor._houseStatIds(), ["h"]);
+  assert.deepEqual(sensor._houseHourly({ h: hourRows(t, [100, null, -5]) }), [100, 0]);
+});
+
+test("usage statistics: a week is one hourly request, a month a daily and an hourly one, today comes from the history", async () => {
+  const p = usagePanel();
+  const calls = [];
+  p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
+  p._tab = "usage";
+  p._maybeLoadUsageView(); // today: nothing
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 0);
+  p._usRange = "week";
+  p._usOff = -1;
+  p._maybeLoadUsageView();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].type, "recorder/statistics_during_period");
+  assert.equal(calls[0].period, "hour");
+  assert.deepEqual(calls[0].types, ["mean"]);
+  assert.deepEqual(calls[0].units, { power: "W" });
+  assert.deepEqual([...calls[0].statistic_ids].sort(), ["h", "sensor.a", "sensor.b", "sensor.c"]); // devices and the house sensor
+  assert.equal(p._usageView.range, "week");
+  assert.equal(p._usageView.off, -1);
+  p._maybeLoadUsageView(); // fresh: no new request
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  p._usRange = "month";
+  p._usOff = 0;
+  p._maybeLoadUsageView();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.slice(1).map((c) => c.period).sort(), ["day", "hour"]);
+  const hourlyCall = calls.slice(1).find((c) => c.period === "hour");
+  assert.ok(new Date(hourlyCall.end_time) - new Date(hourlyCall.start_time) <= 31 * 86400000 + 1000); // the base load: at most 31 days
+});
+
+test("usage statistics: a failing request says so and a period shows its devices and the matching hint", async () => {
+  const p = usagePanel();
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  p._usRange = "week";
+  await p._loadUsageView();
+  assert.equal(p._usageView.failed, true);
+  const html = p._renderUsage();
+  assert.match(html, /Not enough data yet/);
+  assert.match(html, /need the state class measurement/);
+  const t = new Date(2026, 10, 9).getTime();
+  const q = usagePanel({ "sensor.a": { state: "1", attributes: { friendly_name: "Kühlschrank" } } });
+  q._usRange = "week";
+  q._usageView = {
+    range: "week", off: 0, at: Date.now(), houseBase: 130,
+    devices: [{ id: "sensor.a", name: "Kühlschrank", kwh: 6.5, baseW: 40 }],
+  };
+  const view = q._renderUsage();
+  assert.match(view, /data-urange="week"/);
+  assert.match(view, /Lowest hourly mean of the house power in the period/);
+  assert.match(view, /Lowest hourly mean of each device in the period/);
+  assert.match(view, /Base load<\/div><div class="eb-value">130<small>W/);
+  assert.match(view, /6[.,]50<small>kWh/);
+  assert.doesNotMatch(view, /need the state class/);
+  assert.match(view, /<span class="eb-title">Biggest consumers<\/span>/);
+  // today still has its own data: the selection of another period does not replace it
+  q._usRange = "day";
+  q._usage = { at: Date.now(), devices: [{ id: "sensor.a", name: "Kühlschrank", kwh: 1.5, baseW: 40, run: 0 }] };
+  assert.match(q._renderUsage(), /1[.,]50<small>kWh/);
+  assert.equal(t > 0, true);
+});

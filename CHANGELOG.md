@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-13
+
+### Added
+
+- The Consumption tab has the **period picker** of the Balance tab (day, week, month, year, arrows, label). Today still comes from the history; every other period comes from the long-term statistics: the energy of the devices from their hourly means (daily means for a month and a year), the base load as the lowest hourly mean of the house and of every device in the period (at most its last 31 days). Without a house power sensor the house power is the balance of the separate sensors per hour. The picker is a shared component of both tabs.
+
+### Changed
+
+- The card of the biggest consumers is titled **Biggest consumers** (no longer *today*), the period is in the picker.
+
 ## [0.20.0] - 2026-11-13
 
 ### Added
