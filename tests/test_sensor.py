@@ -282,3 +282,30 @@ async def test_no_cost_sensors_without_tariffy(hass: HomeAssistant, mock_panel) 
         )
         for p in PERIODS
     )
+
+
+async def test_entity_ids_and_names_follow_the_language_of_home_assistant(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    from custom_components.energy_assistant.sensor import COST
+
+    hass.config.language = "de"
+    hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    ):
+        entry = await _setup(hass, ["klima"])
+    registry = er.async_get(hass)
+    energy = registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", "day")
+    )
+    cost = registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST + "week")
+    )
+    assert energy == "sensor.energy_assistant_klima_energie_heute"
+    assert cost == "sensor.energy_assistant_klima_kosten_diese_woche"
+    assert (
+        hass.states.get(energy).attributes["friendly_name"]
+        == "Energy Assistant Klima Energie heute"
+    )
