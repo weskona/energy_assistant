@@ -148,8 +148,15 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:6px 8px;min-height:44px;cursor:text}
 .tags:focus-within{border-color:var(--eb-green)}
 .tags.cap{max-height:130px;overflow:auto}
-.set .tags input[type=text]{flex:1 1 130px;width:auto;min-width:110px;border:0;background:none;padding:5px 4px}
+.set .tags input[type=text]{flex:1 1 150px;width:auto;min-width:150px;border:0;background:none;padding:5px 4px}
 .set .tags input[type=text]:focus{outline:none}
+.devsec .fields{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
+.devsec .fld{display:flex;flex-direction:column}
+.devsec .fld>.tags{flex:1;min-height:104px;max-height:132px;overflow:auto;align-content:flex-start}
+.devsec .fld.span>.tags{flex:none;min-height:44px}
+.devsec .fld.note{margin-top:8px;font-size:12.5px;color:var(--eb-muted)}
+@media (max-width:1100px){.devsec .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.devsec .fields{grid-template-columns:minmax(0,1fr)}.devsec .fld>.tags{min-height:44px}}
 .mtoggle{display:flex;align-items:center;gap:10px;width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:10px 12px;color:var(--eb-text);font:14px var(--eb-font);cursor:pointer;text-align:left}
 .mtoggle .chev{font-size:11px;color:var(--eb-dim);display:inline-block;transition:transform .2s}
 .mtoggle .chev.on{transform:rotate(90deg)}
@@ -365,7 +372,7 @@ const STRINGS = {
     f_label_tariffs: "Tariff per label (for the cost sensors)",
     h_label_tariffs: "Which Tariffy electricity contract prices the cost of a label, e.g. the heat pump tariff for the heat pump label. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     tariffDefault: "Default ({name})",
-    h_device_standby: "Shown as always on in the Consumption tab. None selected = detected automatically.",
+    h_device_standby: "Standby devices are shown as always on in the Consumption tab. None selected = detected automatically.",
     f_device_patterns: "Name patterns for device sensors",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
@@ -647,7 +654,7 @@ const STRINGS = {
     f_label_tariffs: "Tarif pro Label (für die Kostensensoren)",
     h_label_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Labels bewertet, z. B. der Wärmepumpentarif für das Wärmepumpen-Label. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     tariffDefault: "Standard ({name})",
-    h_device_standby: "Werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
+    h_device_standby: "Standby-Geräte werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
     f_device_patterns: "Namensmuster für Geräte-Sensoren",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
@@ -796,7 +803,7 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["label_tariffs", "labeltariffs"]] },
 ];
@@ -2638,6 +2645,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const socOptions = this._socCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const field = ([key, kind]) => {
       if (kind === "energyoffer") return this._renderEnergyOffer(ro);
+      if (kind === "note") return `<div class="fld span note">${esc(this._t(key))}</div>`;
       if (kind === "labeltariffs") return this._renderLabelTariffs(ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
@@ -2663,15 +2671,14 @@ class EnergyAssistantPanel extends HTMLElement {
         return `<div class="fld span">${head}${open ? this._renderMatches(ro) : ""}</div>`;
       }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
-      const hint = key === "device_standby" ? `<div class="hint">${esc(this._t("h_device_standby"))}</div>` : "";
       const long = key === "device_exclude"; // can be a long list: full width, scrolls when very long
       const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
       // The chips and the input share one box, so a list only grows as much as it has entries.
       return `<div class="fld${long ? " span" : ""}"><label>${esc(label)}</label>
-        <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}${hint}</div>`;
+        <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
+      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}${sec.title === "sectionDevices" ? " devsec" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";

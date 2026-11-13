@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Device settings, more compact:** every sensor list keeps its chips and its input in one box (click the box to type), so a list only grows as much as it has entries; the labels are shorter (the examples are in the placeholders). The list of matching sensors is folded behind a header with the counts (*23 matching sensors, 14 excluded*) and opens with one click.
+- **Device settings, more compact:** every sensor list keeps its chips and its input in one box (click the box to type), on wide screens the four inputs share a fixed four-column row of equally high boxes (two columns on medium, one on narrow screens), the standby explanation is a note below them; the labels are shorter (the examples are in the placeholders). The list of matching sensors is folded behind a header with the counts (*23 matching sensors, 14 excluded*) and opens with one click.
 
 ## [0.25.0] - 2026-11-13
 
