@@ -2926,16 +2926,103 @@ function labelEnergyPanel(range = "day", off = 0) {
   return p;
 }
 
+function withLabelUsage(p, rows, range = "day", off = 0) {
+  p._labelUsage = { key: p._labelUsageKey(range, off), at: Date.now(), rows };
+  return p;
+}
+
 test("usage: the labels card shows the kWh of every selected label for the shown period, biggest first", () => {
-  const html = labelEnergyPanel()._renderUsage();
+  const p = withLabelUsage(labelEnergyPanel(), {
+    klima: { kwh: 1.25, covered: 1, total: 2 },
+    licht: { kwh: 4.5, covered: 3, total: 3 },
+    kaputt: { kwh: 0, covered: 0, total: 2 },
+  });
+  const html = p._renderUsage();
   const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
   assert.ok(card.indexOf("Licht") < card.indexOf("Klima"));
   assert.match(card, /Licht[\s\S]*4[.,]50<small>kWh/);
-  assert.match(card, /Klima[\s\S]*1[.,]25<small>kWh/);
-  assert.doesNotMatch(card, /Kaputt/); // an unavailable sensor is left out
+  assert.match(card, /Klima[\s\S]*1 of 2 sensors[\s\S]*1[.,]25<small>kWh/); // not all of its sensors have statistics
+  assert.doesNotMatch(card.slice(card.indexOf("Licht"), card.indexOf("Klima")), /sensors<\/small>/); // Licht is complete
+  assert.doesNotMatch(card, /Kaputt/); // no sensor with statistics at all
   assert.match(card, /width:100%/); // the biggest label fills the bar
-  assert.match(card, /creates the sensors/);
-  assert.doesNotMatch(card, /€/); // no cost sensor, so no cost (never today's price times the energy)
+  assert.match(card, /long-term statistics/);
+});
+
+test("usage: the labels card waits for the data of the shown period", () => {
+  const p = withLabelUsage(labelEnergyPanel(), { licht: { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
+  p._usRange = "week"; // another period than the data
+  p._usageView = { range: "week", off: 0, devices: p._usage.devices, houseBase: 150 };
+  const html = p._renderUsage();
+  assert.match(html.slice(html.indexOf('<span class="eb-title">Labels</span>')), /Loading/);
+  assert.doesNotMatch(html, /4[.,]50<small>kWh/);
+});
+
+function statsPanel(calls, byPeriod) {
+  const p = labelPanel({ label_ids: ["klima", "licht"] });
+  p._hass.language = "en";
+  p._hass.config = { time_zone: "Europe/Berlin" };
+  p._ready = true;
+  p._render = () => {};
+  p._hass.callWS = async (m) => {
+    calls.push({ period: m.period, from: m.start_time, to: m.end_time, ids: m.statistic_ids });
+    return byPeriod[m.period] || {};
+  };
+  return p;
+}
+const hourRow = (startIso, mean) => ({ start: Date.parse(startIso), end: Date.parse(startIso) + 3600000, mean });
+const minRow = (startIso, mean) => ({ start: Date.parse(startIso), end: Date.parse(startIso) + 300000, mean });
+
+test("label usage: today is the finished hours plus the running hour from the 5-minute statistics", async () => {
+  const calls = [];
+  const p = statsPanel(calls, {
+    hour: {
+      "sensor.klimaanlage_leistung": [hourRow("2026-11-13T00:00:00Z", 1000), hourRow("2026-11-13T01:00:00Z", 500)], // 1.5 kWh
+      "sensor.lueftung_leistung": [hourRow("2026-11-13T00:00:00Z", 100)], // 0.1 kWh
+    },
+    "5minute": { "sensor.klimaanlage_leistung": [minRow("2026-11-13T14:00:00Z", 1200), minRow("2026-11-13T14:05:00Z", 1200)] }, // 0.2 kWh
+  });
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["hour", "5minute"]);
+  assert.equal(calls[0].from, "2026-11-12T23:00:00.000Z"); // midnight of Berlin
+  assert.equal(calls[0].to, "2026-11-13T14:00:00.000Z"); // up to the running hour
+  assert.equal(calls[1].from, "2026-11-13T14:00:00.000Z");
+  assert.equal(calls[1].to, "2026-11-13T14:20:00.000Z");
+  const klima = p._labelUsage.rows.klima;
+  assert.ok(Math.abs(klima.kwh - (1.5 + 0.1 + 0.2)) < 1e-9);
+  assert.equal(klima.covered, 2); // two of the three sensors of the label have statistics
+  assert.equal(klima.total, 3);
+});
+
+test("label usage: a month uses daily statistics, today's hours and the running hour", async () => {
+  const calls = [];
+  const p = statsPanel(calls, {
+    day: { "sensor.klimaanlage_leistung": [{ start: Date.parse("2026-10-31T23:00:00Z"), end: Date.parse("2026-11-01T23:00:00Z"), mean: 240 }] }, // 5.76 kWh
+  });
+  p._usRange = "month";
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["day", "hour", "5minute"]);
+  assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z"); // the day statistics end at the start of today
+  assert.equal(calls[1].from, "2026-11-12T23:00:00.000Z"); // today by the hour
+  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 5.76) < 1e-9);
+});
+
+test("label usage: a past period needs the finished statistics only", async () => {
+  const calls = [];
+  const p = statsPanel(calls, { hour: { "sensor.klimaanlage_leistung": [hourRow("2026-11-12T10:00:00Z", 2000)] } });
+  p._usOff = -1;
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["hour"]);
+  assert.equal(calls[0].from, "2026-11-11T23:00:00.000Z");
+  assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z");
+  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 2) < 1e-9);
+});
+
+test("label usage: a failed request says so instead of showing zeros", async () => {
+  const p = statsPanel([], {});
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.equal(p._labelUsage.failed, true);
+  assert.match(p._renderLabelEnergy({ range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
 });
 
 test("usage: the labels card shows kWh only, the cost belongs to the Costs tab", () => {
@@ -2975,15 +3062,6 @@ test("costs: no card without cost sensors", () => {
   assert.match(p._renderLabelCosts(), /Cost per label/);
   p._labelEnergy = {};
   assert.equal(p._renderLabelCosts(), "");
-});
-
-test("usage: the labels card follows the period picker and says when only the running period exists", () => {
-  const week = labelEnergyPanel("week", 0)._renderUsage();
-  assert.match(week, /Licht[\s\S]*20[.,]10<small>kWh/);
-  assert.doesNotMatch(week.slice(week.indexOf('<span class="eb-title">Labels</span>')), /Klima/); // no weekly sensor for it
-  const past = labelEnergyPanel("day", -1)._renderUsage();
-  assert.match(past, /only count the running period/);
-  assert.doesNotMatch(past, /4[.,]50<small>kWh/);
 });
 
 test("usage: without selected labels there is no labels card", () => {

@@ -244,8 +244,9 @@ const STRINGS = {
     uLabelsTitle: "Labels",
     labelCostTitle: "Cost per label",
     labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created.",
-    uLabelsHint: "Energy of the sensors that carry the label, summed up since the start of the period. Energy Assistant creates the sensors when a label is selected in the settings; they count from then on.",
-    uLabelsPast: "The label sensors only count the running period. Go back to the current one to see them.",
+    uLabelsHint: "Energy of the sensors that carry the label in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per label for dashboards and automations, they count from the moment they were created.",
+    uLabelsCoverage: "{n} of {m} sensors",
+    uLabelsCoverageTip: "Only these sensors have statistics; the others are not counted.",
     uBaseHintStat: "Lowest hourly mean of the house power in the period (at most the last 31 days).",
     uAlwaysHintStat: "Lowest hourly mean of each device in the period (at most the last 31 days), from 2 W on.",
     uNeedStats: "Past periods come from the long-term statistics: the power sensors need the state class measurement.",
@@ -526,8 +527,9 @@ const STRINGS = {
     uLabelsTitle: "Labels",
     labelCostTitle: "Kosten pro Label",
     labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen.",
-    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
-    uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
+    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro Label für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
+    uLabelsCoverage: "{n} von {m} Sensoren",
+    uLabelsCoverageTip: "Nur diese Sensoren haben Statistik; die anderen zählen nicht mit.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",
     uNeedStats: "Vergangene Zeiträume kommen aus der Langzeitstatistik: die Leistungssensoren brauchen die State Class measurement.",
@@ -1412,27 +1414,106 @@ class EnergyAssistantPanel extends HTMLElement {
     const selected = this._cfg.label_ids || [];
     if (!selected.length) return "";
     const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
-    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span></div>`;
-    if (off !== 0) {
-      return `<div class="eb-card">${title}<div class="hint">${esc(this._t("uLabelsPast"))}</div></div>`;
-    }
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span>${this._labelUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
+    const u = this._labelUsage;
+    if (!u || u.key !== this._labelUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
     const rows = selected
-      .map((id) => {
-        const entityId = this._labelEnergy?.[id]?.[range];
-        const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
-        return { id, name: names[id] || id, kwh: value };
-      })
-      .filter((r) => Number.isFinite(r.kwh))
+      .map((id) => ({ id, name: names[id] || id, ...(u.rows?.[id] || { kwh: 0, covered: 0, total: 0 }) }))
+      .filter((r) => r.covered > 0)
       .sort((a, b) => b.kwh - a.kwh);
     const max = Math.max(0, ...rows.map((r) => r.kwh));
     const html = rows
       .map((r) => {
-        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span></span>
+        const cover = r.covered < r.total ? ` <small class="cnt" title="${esc(this._t("uLabelsCoverageTip"))}">${esc(this._t("uLabelsCoverage", { n: r.covered, m: r.total }))}</small>` : "";
+        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span>${cover}</span>
           <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t("uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
+  }
+
+  /** The selected labels with the power sensors that carry them: {label_id: [entity_id]}. */
+  _labelMemberMap() {
+    const out = {};
+    for (const id of this._cfg.label_ids || []) out[id] = this._labelMembers(id);
+    return out;
+  }
+
+  _labelUsageKey(range, off) {
+    return `${range}:${off}:${Object.entries(this._labelMemberMap()).map(([l, m]) => `${l}=${m.join(",")}`).join(";")}`;
+  }
+
+  _maybeLoadLabelUsage() {
+    if (!this._ready || this._labelUsageLoading || !this._labelData || !(this._cfg.label_ids || []).length) return;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const v = this._labelUsage;
+    if (!v || v.key !== this._labelUsageKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadLabelUsage();
+  }
+
+  /** Energy per label for the shown period: the statistics of the sensors that carry it, summed up. */
+  async _loadLabelUsage() {
+    if (!this._hass || this._labelUsageLoading) return;
+    this._labelUsageLoading = true;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const key = this._labelUsageKey(range, off);
+    try {
+      const map = this._labelMemberMap();
+      const ids = [...new Set(Object.values(map).flat())];
+      const kwh = await this._statsKwh(ids, this._balWindow(range, off), range);
+      this._labelUsage = kwh == null
+        ? { key, rows: null, failed: true, at: Date.now() }
+        : {
+          key, at: Date.now(),
+          rows: Object.fromEntries(Object.entries(map).map(([label, members]) => {
+            const have = members.filter((m) => kwh.has(m));
+            return [label, { kwh: have.reduce((a, m) => a + kwh.get(m), 0), covered: have.length, total: members.length }];
+          })),
+        };
+    } finally {
+      this._labelUsageLoading = false;
+      this._render();
+    }
+  }
+
+  /**
+   * Energy in kWh per sensor for a window from the long-term statistics (hourly or daily means of the power times
+   * their duration), complete up to now: the statistics of an hour or a day only exist when it is over, so the
+   * running day is taken from the hourly and the running hour from the 5-minute statistics. A Map of the sensors
+   * that have statistics; null when a request fails.
+   */
+  async _statsKwh(ids, win, range) {
+    if (!ids.length) return new Map();
+    const now = Date.now(), tz = this._tz();
+    const to = Math.min(win.end, now);
+    const live = win.end > now;
+    const hourStart = live ? Math.floor(to / 3600000) * 3600000 : to;
+    const p = tzParts(now, tz);
+    const todayStart = zonedTime(p.y, p.m - 1, p.d, 0, tz);
+    const parts = [];
+    if (range === "month" || range === "year") {
+      parts.push([win.start, Math.min(to, todayStart), "day"]);
+      if (live) parts.push([Math.max(win.start, todayStart), hourStart, "hour"]);
+    } else parts.push([win.start, hourStart, "hour"]);
+    if (live && to > hourStart) parts.push([Math.max(hourStart, win.start), to, "5minute"]);
+    const results = await Promise.all(parts.map(([from, end, period]) => this._usStats(ids, from, end, period)));
+    if (results.some((r) => r == null)) return null;
+    const kwh = new Map();
+    results.forEach((res, i) => {
+      const period = parts[i][2];
+      for (const id of ids) {
+        const rows = res?.[id];
+        if (!rows || !rows.length) continue;
+        let sum = kwh.get(id) ?? 0;
+        for (const row of rows) {
+          if (row.mean == null || Number.isNaN(row.mean)) continue;
+          const hours = row.end != null && row.start != null ? (Number(row.end) - Number(row.start)) / 3600000 : period === "day" ? 24 : period === "5minute" ? 1 / 12 : 1;
+          sum += (Math.max(0, row.mean) * hours) / 1000;
+        }
+        kwh.set(id, sum);
+      }
+    });
+    return kwh;
   }
 
   /**
@@ -3574,6 +3655,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._tab === "balance") this._maybeLoadBalance();
     if (this._tab === "usage" || (this._tab === "house" && this._usageEnabled())) this._maybeLoadUsage();
     if (this._tab === "usage") this._maybeLoadUsageView();
+    if (this._tab === "usage") this._maybeLoadLabelUsage();
     if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {
