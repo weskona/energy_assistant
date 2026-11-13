@@ -2844,6 +2844,69 @@ test("usage: base load with its cost per year, the share of the always-on device
   assert.doesNotMatch(html, /Backofen<\/span> <small class="cnt">[^<]*per year/); // 0 W standby: not listed
 });
 
+test("usage: defined standby devices replace the automatic detection", () => {
+  const p = loadedUsage();
+  p._cfg.device_standby = ["sensor.c", "sensor.b"];
+  const html = p._renderUsage();
+  assert.match(html, /The standby devices you defined/);
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.match(card, /Router/);
+  assert.match(card, /Backofen/); // a defined device is listed even at 0 W
+  assert.doesNotMatch(card, /Kühlschrank/); // detected automatically before, now not defined
+  assert.match(html, /Always-on devices<\/div><div class="eb-value">12<small>W/); // only the router counts
+});
+
+test("usage: defined standby devices are part of the device list", () => {
+  const p = loadedUsage();
+  p._cfg.device_power = ["sensor.a"];
+  p._cfg.device_standby = ["sensor.b"];
+  assert.deepEqual(p._deviceIds(), ["sensor.a", "sensor.b"]);
+  p._cfg.device_power = [];
+  p._cfg.device_patterns = [];
+  assert.equal(p._usageEnabled(), true);
+});
+
+test("usage: both lists show as many rows as the shorter one (at least 5), the rest unfolds per list", () => {
+  const p = loadedUsage();
+  const many = [];
+  for (let k = 0; k < 9; k++) many.push({ id: `sensor.d${k}`, name: `Gerät${k}`, kwh: 5 - k * 0.4, baseW: k < 3 ? 30 - k : 0 });
+  p._usage.devices = many;
+  let html = p._renderUsage();
+  const rows = (card) => (card.match(/class="dev"/g) || []).length;
+  const split = (h) => [h.slice(h.indexOf("Biggest consumers"), h.indexOf("Always on (standby)")), h.slice(h.indexOf("Always on (standby)"))];
+  let [top, always] = split(html);
+  assert.equal(rows(top), 5); // the standby list has 3, but there are at least 5 rows
+  assert.equal(rows(always), 3);
+  assert.match(top, /Show all 9/);
+  assert.doesNotMatch(always, /Show all/);
+  assert.doesNotMatch(top, /devlist/);
+  p._usTopExpanded = true;
+  html = p._renderUsage();
+  [top] = split(html);
+  assert.equal(rows(top), 9);
+  assert.match(top, /Show less/);
+  assert.match(top, /devgrid devlist/);
+});
+
+test("usage: the bar of a consumer is its share of the total energy, not of the biggest one", () => {
+  const p = loadedUsage();
+  const html = p._renderUsage();
+  const top = html.slice(html.indexOf("Biggest consumers"), html.indexOf("Always on (standby)"));
+  const widths = [...top.matchAll(/class="fill" style="width:([\d.]+)%/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(widths[0] - (2.5 / 4.3) * 100) < 0.01); // Backofen: 2.5 of 4.3 kWh
+  assert.ok(Math.abs(widths[1] - (1.5 / 4.3) * 100) < 0.01); // Kühlschrank
+  assert.ok(widths[0] < 100);
+});
+
+test("usage: the bar of a standby device is its share of the base load", () => {
+  const p = loadedUsage(); // base load 120 W, Kühlschrank 40 W, Router 12 W
+  const html = p._renderUsage();
+  const always = html.slice(html.indexOf("Always on (standby)"));
+  const widths = [...always.matchAll(/class="fill" style="width:([\d.]+)%/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(widths[0] - (40 / 120) * 100) < 0.01);
+  assert.ok(Math.abs(widths[1] - (12 / 120) * 100) < 0.01);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();

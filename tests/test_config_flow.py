@@ -86,6 +86,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "device_exclude_patterns",
         "device_exclude",
         "device_power",
+        "device_standby",
         "area_ids",
         "label_ids",
     ]
@@ -97,6 +98,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
                 "device_exclude_patterns": [" Alpha_ESS_* ", "alpha_ess_*"],
                 "device_exclude": ["sensor.skip_power"],
                 "device_power": ["sensor.oven", "sensor.fridge"],
+                "device_standby": ["sensor.fridge"],
                 "area_ids": ["kueche", " kueche ", "wohnzimmer"],
                 "label_ids": ["klima", " klima ", "licht"],
             },
@@ -119,6 +121,7 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "device_exclude_patterns": ["alpha_ess_*"],
         "device_exclude": ["sensor.skip_power"],
         "device_power": ["sensor.oven", "sensor.fridge"],
+        "device_standby": ["sensor.fridge"],
         "area_ids": ["kueche", "wohnzimmer"],
         "label_ids": ["klima", "licht"],
     }

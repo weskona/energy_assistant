@@ -57,6 +57,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "battery_charge": [],
         "battery_grid_charge": ["sensor.bgc"],
         "device_power": ["sensor.oven", "sensor.fridge"],
+        "device_standby": [],
         "device_patterns": ["*_power"],
         "device_exclude": ["sensor.skip_power"],
         "device_exclude_patterns": ["alpha_ess_*"],

@@ -159,6 +159,8 @@ The **Consumption** tab appears as soon as devices are set up (single sensors or
 - **Biggest consumers today:** the power of the devices summed up since midnight in kWh, with the share and, with Tariffy, the cost of today.
 - **Always on (standby):** the devices whose lowest 30-minute average of the last 24 hours is at least 2 W, with kWh and cost per year.
 
+**Define standby devices:** in the settings (Devices section, also in the options of the integration) the field *Standby devices* takes the sensors that count as standby, e.g. router, NAS or fridge. As soon as it is filled, the *Always on* card lists exactly these devices (also below 2 W), with their lowest power in the period, and the *Always-on devices* tile sums them up. Left empty, the devices are detected automatically as before. A standby device is added to the device list even if no pattern finds it.
+
 **Device evaluation:** every row has a small line of the device (24 hours, or the period) in front of its value, also in the Devices card of the Power tab, where the tooltip adds the energy of today. A row of the Consumption tab opens to a larger line and the figures of the device: energy and cost, average power, peak, always-on power and how long it has been running.
 
 Devices that are unavailable now still count with their history; the wallbox row of EV Assistant has no history of its own and is not part of it.
