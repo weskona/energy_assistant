@@ -1344,7 +1344,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const year = (d.baseW / 1000) * 8760;
       const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
       const [v, unit] = fmtPower(d.baseW);
-      return row("always", d, d.name, v, unit, null, always[0].baseW > 0 ? (d.baseW / always[0].baseW) * 100 : 0, text);
+      return row("always", d, d.name, v, unit, null, houseBase > 0 ? (d.baseW / houseBase) * 100 : 0, text); // bar = share of the base load
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>

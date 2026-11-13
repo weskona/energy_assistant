@@ -2898,6 +2898,15 @@ test("usage: the bar of a consumer is its share of the total energy, not of the 
   assert.ok(widths[0] < 100);
 });
 
+test("usage: the bar of a standby device is its share of the base load", () => {
+  const p = loadedUsage(); // base load 120 W, Kühlschrank 40 W, Router 12 W
+  const html = p._renderUsage();
+  const always = html.slice(html.indexOf("Always on (standby)"));
+  const widths = [...always.matchAll(/class="fill" style="width:([\d.]+)%/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(widths[0] - (40 / 120) * 100) < 0.01);
+  assert.ok(Math.abs(widths[1] - (12 / 120) * 100) < 0.01);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();
