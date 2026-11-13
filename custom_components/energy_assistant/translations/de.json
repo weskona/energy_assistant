@@ -22,7 +22,22 @@
           "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
-          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
+          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)",
+          "battery_soc": "Ladestand-Sensor des Speichers (%) (optional)",
+          "battery_capacity": "Speicherkapazität in kWh (optional)",
+          "battery_min_soc": "Mindest-Ladestand in % (optional)"
+        }
+      },
+      "energy": {
+        "title": "Energiezähler",
+        "description": "Optional: fortlaufende kWh-Zähler oder Utility Meter für den Tab Bilanz, mehrere je Feld werden summiert. Ist das Energie-Dashboard von Home Assistant eingerichtet, werden dessen Zähler hier vorgeschlagen; ändere oder entferne sie nach Belieben.",
+        "data": {
+          "energy_solar": "PV-Erzeugung",
+          "energy_grid_import": "Netzbezug",
+          "energy_grid_export": "Einspeisung",
+          "energy_battery_charge": "In Speicher (Laden)",
+          "energy_battery_discharge": "Aus Speicher (Entladen)",
+          "energy_house": "Hausverbrauch (optional, sonst berechnet)"
         }
       },
       "devices": {
@@ -75,7 +90,22 @@
           "invert_battery": "Vorzeichen Speicher umkehren",
           "battery_discharge": "Vom Speicher / Entladen (optional, mehrere möglich)",
           "battery_charge": "Zum Speicher / Laden (optional, mehrere möglich)",
-          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)"
+          "battery_grid_charge": "Speicher aus dem Netz geladen (optional, Teil von „Zum Speicher“)",
+          "battery_soc": "Ladestand-Sensor des Speichers (%) (optional)",
+          "battery_capacity": "Speicherkapazität in kWh (optional)",
+          "battery_min_soc": "Mindest-Ladestand in % (optional)"
+        }
+      },
+      "energy": {
+        "title": "Energiezähler",
+        "description": "Optional: fortlaufende kWh-Zähler oder Utility Meter für den Tab Bilanz, mehrere je Feld werden summiert. Ist das Energie-Dashboard von Home Assistant eingerichtet, werden dessen Zähler hier vorgeschlagen; ändere oder entferne sie nach Belieben.",
+        "data": {
+          "energy_solar": "PV-Erzeugung",
+          "energy_grid_import": "Netzbezug",
+          "energy_grid_export": "Einspeisung",
+          "energy_battery_charge": "In Speicher (Laden)",
+          "energy_battery_discharge": "Aus Speicher (Entladen)",
+          "energy_house": "Hausverbrauch (optional, sonst berechnet)"
         }
       },
       "devices": {

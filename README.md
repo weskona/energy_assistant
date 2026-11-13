@@ -130,6 +130,10 @@ Without the optional "storage charged from grid" sensor the storage is assumed t
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile, in the source bar and as a second line in the history. Under the tile the production is split up: how many percent go straight to the house, into the storage (the solar share of the charging) and into the grid, for example `40 % House · 60 % Storage`. The whole percentages add up to 100; parts that round to 0 % are left out.
 
+### Config flow and options
+
+The config flow (and the options, which can be changed later with *Configure*) has four steps: grid and house, solar and storage, **energy counters** and devices. The storage step now also asks for the charge level sensor, the capacity (kWh) and the minimum charge level (%). The energy step asks for the counters of the Balance tab; if the Energy dashboard of Home Assistant is set up, its counters are suggested the first time and can be changed or removed. In the options, a field that you empty is cleared (before, the old value came back).
+
 ### Storage card
 
 With a **charge level sensor** (percent) in the settings (section *Solar and storage*) the Power tab shows a **Storage** card: the charge level as a bar with the minimum level marked, the status (charging, discharging, idle) and, with the **capacity** (kWh) and the **minimum charge level** (%), what is stored and what is usable. While the storage discharges it says when it is empty, while it charges when it is full, from the current power (from 20 W on). PV Assistant offers its charge level sensor, capacity and minimum level with the button of the notice.
@@ -143,6 +147,10 @@ A card **Notices** at the top of the Power tab appears when something needs atte
 - a **device that has been running for hours** (at least 200 W for 4 hours, breaks up to 15 minutes do not count; devices that never stopped in the last 24 hours, such as a heat pump, are not reported),
 - a **high base load**: the base load of the last 24 hours is at least 1.5 times and 50 W above the usual one (the median over the days before, from the long-term statistics of the house power sensor; it needs a house power sensor and three full days).
 
+### Time zone
+
+All periods and times (the day limits of the Balance and Consumption tabs, the clock times in the history chart and its table, "empty at") use the **time zone of your Home Assistant instance** (*Settings → System → General*), not the one of the browser. Days with a clock change have 23 or 25 hours, zones with a half-hour offset work too. If the time zone is not known, the browser's is used.
+
 ### Consumption tab: base load and devices
 
 The **Consumption** tab appears as soon as devices are set up (single sensors or name patterns) and needs no further setting. It reads the history of the last 24 hours (5-minute steps) of the device power sensors and the house power:
@@ -150,6 +158,8 @@ The **Consumption** tab appears as soon as devices are set up (single sensors or
 - **Base load:** the lowest 30-minute average of the house power, what never goes away, extrapolated to kWh per year and, with Tariffy, to the cost per year (price of the contract). It also says how much of it the always-on devices explain.
 - **Biggest consumers today:** the power of the devices summed up since midnight in kWh, with the share and, with Tariffy, the cost of today.
 - **Always on (standby):** the devices whose lowest 30-minute average of the last 24 hours is at least 2 W, with kWh and cost per year.
+
+**Device evaluation:** every row has a small line of the device (24 hours, or the period) in front of its value, also in the Devices card of the Power tab, where the tooltip adds the energy of today. A row of the Consumption tab opens to a larger line and the figures of the device: energy and cost, average power, peak, always-on power and how long it has been running.
 
 Devices that are unavailable now still count with their history; the wallbox row of EV Assistant has no history of its own and is not part of it.
 

@@ -1,6 +1,6 @@
 """Tests for the two-step config flow and the options flow."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -52,6 +52,9 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "battery_discharge",
         "battery_charge",
         "battery_grid_charge",
+        "battery_soc",
+        "battery_capacity",
+        "battery_min_soc",
     ]
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -59,7 +62,23 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
             "solar_power": ["sensor.pv_1", "sensor.pv_2"],
             "battery_charge": ["sensor.bat_in"],
             "battery_grid_charge": "sensor.bat_grid",
+            "battery_soc": "sensor.soc",
+            "battery_capacity": 10.5,
+            "battery_min_soc": 10,
         },
+    )
+    assert result["step_id"] == "energy"
+    assert list(result["data_schema"].schema) == [
+        "energy_solar",
+        "energy_grid_import",
+        "energy_grid_export",
+        "energy_battery_charge",
+        "energy_battery_discharge",
+        "energy_house",
+    ]
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"energy_solar": ["sensor.pv_e"], "energy_grid_import": ["sensor.imp_e"]},
     )
     assert result["step_id"] == "devices"
     assert list(result["data_schema"].schema) == [
@@ -90,6 +109,11 @@ async def test_full_flow_with_combined_sensors(hass: HomeAssistant) -> None:
         "solar_power": ["sensor.pv_1", "sensor.pv_2"],
         "battery_charge": ["sensor.bat_in"],
         "battery_grid_charge": "sensor.bat_grid",
+        "battery_soc": "sensor.soc",
+        "battery_capacity": 10.5,
+        "battery_min_soc": 10,
+        "energy_solar": ["sensor.pv_e"],
+        "energy_grid_import": ["sensor.imp_e"],
         "invert_battery": False,
         "device_patterns": ["*_power", "sensor.x_*"],
         "device_exclude_patterns": ["alpha_ess_*"],
@@ -105,6 +129,7 @@ async def test_flow_with_separate_import_only(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"grid_import": ["sensor.import"]}
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     with patch(SETUP, return_value=True):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
@@ -150,6 +175,8 @@ async def test_options_flow_prefills_and_saves(hass: HomeAssistant) -> None:
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"solar_power": ["sensor.pv", "sensor.pv_2"]}
     )
+    assert result["step_id"] == "energy"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
     assert result["step_id"] == "devices"
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"device_power": ["sensor.oven"]}
@@ -174,6 +201,7 @@ async def test_devices_step_rejects_invalid_patterns(hass: HomeAssistant) -> Non
         result["flow_id"], {"house_power": "sensor.house"}
     )
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["step_id"] == "devices"
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_patterns": ["*_power", "bad pattern!"]}
@@ -189,6 +217,7 @@ async def test_devices_step_rejects_invalid_exclude_patterns(
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"house_power": "sensor.house"}
     )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"device_exclude_patterns": ["no spaces"]}
@@ -211,5 +240,148 @@ async def test_options_flow_keeps_the_display_names(hass: HomeAssistant) -> None
     )
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})
     result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["device_names"] == {"sensor.wallbox_leistung": "Wallbox"}
+
+
+def _offer(targets):
+    return patch(
+        "custom_components.energy_assistant.config_flow.async_energy_suggestion",
+        AsyncMock(return_value={"targets": targets} if targets else None),
+    )
+
+
+async def test_the_energy_step_suggests_the_counters_of_the_energy_dashboard(
+    hass: HomeAssistant,
+) -> None:
+    offer = {
+        "energy_solar": ["sensor.pv_e"],
+        "energy_grid_import": ["sensor.imp_e"],
+        "energy_grid_export": ["sensor.exp_e"],
+    }
+    with _offer(offer):
+        result = await _start(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"house_power": "sensor.house"}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["step_id"] == "energy"
+        schema = {str(k): k for k in result["data_schema"].schema}
+        assert schema["energy_solar"].description == {
+            "suggested_value": ["sensor.pv_e"]
+        }
+        assert schema["energy_grid_export"].description == {
+            "suggested_value": ["sensor.exp_e"]
+        }
+        assert schema["energy_house"].description is None
+        # taking them over stores them, the user can still change them
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"energy_solar": ["sensor.pv_e", "sensor.balkon_e"]}
+        )
+        with patch(SETUP, return_value=True):
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"], {}
+            )
+    assert result["data"]["energy_solar"] == ["sensor.pv_e", "sensor.balkon_e"]
+    assert (
+        "energy_grid_import" not in result["data"]
+    )  # not taken over: removed in the form
+
+
+async def test_without_the_energy_dashboard_the_energy_step_is_empty(
+    hass: HomeAssistant,
+) -> None:
+    with _offer(None):
+        result = await _start(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"house_power": "sensor.house"}
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        schema = {str(k): k for k in result["data_schema"].schema}
+        assert all(marker.description is None for marker in schema.values())
+
+
+async def test_the_pv_assistant_offer_fills_the_storage_fields(
+    hass: HomeAssistant,
+) -> None:
+    MockConfigEntry(
+        domain="pv_assistant",
+        data={
+            "production_power_sensors": ["sensor.pv"],
+            "battery_soc_sensor": "sensor.soc",
+        },
+    ).add_to_hass(hass)
+    hass.data["pv_assistant"] = {
+        "settings": {"general": {"storage_capacity_kwh": 9.5, "battery_min_soc": 10}}
+    }
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"use_pv": True}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"grid_import": ["sensor.import"]}
+    )
+    assert result["step_id"] == "storage"
+    schema = {str(k): k for k in result["data_schema"].schema}
+    assert schema["battery_soc"].description == {
+        "suggested_value": "sensor.soc"
+    }  # one sensor, not a list
+    assert schema["battery_capacity"].description == {"suggested_value": 9.5}
+    assert schema["battery_min_soc"].description == {"suggested_value": 10.0}
+
+
+async def test_a_minimum_of_zero_is_shown_as_zero(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={"grid_import": ["sensor.import"], "battery_min_soc": 0.0}
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"grid_import": ["sensor.import"]}
+    )
+    schema = {str(k): k for k in result["data_schema"].schema}
+    assert schema["battery_min_soc"].description == {"suggested_value": 0.0}
+
+
+async def test_options_flow_clears_fields_that_were_emptied(
+    hass: HomeAssistant,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "grid_import": ["sensor.import"],
+            "solar_power": ["sensor.pv"],
+            "battery_soc": "sensor.soc",
+            "battery_capacity": 10.0,
+            "energy_solar": ["sensor.pv_e"],
+            "device_power": ["sensor.oven"],
+            "house_power": "sensor.house",
+        },
+    )
+    entry.add_to_hass(hass)
+    with _offer(None):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        # the user empties the house power sensor; the import stays
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"grid_import": ["sensor.import"]}
+        )
+        # in the storage step everything is emptied
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    data = result["data"]
+    assert data["grid_import"] == ["sensor.import"]
+    assert not data["house_power"]
+    assert not data["solar_power"]
+    assert not data["battery_soc"]
+    assert not data["battery_capacity"]
+    assert not data["energy_solar"]
+    assert not data["device_power"]

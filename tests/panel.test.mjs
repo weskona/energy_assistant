@@ -3293,3 +3293,258 @@ test("usage statistics: a failing request says so and a period shows its devices
   assert.match(q._renderUsage(), /1[.,]50<small>kWh/);
   assert.equal(t > 0, true);
 });
+
+// --- the time zone of the Home Assistant instance ---------------------------------------------------
+function zonePanel(tz, extra = {}) {
+  const p = panel({ house_power: "h", device_power: ["sensor.a"], ...extra }, { h: st(1) });
+  p._hass.language = "en";
+  p._hass.config = tz === undefined ? {} : { time_zone: tz };
+  p._ready = true;
+  return p;
+}
+function atTime(iso, fn) {
+  const real = Date.now;
+  Date.now = () => Date.parse(iso);
+  try { return fn(); } finally { Date.now = real; }
+}
+const iso = (ms) => new Date(ms).toISOString();
+
+test("time zone: the wall clock of an instant and the instant of a wall clock", () => {
+  const { tzParts, zonedTime } = Panel;
+  const t = Date.parse("2026-11-13T23:30:00Z");
+  assert.deepEqual(tzParts(t, "Pacific/Auckland"), { y: 2026, m: 11, d: 14, h: 12, mi: 30, s: 0 }); // UTC+13
+  assert.deepEqual(tzParts(t, "America/Los_Angeles"), { y: 2026, m: 11, d: 13, h: 15, mi: 30, s: 0 }); // UTC-8
+  assert.deepEqual(tzParts(t, "Asia/Kolkata"), { y: 2026, m: 11, d: 14, h: 5, mi: 0, s: 0 }); // UTC+5:30
+  assert.equal(tzParts(Date.parse("2026-11-13T00:00:00Z"), "UTC").h, 0); // 0, never 24
+  assert.equal(iso(zonedTime(2026, 10, 13, 0, "Europe/Berlin")), "2026-11-12T23:00:00.000Z");
+  assert.equal(iso(zonedTime(2026, 6, 13, 0, "Europe/Berlin")), "2026-07-12T22:00:00.000Z"); // summer time
+  assert.equal(iso(zonedTime(2026, 10, 32, 0, "UTC")), "2026-12-02T00:00:00.000Z"); // days overflow into the next month
+  assert.equal(iso(zonedTime(2026, 12, 1, 0, "UTC")), "2027-01-01T00:00:00.000Z"); // and months into the next year
+});
+
+test("time zone: the periods start at midnight of the instance, whatever the browser says", () => {
+  const now = "2026-11-13T23:30:00Z"; // Friday in Los Angeles, already Saturday in Auckland
+  atTime(now, () => {
+    const la = zonePanel("America/Los_Angeles");
+    assert.equal(iso(la._balWindow("day", 0).start), "2026-11-13T08:00:00.000Z");
+    assert.equal(la._balWindow("day", 0).edges.length - 1, 24);
+    assert.equal(iso(la._balWindow("week", 0).start), "2026-11-09T08:00:00.000Z"); // Monday 9th
+    assert.equal(iso(la._balWindow("month", 0).start), "2026-11-01T07:00:00.000Z"); // still summer time on the 1st
+    assert.equal(iso(la._balWindow("year", 0).start), "2026-01-01T08:00:00.000Z");
+    const nz = zonePanel("Pacific/Auckland");
+    assert.equal(iso(nz._balWindow("day", 0).start), "2026-11-13T11:00:00.000Z"); // the 14th starts at 11:00 UTC
+    assert.equal(iso(nz._balWindow("week", 0).start), "2026-11-08T11:00:00.000Z"); // Monday 9th, 00:00 NZDT
+    assert.equal(iso(nz._balWindow("day", -1).start), "2026-11-12T11:00:00.000Z");
+  });
+});
+
+test("time zone: days with a clock change have 23 or 25 hours, a month its real days", () => {
+  atTime("2026-10-25T12:00:00Z", () => {
+    const berlin = zonePanel("Europe/Berlin");
+    assert.equal(berlin._balWindow("day", 0).edges.length - 1, 25); // the end of summer time
+    assert.equal(berlin._balWindow("month", 0).edges.length - 1, 31);
+    assert.equal(iso(berlin._balWindow("month", 0).start), "2026-09-30T22:00:00.000Z");
+  });
+  atTime("2026-03-29T12:00:00Z", () => {
+    assert.equal(zonePanel("Europe/Berlin")._balWindow("day", 0).edges.length - 1, 23); // the start of summer time
+    assert.equal(zonePanel("America/Los_Angeles")._balWindow("day", 0).edges.length - 1, 24); // not there
+  });
+  atTime("2026-11-13T12:00:00Z", () => {
+    const edges = zonePanel("Asia/Kolkata")._balWindow("day", 0).edges;
+    assert.equal(iso(edges[0]), "2026-11-12T18:30:00.000Z"); // half-hour zones too
+    assert.equal(edges.length - 1, 24);
+  });
+});
+
+test("time zone: the labels of the balance follow the zone", () => {
+  atTime("2026-11-13T23:30:00Z", () => {
+    const nz = zonePanel("Pacific/Auckland");
+    const day = nz._balWindow("day", 0);
+    const dayLabel = nz._balLabel(day);
+    for (const part of [/Sat/, /14/, /November/, /2026/]) assert.match(dayLabel, part);
+    assert.match(nz._balTick(day, 0), /^(00:00|12:00 AM)$/); // midnight of the instance
+    assert.equal(nz._balTick(day, 1), "");
+    assert.match(nz._balTick(day, 3), /^(03:00|03:00 AM)$/);
+    assert.match(nz._balRowLabel(day, 5), /14\/11?|11\/14/); // 14 November
+    const week = nz._balWindow("week", 0);
+    assert.match(nz._balLabel(week), /Nov 9 – Nov 15, 2026|9 Nov – 15 Nov 2026/);
+    for (const part of [/Mon/, /9/]) assert.match(nz._balTick(week, 0), part);
+    const year = nz._balWindow("year", 0);
+    assert.equal(nz._balLabel(year), "2026");
+    assert.match(nz._balTick(nz._balWindow("month", 0), 13), /^14$/); // the day of the month in the zone
+    const la = zonePanel("America/Los_Angeles");
+    const laLabel = la._balLabel(la._balWindow("day", 0));
+    for (const part of [/Fri/, /13/, /November/]) assert.match(laLabel, part);
+  });
+});
+
+test("time zone: a zone the browser does not know falls back to the browser's, no zone too", () => {
+  assert.equal(zonePanel("Mars/Olympus")._tz(), undefined);
+  assert.equal(zonePanel(undefined)._tz(), undefined);
+  assert.equal(zonePanel("Europe/Berlin")._tz(), "Europe/Berlin");
+  const odd = zonePanel("Mars/Olympus");
+  assert.equal(odd._balWindow("day", 0).edges.length - 1 >= 23, true); // still a usable window
+  const none = new Panel();
+  assert.equal(none._tz(), undefined);
+});
+
+test("time zone: the consumption of today counts from midnight of the instance", () => {
+  const t1 = Date.parse("2026-11-13T12:00:00Z"); // 13:00 in Berlin: 13 hours since midnight there, 12 in UTC
+  const t0 = t1 - 24 * 3600000;
+  const rows = (w) => [{ lu: t0 / 1000, s: String(w) }];
+  const berlin = zonePanel("Europe/Berlin");
+  const utc = zonePanel("UTC");
+  const inBerlin = berlin._usageCompute({ "sensor.a": rows(1000) }, ["sensor.a"], t0, t1).devices[0].kwh;
+  const inUtc = utc._usageCompute({ "sensor.a": rows(1000) }, ["sensor.a"], t0, t1).devices[0].kwh;
+  assert.ok(Math.abs(inBerlin - 13) < 1e-9);
+  assert.ok(Math.abs(inUtc - 12) < 1e-9);
+});
+
+test("time zone: the days of the usual base load are the days of the instance", () => {
+  const p = zonePanel("Pacific/Auckland");
+  // 24 hourly means that belong to one Auckland day, but to two UTC days
+  const start = Date.parse("2026-11-09T11:00:00Z"); // 10 Nov 00:00 NZDT
+  const day = (offset, low) => Array.from({ length: 24 }, (_, h) => ({ start: start + (offset * 24 + h) * 3600000, mean: h === 2 ? low : 400 }));
+  const rows = [0, 1, 2].flatMap((o, i) => day(o, [100, 120, 140][i]));
+  assert.equal(p._baseRefFrom(rows, new Date("2026-11-20T12:00:00Z")), 120); // three full days
+  const utc = zonePanel("UTC");
+  assert.equal(utc._baseRefFrom(rows, new Date("2026-11-20T12:00:00Z")), null); // in UTC they are split into days of less than 18 hours
+});
+
+test("time zone: the history chart has its ticks and its table at the local hours", () => {
+  const pts = [];
+  const t0 = Date.parse("2026-11-12T20:10:00Z");
+  for (let k = 0; k <= 288; k++) pts.push({ t: t0 + k * 300000, v: 100 + (k % 7), solar: 0, d: 0, gridIn: 0 });
+  const kolkata = zonePanel("Asia/Kolkata");
+  kolkata._hass.language = "de"; // 24-hour clock
+  const html = kolkata._historyChart(pts);
+  const ticks = [...html.matchAll(/class="htick" x="[^"]*" y="[^"]*" text-anchor="middle">(\d\d:\d\d)</g)].map((m) => m[1]);
+  assert.ok(ticks.length >= 7);
+  for (const t of ticks) assert.match(t, /^(00|03|06|09|12|15|18|21):00$/); // full local hours, also in a half-hour zone
+  assert.match(html, /<tr><th>13\.11\., 02:00<\/th>/); // the first row is the local hour 02:00 (20:30 UTC), not a UTC hour
+  assert.doesNotMatch(html, /<tr><th>[^<]*:30<\/th>/); // no row at half past
+  const tip = kolkata._tipAt(t0 + 3600000);
+  assert.match(tip.title, /\d{1,2}[/.]\d{1,2}.*\d\d:\d\d/);
+});
+
+// --- the device evaluation: small lines and the details of a device -----------------------------------
+test("sparkline: a small line of the values, nothing without a visible curve", () => {
+  const p = new Panel();
+  const line = p._sparkline([0, 10, 40, 20, 80, 30]);
+  assert.match(line, /^<svg class="spk" viewBox="0 0 96 22" width="96" height="22"/);
+  assert.match(line, /<path class="spkarea" d="M0\.0,[\d.]+L[^"]*Z"\/>/);
+  assert.match(line, /<path class="spkline" d="M0\.0,[\d.]+L/);
+  const y = [...line.matchAll(/L?([\d.]+),([\d.]+)/g)];
+  assert.ok(y.length > 6);
+  assert.equal(p._sparkline([0, 0, 0, 0, 0]), ""); // flat zero
+  assert.equal(p._sparkline([1, 2, 3]), ""); // too few values
+  assert.equal(p._sparkline(null), "");
+  assert.equal(p._sparkline([null, null, null, null, null]), "");
+  // gaps break the line, negative values count as 0
+  const gap = p._sparkline([10, 20, null, 30, 40, 50, -5]);
+  assert.equal((gap.match(/M[\d.]+,/g) || []).length >= 2, true);
+  assert.match(p._sparkline([1, 5, 9, 4], { w: 320, h: 56, big: true }), /class="spk big" viewBox="0 0 320 56" preserveAspectRatio="none"/);
+});
+
+test("sparkline: long series are averaged to fit, gaps stay empty", () => {
+  const p = new Panel();
+  const values = Array.from({ length: 289 }, (_, i) => (i < 7 ? null : 100)); // 289 values in buckets of 7
+  const small = p._downsample(values, 48);
+  assert.ok(small.length <= 48);
+  assert.equal(small[0], null); // a bucket of gaps only stays empty
+  assert.equal(small[small.length - 1], 100);
+  assert.deepEqual(p._downsample([1, 2, 3], 48), [1, 2, 3]);
+  assert.deepEqual(p._downsample([], 48), []);
+  assert.deepEqual(p._downsample([10, 30, -20, 0], 2), [20, 0]); // negative readings count as 0
+});
+
+test("device evaluation: the history gives every device a line, the peak and the average power", () => {
+  const p = usagePanel();
+  const { t0, t1 } = usageNow();
+  const res = {
+    "sensor.a": hrows(t0, [[0, 100], [18, 2000], [19, 100]]),
+    "sensor.b": hrows(t0, [[0, 5]]),
+  };
+  const u = p._usageCompute(res, ["sensor.a", "sensor.b"], t0, t1);
+  const a = u.devices[0];
+  assert.ok(a.spark.length <= 48 && a.spark.length > 10);
+  assert.equal(a.peak, 2000);
+  assert.ok(a.avgW > 100 && a.avgW < 2000);
+  assert.equal(u.devices[1].peak, 5);
+  assert.ok(Math.abs(u.devices[1].avgW - 5) < 0.01);
+});
+
+test("device evaluation: the statistics give lines, the peak and the average power of the period", () => {
+  const p = usagePanel();
+  const t = new Date(2026, 10, 9).getTime();
+  const energy = { "sensor.a": hourRows(t, [100, 100, 900, 100]), __period: "hour" };
+  const base = { "sensor.a": hourRows(t, Array.from({ length: 24 }, (_, i) => (i === 5 ? 900 : 100))) };
+  const r = p._usageFromStats(energy, base, ["sensor.a"], 4);
+  const a = r.devices[0];
+  assert.equal(a.peak, 900);
+  assert.ok(Math.abs(a.avgW - 300) < 1e-9); // 1.2 kWh in 4 hours
+  assert.equal(a.spark.length, 24); // from the hourly means
+  assert.equal(p._usageFromStats(energy, base, ["sensor.a"]).devices[0].avgW, null); // unknown duration
+  const noHourly = p._usageFromStats(energy, {}, ["sensor.a"], 4).devices[0];
+  assert.equal(noHourly.spark.length, 4); // from the energy rows if there are no hourly ones
+});
+
+function usageWithLines(extra = {}) {
+  const p = loadedUsage(extra);
+  const spark = Array.from({ length: 48 }, (_, i) => (i % 8 < 4 ? 120 : 20));
+  p._usage.devices = [
+    { id: "sensor.a", name: "Kühlschrank", kwh: 1.5, baseW: 40, spark, peak: 150, avgW: 62, run: 0 },
+    { id: "sensor.b", name: "Router", kwh: 0.3, baseW: 12, spark, peak: 14, avgW: 12.5, run: 0 },
+    { id: "sensor.c", name: "Backofen", kwh: 2.5, baseW: 0, spark, peak: 2100, avgW: 400, run: 2 * 3600000 },
+  ];
+  return p;
+}
+
+test("device evaluation: the rows of the consumption tab have a small line and open to the details", () => {
+  const p = usageWithLines({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } } });
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  let html = p._renderUsage();
+  assert.ok((html.match(/<svg class="spk"/g) || []).length >= 5); // consumers (3) and always on (2)
+  assert.match(html, /data-open="usage:top:sensor\.c"[^>]*aria-expanded="false"/);
+  assert.doesNotMatch(html, /class="subs"/);
+  p._render = () => {};
+  p._onClick({ target: { closest: (sel) => (sel === "[data-open]" ? { dataset: { open: "usage:top:sensor.c" } } : null) } });
+  html = p._renderUsage();
+  assert.match(html, /data-open="usage:top:sensor\.c"[^>]*aria-expanded="true"/);
+  const detail = html.slice(html.indexOf('class="subs"'));
+  assert.match(detail, /<svg class="spk big"/);
+  assert.match(detail, /Energy<\/span><b>2[.,]50 kWh<\/b>/);
+  assert.match(detail, /Cost<\/span><b>[^<]*0[.,]75[^<]*<\/b>/); // 2.5 kWh x 0.30
+  assert.match(detail, /Average power<\/span><b>400 W<\/b>/);
+  assert.match(detail, /Peak<\/span><b>2[.,]?100 W<\/b>/);
+  assert.match(detail, /Running now for<\/span><b>2 h 0 min<\/b>/);
+  assert.doesNotMatch(detail, /Always on<\/span>/); // a standby of 0 W is not a fact
+  // another device and the same device in the other list stay closed
+  assert.equal((html.match(/class="subs"/g) || []).length, 1);
+});
+
+test("device evaluation: the details of a past period have no running time, devices without a line show none", () => {
+  const p = usageWithLines();
+  p._usRange = "week";
+  p._usageView = { range: "week", off: 0, at: Date.now(), houseBase: 100, devices: p._usage.devices };
+  p._open = new Set(["usage:top:sensor.c"]);
+  assert.doesNotMatch(p._renderUsage(), /Running now for/);
+  const bare = usageWithLines();
+  bare._usage.devices[0].spark = [];
+  const html = bare._renderUsage();
+  assert.match(html, /Kühlschrank/);
+  assert.ok((html.match(/<svg class="spk"/g) || []).length < 5);
+});
+
+test("device evaluation: the device list of the Power tab has the lines and the energy of today in the tooltip", () => {
+  const p = evDevicePanel();
+  p._usage = {
+    at: Date.now(),
+    devices: [{ id: "sensor.herd_leistung", name: "Herd", kwh: 1.2, baseW: 0, spark: [0, 800, 900, 700, 0, 600, 900, 100], peak: 900, avgW: 50, run: 0 }],
+  };
+  const html = p._renderDevices(10000);
+  assert.match(html, /Herd<\/span>[\s\S]*<span class="val"><svg class="spk"[\s\S]*900<small>W/); // the line before the value
+  assert.match(html, /title="[^"]*1[.,]20 kWh today"/);
+  assert.match(html, /Solar share 72 %/); // the tooltip of the wallbox row is kept
+  assert.doesNotMatch(html.slice(html.indexOf("Wallbox"), html.indexOf("Herd")), /<svg class="spk"/); // no history for the wallbox row
+});

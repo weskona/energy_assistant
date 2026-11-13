@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-13
+
+### Changed
+
+- **Time zone of the Home Assistant instance:** periods and times no longer follow the browser but `hass.config.time_zone`: the limits of the day, week, month and year in the Balance and Consumption tabs (days with a clock change have 23 or 25 hours, also zones with a half-hour offset), the labels, the time axis, the table and the tooltip of the history chart, the "empty at" time of the storage, the day of the usual base load and the energy of a device since midnight. An unknown time zone falls back to the browser's.
+
+### Added
+
+- **Device evaluation, completed:** every device row has a small line of its power (24 hours, or the selected period) in front of the value, in the Consumption tab and in the Devices card of the Power tab (whose tooltip adds the energy of today). A row of the Consumption tab opens to a larger line and the figures of the device: energy, cost (with Tariffy), average power, peak, always-on power and the running time.
+- **Config flow and options:** the storage step asks for the charge level sensor, the capacity and the minimum level; a new step **Energy counters** asks for the counters of the Balance tab and suggests those of the Energy dashboard of Home Assistant the first time. Config and options flow now have four steps.
+
+### Fixed
+
+- In the options flow a field that was emptied is cleared; before, the stored value came back when the options were merged.
+
 ## [0.21.0] - 2026-11-13
 
 ### Added

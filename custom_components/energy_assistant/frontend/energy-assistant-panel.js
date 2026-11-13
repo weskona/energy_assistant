@@ -45,6 +45,11 @@ const STYLE = `
 .socbar.charging i{background:var(--ea-bin)}
 .socbar.discharging i{background:var(--ea-bout)}
 .socbar b{position:absolute;top:-3px;width:2px;height:18px;background:var(--eb-text);opacity:.6;border-radius:1px}
+.spk{display:inline-block;vertical-align:middle;margin-right:10px;overflow:visible}
+.spk .spkline{fill:none;stroke:var(--eb-green);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.spk .spkarea{fill:var(--eb-green);opacity:.15}
+.spk.big{display:block;margin:6px 0 4px;width:100%;height:56px}
+.dev .line.open .nt{border-bottom:1px dotted var(--eb-dim)}
 .bpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .bpick .segs{margin-top:0}
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
@@ -172,6 +177,13 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    uTodayKwh: "{kwh} kWh today",
+    uFactEnergy: "Energy",
+    uFactCost: "Cost",
+    uFactAvg: "Average power",
+    uFactPeak: "Peak",
+    uFactBase: "Always on",
+    uFactRun: "Running now for",
     alTitle: "Notices",
     alFault: "Plant fault{plants}",
     alNegPrice: "The electricity price is negative ({price} ct/kWh): using power now pays",
@@ -433,6 +445,13 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    uTodayKwh: "{kwh} kWh heute",
+    uFactEnergy: "Energie",
+    uFactCost: "Kosten",
+    uFactAvg: "Durchschnittsleistung",
+    uFactPeak: "Spitze",
+    uFactBase: "Dauerlast",
+    uFactRun: "Läuft seit",
     alTitle: "Hinweise",
     alFault: "Anlagenstörung{plants}",
     alNegPrice: "Der Strompreis ist negativ ({price} ct/kWh): Verbrauchen lohnt sich jetzt",
@@ -697,6 +716,32 @@ const esc = (t) =>
   String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // Settings form: [key, kind]. "multi" = several sensors, "single" = one sensor.
+// --- time zone of the Home Assistant instance (hass.config.time_zone), not the one of the browser -------------
+const _tzFormats = new Map();
+function _tzFormat(tz) {
+  let f = _tzFormats.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
+    _tzFormats.set(tz, f);
+  }
+  return f;
+}
+/** The wall clock of an instant in a time zone: year, month (1-12), day, hour, minute, second. */
+function tzParts(ms, tz) {
+  const out = {};
+  for (const part of _tzFormat(tz).formatToParts(ms)) if (part.type !== "literal") out[part.type] = Number(part.value);
+  return { y: out.year, m: out.month, d: out.day, h: out.hour % 24, mi: out.minute, s: out.second };
+}
+function tzOffset(ms, tz) {
+  const p = tzParts(ms, tz);
+  return Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000;
+}
+/** The instant of a wall clock time (month 0-11, days and months may overflow) in a time zone. */
+function zonedTime(y, m, d, h, tz) {
+  const guess = Date.UTC(y, m, d, h);
+  const first = guess - tzOffset(guess, tz);
+  return guess - tzOffset(first, tz);
+}
 const BAL_CATS = [["solar", "energy_solar"], ["imp", "energy_grid_import"], ["exp", "energy_grid_export"], ["chg", "energy_battery_charge"], ["dis", "energy_battery_discharge"], ["house", "energy_house"]];
 const NUMBER_KEYS = ["battery_capacity", "battery_min_soc"];
 const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
@@ -889,7 +934,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (days != null) tiles.push(tile(this._t("aDays"), Math.round(days).toLocaleString(lang), this._t("aDaysUnit")));
       const dateState = ids.datum && this._hass?.states?.[ids.datum]?.state;
       const date = dateState && !["unknown", "unavailable"].includes(dateState) ? new Date(dateState) : null;
-      if (date && !Number.isNaN(date.getTime())) tiles.push(tile(this._t("aDate"), esc(date.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" }))));
+      if (date && !Number.isNaN(date.getTime())) tiles.push(tile(this._t("aDate"), esc(date.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric", timeZone: this._tz() }))));
       if (!tiles.length) return "";
       return `<div class="eb-label costs">${esc(entry.title || "Amortix")}</div><div class="tiles">${tiles.join("")}</div>`;
     }).join("");
@@ -929,6 +974,41 @@ class EnergyAssistantPanel extends HTMLElement {
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
+  }
+
+  /** The mean of the values per bucket, so that a long series fits a small line (gaps stay empty). */
+  _downsample(values, n = 48) {
+    if (!values || !values.length) return [];
+    const size = Math.max(1, Math.ceil(values.length / n));
+    const out = [];
+    for (let i = 0; i < values.length; i += size) {
+      const part = values.slice(i, i + size).filter((v) => v != null && !Number.isNaN(v));
+      out.push(part.length ? part.reduce((a, v) => a + Math.max(0, v), 0) / part.length : null);
+    }
+    return out;
+  }
+
+  /** A small line of a power series (zero at the bottom) as inline SVG; nothing without a visible curve. */
+  _sparkline(values, { w = 96, h = 22, big = false } = {}) {
+    const v = (values || []).map((x) => (x == null || Number.isNaN(x) ? null : Math.max(0, x)));
+    const known = v.filter((x) => x != null);
+    const max = Math.max(0, ...known);
+    if (known.length < 4 || !(max > 0)) return "";
+    const n = v.length;
+    const x = (i) => (n === 1 ? 0 : (i / (n - 1)) * w).toFixed(1);
+    const y = (val) => (h - 1 - (val / max) * (h - 3)).toFixed(1);
+    let line = "", area = "", seg = [];
+    const flush = () => {
+      if (seg.length > 1) {
+        line += seg.map(([i, val], k) => `${k ? "L" : "M"}${x(i)},${y(val)}`).join("");
+        area += `${seg.map(([i, val], k) => `${k ? "L" : "M"}${x(i)},${y(val)}`).join("")}L${x(seg[seg.length - 1][0])},${h}L${x(seg[0][0])},${h}Z`;
+      }
+      seg = [];
+    };
+    v.forEach((val, i) => { if (val == null) flush(); else seg.push([i, val]); });
+    flush();
+    if (!line) return "";
+    return `<svg class="spk${big ? " big" : ""}" viewBox="0 0 ${w} ${h}" ${big ? 'preserveAspectRatio="none"' : `width="${w}" height="${h}"`} aria-hidden="true"><path class="spkarea" d="${area}"/><path class="spkline" d="${line}"/></svg>`;
   }
 
   /** The consumption tab exists when devices are set up (single sensors or name patterns). */
@@ -977,9 +1057,10 @@ class EnergyAssistantPanel extends HTMLElement {
   _usageCompute(res, ids, t0, t1) {
     const step = BUCKET_MIN * 60 * 1000;
     const n = Math.floor((t1 - t0) / step);
-    const midnight = new Date(t1);
-    midnight.setHours(0, 0, 0, 0);
-    const from = Math.max(0, Math.ceil((midnight.getTime() - t0) / step));
+    const tz = this._tz();
+    const day = tzParts(t1, tz);
+    const midnight = zonedTime(day.y, day.m - 1, day.d, 0, tz);
+    const from = Math.max(0, Math.ceil((midnight - t0) / step));
     const devices = [];
     for (const id of ids) {
       const arr = this._sampleW(res?.[id], id, t0, n, step);
@@ -996,7 +1077,12 @@ class EnergyAssistantPanel extends HTMLElement {
         }
         run = (end - startK + 1) * step;
       }
-      devices.push({ id, name: this._deviceName(id), kwh, baseW: this._baseline(arr), run, nowW: arr[n] });
+      const known = arr.filter((v) => v != null && !Number.isNaN(v));
+      const hoursToday = Math.max(0.0001, (t1 - midnight) / 3600000);
+      devices.push({
+        id, name: this._deviceName(id), kwh, baseW: this._baseline(arr), run, nowW: arr[n],
+        spark: this._downsample(arr, 48), peak: known.length ? Math.max(0, ...known) : null, avgW: (kwh / hoursToday) * 1000,
+      });
     }
     return { devices, at: Date.now() };
   }
@@ -1102,7 +1188,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * Consumption of a period from the long-term statistics: the energy of every device (hourly or daily means
    * times their duration) and the base load as the lowest hourly mean, of the house and of every device.
    */
-  _usageFromStats(energyRes, baseRes, ids) {
+  _usageFromStats(energyRes, baseRes, ids, hours = null) {
     const hoursOf = (row, period) => (row.end != null && row.start != null ? (Number(row.end) - Number(row.start)) / 3600000 : period === "day" ? 24 : 1);
     const devices = [];
     for (const id of ids) {
@@ -1113,7 +1199,13 @@ class EnergyAssistantPanel extends HTMLElement {
         if (row.mean == null || Number.isNaN(row.mean)) continue;
         kwh += (Math.max(0, row.mean) * hoursOf(row, energyRes.__period)) / 1000;
       }
-      devices.push({ id, name: this._deviceName(id), kwh, baseW: this._lowestMean((baseRes?.[id] || []).map((r) => r.mean)) });
+      const hourly = (baseRes?.[id] || []).map((r) => r.mean);
+      const means = (hourly.length ? hourly : rows.map((r) => r.mean)).map((v) => (v == null || Number.isNaN(v) ? null : v));
+      const known = means.filter((v) => v != null);
+      devices.push({
+        id, name: this._deviceName(id), kwh, baseW: this._lowestMean(hourly),
+        spark: this._downsample(means, 60), peak: known.length ? Math.max(0, ...known) : null, avgW: hours > 0 ? (kwh / hours) * 1000 : null,
+      });
     }
     return { devices, houseBase: this._lowestMean(this._houseHourly(baseRes)) };
   }
@@ -1147,7 +1239,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (energy == null || base == null) {
         this._usageView = { range, off, devices: [], houseBase: null, failed: true, at: Date.now() };
       } else {
-        const calc = this._usageFromStats({ ...energy, __period: hourly ? "hour" : "day" }, base, ids);
+        const calc = this._usageFromStats({ ...energy, __period: hourly ? "hour" : "day" }, base, ids, (to - win.start) / 3600000);
         this._usageView = { range, off, ...calc, at: Date.now() };
       }
     } finally {
@@ -1201,12 +1293,29 @@ class EnergyAssistantPanel extends HTMLElement {
     // 2) biggest consumers today
     const top = u.devices.filter((d) => d.kwh >= 0.005).sort((a, b) => b.kwh - a.kwh).slice(0, 10);
     const total = u.devices.reduce((a, d) => a + d.kwh, 0);
-    const row = (name, value, unit, share, width, subtitle = "") => `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(name)}">${esc(name)}</span>${subtitle ? ` <small class="cnt">${esc(subtitle)}</small>` : ""}</span>
-      <span class="val">${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
-      <div class="track"><div class="fill" style="width:${Math.min(100, width)}%"></div></div></div>`;
+    const facts = (d) => {
+      const f = [[this._t("uFactEnergy"), `${num(d.kwh, 2)} kWh`]];
+      if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * price)]);
+      if (d.avgW != null) f.push([this._t("uFactAvg"), fmtPower(d.avgW).join(" ")]);
+      if (d.peak != null) f.push([this._t("uFactPeak"), fmtPower(d.peak).join(" ")]);
+      if (d.baseW != null && d.baseW >= 2) f.push([this._t("uFactBase"), fmtPower(d.baseW).join(" ")]);
+      if (d.run >= 3600000 && today) f.push([this._t("uFactRun"), this._duration(d.run / 3600000)]);
+      return f;
+    };
+    // A row opens to the line of the device and its figures (the line also sits in the row, small).
+    const row = (scope, d, name, value, unit, share, width, subtitle = "") => {
+      const key = `usage:${scope}:${d.id}`; // each list opens its rows on its own
+      const isOpen = this._open?.has(key);
+      const detail = isOpen
+        ? `<div class="subs">${this._sparkline(d.spark, { w: 320, h: 56, big: true })}${facts(d).map(([k, val]) => `<div class="s"><span class="sn">${esc(k)}</span><b>${esc(val)}</b></div>`).join("")}</div>`
+        : "";
+      return `<div class="dev"><div class="line open" data-open="${esc(key)}" role="button" tabindex="0" aria-expanded="${isOpen ? "true" : "false"}"><span class="name"><span class="nt" title="${esc(name)}">${esc(name)}</span>${subtitle ? ` <small class="cnt">${esc(subtitle)}</small>` : ""}</span>
+      <span class="val">${this._sparkline(d.spark)}${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, width)}%"></div></div>${detail}</div>`;
+    };
     const topRows = top.map((d) => {
       const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
-      return row(d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
+      return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
       <div class="devgrid">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
@@ -1215,7 +1324,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const year = (d.baseW / 1000) * 8760;
       const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
       const [v, unit] = fmtPower(d.baseW);
-      return row(d.name, v, unit, null, (d.baseW / always[0].baseW) * 100, text);
+      return row("always", d, d.name, v, unit, null, (d.baseW / always[0].baseW) * 100, text);
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
       <div class="hint">${esc(this._t(today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
@@ -1266,7 +1375,7 @@ class EnergyAssistantPanel extends HTMLElement {
       tiles.push(tile(this._t("stPower"), v, u));
     }
     if (st.hours != null && Number.isFinite(st.hours)) {
-      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
+      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
       tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
     }
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
@@ -1305,8 +1414,9 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _baseRefFrom(rows, now = new Date()) {
-    const key = (t) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
-    const today = key(now);
+    const tz = this._tz();
+    const key = (t) => { const p = tzParts(t, tz); return `${p.y}-${p.m}-${p.d}`; };
+    const today = key(now instanceof Date ? now.getTime() : now);
     const days = new Map();
     for (const row of rows) {
       if (row.mean == null || Number.isNaN(row.mean)) continue;
@@ -1370,6 +1480,18 @@ class EnergyAssistantPanel extends HTMLElement {
       ${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${a.level === "info" ? "ℹ" : "⚠"} ${esc(a.text)}</div>`).join("")}</div>`;
   }
 
+  /** The time zone of the Home Assistant instance; the browser's if it is unknown or not usable. */
+  _tz() {
+    const tz = this._hass?.config?.time_zone;
+    if (!tz) return undefined;
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: tz });
+      return tz;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   /** The balance tab exists when at least one energy counter is configured. */
   _balEnabled() {
     return ENERGY_KEYS.some((k) => (this._cfg[k] || []).length > 0);
@@ -1381,35 +1503,39 @@ class EnergyAssistantPanel extends HTMLElement {
    * `edges` are the starts of the buckets plus the end of the period.
    */
   _balWindow(range = this._balRange ?? "day", off = this._balOff ?? 0) {
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    const tz = this._tz();
+    const now = tzParts(Date.now(), tz);
+    const y = now.y, m = now.m - 1, d = now.d;
+    const weekday = new Date(Date.UTC(y, m, d)).getUTCDay();
     let start, end, bucket;
     if (range === "week") {
-      start = new Date(y, m, d - ((now.getDay() + 6) % 7) + off * 7);
-      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+      const monday = d - ((weekday + 6) % 7) + off * 7;
+      start = zonedTime(y, m, monday, 0, tz);
+      end = zonedTime(y, m, monday + 7, 0, tz);
       bucket = "day";
     } else if (range === "month") {
-      start = new Date(y, m + off, 1);
-      end = new Date(y, m + off + 1, 1);
+      start = zonedTime(y, m + off, 1, 0, tz);
+      end = zonedTime(y, m + off + 1, 1, 0, tz);
       bucket = "day";
     } else if (range === "year") {
-      start = new Date(y + off, 0, 1);
-      end = new Date(y + off + 1, 0, 1);
+      start = zonedTime(y + off, 0, 1, 0, tz);
+      end = zonedTime(y + off + 1, 0, 1, 0, tz);
       bucket = "month";
     } else {
-      start = new Date(y, m, d + off);
-      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+      start = zonedTime(y, m, d + off, 0, tz);
+      end = zonedTime(y, m, d + off + 1, 0, tz);
       bucket = "hour";
     }
-    const edges = [start.getTime()];
-    while (edges[edges.length - 1] < end.getTime()) {
-      const t = new Date(edges[edges.length - 1]);
-      edges.push(bucket === "hour" ? t.getTime() + 3600000
-        : bucket === "day" ? new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1).getTime()
-          : new Date(t.getFullYear(), t.getMonth() + 1, 1).getTime());
+    const edges = [start];
+    while (edges[edges.length - 1] < end) {
+      const last = edges[edges.length - 1];
+      const t = tzParts(last, tz);
+      edges.push(bucket === "hour" ? last + 3600000
+        : bucket === "day" ? zonedTime(t.y, t.m - 1, t.d + 1, 0, tz)
+          : zonedTime(t.y, t.m, 1, 0, tz));
     }
-    edges[edges.length - 1] = end.getTime();
-    return { range, off, start: start.getTime(), end: end.getTime(), bucket, period: bucket, edges };
+    edges[edges.length - 1] = end;
+    return { range, off, start, end, bucket, period: bucket, edges };
   }
 
   /** The changes of the counters per bucket and category (null where a category has no counter). */
@@ -1509,28 +1635,31 @@ class EnergyAssistantPanel extends HTMLElement {
   /** Label of the period: the date, the week, the month or the year. */
   _balLabel(win) {
     const lang = this._hass?.language || "en";
-    const fmt = (t, o) => new Date(t).toLocaleDateString(lang, o);
+    const tz = this._tz();
+    const fmt = (t, o) => new Date(t).toLocaleDateString(lang, { ...o, timeZone: tz });
     if (win.range === "week") return `${fmt(win.start, { day: "numeric", month: "short" })} – ${fmt(win.end - 1, { day: "numeric", month: "short", year: "numeric" })}`;
     if (win.range === "month") return fmt(win.start, { month: "long", year: "numeric" });
-    if (win.range === "year") return String(new Date(win.start).getFullYear());
+    if (win.range === "year") return String(tzParts(win.start, tz).y);
     return fmt(win.start, { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   }
 
   /** Short label of a bucket on the axis ("" where the label is left out) and the full one for the table. */
   _balTick(win, i) {
     const lang = this._hass?.language || "en";
+    const tz = this._tz();
     const d = new Date(win.edges[i]);
-    if (win.bucket === "hour") return d.getHours() % 3 === 0 ? d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" }) : "";
-    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "short" });
-    return win.range === "week" ? d.toLocaleDateString(lang, { weekday: "short", day: "numeric" }) : String(d.getDate());
+    if (win.bucket === "hour") return tzParts(win.edges[i], tz).h % 3 === 0 ? d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: tz }) : "";
+    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "short", timeZone: tz });
+    return win.range === "week" ? d.toLocaleDateString(lang, { weekday: "short", day: "numeric", timeZone: tz }) : String(tzParts(win.edges[i], tz).d);
   }
 
   _balRowLabel(win, i) {
     const lang = this._hass?.language || "en";
+    const tz = this._tz();
     const d = new Date(win.edges[i]);
-    if (win.bucket === "hour") return d.toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
-    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "long", year: "numeric" });
-    return d.toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "numeric" });
+    if (win.bucket === "hour") return d.toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz });
+    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "long", year: "numeric", timeZone: tz });
+    return d.toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "numeric", timeZone: tz });
   }
 
   /**
@@ -1665,7 +1794,7 @@ class EnergyAssistantPanel extends HTMLElement {
   /** Time of an ISO timestamp state as hh:mm in the local format (null if it is not a time). */
   _time(value) {
     const d = value && !["unknown", "unavailable"].includes(value) ? new Date(value) : null;
-    return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString(this._hass?.language || "en", { hour: "2-digit", minute: "2-digit" }) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString(this._hass?.language || "en", { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }) : null;
   }
 
   /**
@@ -2805,11 +2934,12 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     // time axis: full hours, every 3 hours (every 6 on a narrow chart)
     const hours = pw < 420 ? 6 : 3;
-    const d = new Date(t0);
-    d.setMinutes(0, 0, 0);
-    while (d.getTime() < t0 || d.getHours() % hours !== 0) d.setHours(d.getHours() + 1);
-    for (; d.getTime() <= t1; d.setHours(d.getHours() + hours)) {
-      svg += `<text class="htick" x="${f1(x(d.getTime()))}" y="${H - 6}" text-anchor="middle">${d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })}</text>`;
+    const tz = this._tz();
+    const first = tzParts(t0, tz);
+    let tick = zonedTime(first.y, first.m - 1, first.d, first.h, tz); // the start of the local hour
+    while (tick < t0 || tzParts(tick, tz).h % hours !== 0) tick += 3600000;
+    for (; tick <= t1; tick += hours * 3600000) {
+      svg += `<text class="htick" x="${f1(x(tick))}" y="${H - 6}" text-anchor="middle">${new Date(tick).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: tz })}</text>`;
     }
     let clip = "";
     series.forEach((s, i) => {
@@ -2851,13 +2981,14 @@ class EnergyAssistantPanel extends HTMLElement {
     // table: hourly means
     const byHour = new Map();
     series.forEach((s, i) => s.points.forEach(([ts, v]) => {
-      const h = ts - (ts % 3600000);
+      const hp = tzParts(ts, tz);
+      const h = zonedTime(hp.y, hp.m - 1, hp.d, hp.h, tz); // the start of the local hour
       const e = byHour.get(h) || series.map(() => [0, 0]);
       e[i][0] += v;
       e[i][1] += 1;
       byHour.set(h, e);
     }));
-    const fmtTime = (ts) => new Date(ts).toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const fmtTime = (ts) => new Date(ts).toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz });
     const rows = [...byHour.entries()].sort((a, b) => a[0] - b[0]).map(([h, e]) =>
       `<tr><th>${esc(fmtTime(h))}</th>${e.map(([sum, n]) => `<td>${n ? Math.round(sum / n).toLocaleString(lang) : "–"}</td>`).join("")}</tr>`).join("");
     const times = [...new Set(series.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
@@ -2965,7 +3096,12 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!configured && !this._evRows().length) return "";
     const all = this._devices();
     // Admins can rename the sensors right in the list (pencil next to the name).
-    const active = all.filter((d) => d.w >= IDLE_W).map((d) => ({ ...d, editable: this._isAdmin }));
+    const byId = new Map((this._usage?.devices || []).map((u) => [u.id, u]));
+    const active = all.filter((d) => d.w >= IDLE_W).map((d) => {
+      const u = d.id ? byId.get(d.id) : null;
+      const kwh = u?.kwh >= 0.005 ? u.kwh.toLocaleString(this._hass?.language || "en", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+      return { ...d, editable: this._isAdmin, spark: u?.spark, tip: [d.tip, kwh ? this._t("uTodayKwh", { kwh }) : ""].filter(Boolean).join(" · ") || undefined };
+    });
     const sum = all.reduce((a, d) => a + d.w, 0);
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
     // The total in the header includes the unmeasured rest, so it equals the house power.
@@ -3136,7 +3272,7 @@ class EnergyAssistantPanel extends HTMLElement {
           }).join("")}</div>`
           : "";
         return `<div class="dev"><div class="line${expandable ? " open" : ""}"${openAttr}><span class="name" title="${esc(tip)}">${chev}${this._iconHtml(d.icon, d.color)}${nameHtml}</span>
-          <span class="val">${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
+          <span class="val">${d.spark ? this._sparkline(d.spark) : ""}${v}<small>${u}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
           <div class="track"><div class="fill${d.other ? " other" : ""}" style="width:${Math.min(100, (d.w / scale) * 100)}%"></div></div>${subs}</div>`;
       })
       .join("");
@@ -3446,5 +3582,9 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 }
+
+// The time helpers are reachable for the tests.
+EnergyAssistantPanel.tzParts = tzParts;
+EnergyAssistantPanel.zonedTime = zonedTime;
 
 customElements.define("energy-assistant-panel", EnergyAssistantPanel);

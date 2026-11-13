@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.energy_assistant.config_flow import (
     _devices_schema,
+    _energy_schema,
     _grid_schema,
     _pv_schema,
     _storage_schema,
@@ -22,14 +23,15 @@ def test_every_field_is_translated(lang: str) -> None:
     data = json.loads((TRANSLATIONS / f"{lang}.json").read_text())
     schemas = {
         "pv": lambda _defaults: _pv_schema(),
+        "energy": _energy_schema,
         "user": _grid_schema,
         "init": _grid_schema,
         "storage": _storage_schema,
         "devices": _devices_schema,
     }
     for section, steps in (
-        ("config", ("pv", "user", "storage", "devices")),
-        ("options", ("pv", "init", "storage", "devices")),
+        ("config", ("pv", "user", "storage", "energy", "devices")),
+        ("options", ("pv", "init", "storage", "energy", "devices")),
     ):
         assert set(data[section]["step"]) == set(steps)
         for step in steps:

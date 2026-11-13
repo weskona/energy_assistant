@@ -12,14 +12,23 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_AREA_IDS,
+    CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CHARGE,
     CONF_BATTERY_DISCHARGE,
     CONF_BATTERY_GRID_CHARGE,
+    CONF_BATTERY_MIN_SOC,
     CONF_BATTERY_POWER,
+    CONF_BATTERY_SOC,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_POWER,
+    CONF_ENERGY_CHARGE,
+    CONF_ENERGY_DISCHARGE,
+    CONF_ENERGY_GRID_EXPORT,
+    CONF_ENERGY_GRID_IMPORT,
+    CONF_ENERGY_HOUSE,
+    CONF_ENERGY_SOLAR,
     CONF_GRID_EXPORT,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
@@ -29,8 +38,11 @@ from .const import (
     CONF_LABEL_IDS,
     CONF_SOLAR_POWER,
     DOMAIN,
+    NUMBER_KEYS,
+    SINGLE_KEYS,
     TEXT_KEYS,
 )
+from .energy_prefs import async_energy_suggestion
 from .pv_assistant import suggestion
 from .settings import clean_ids, clean_patterns, has_source, valid_patterns
 
@@ -43,15 +55,42 @@ _AREAS = selector.AreaSelector(selector.AreaSelectorConfig(multiple=True))
 _MULTI = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power", multiple=True)
 )
+_ENERGY = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
+)
+_SOC = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+_CAPACITY = selector.NumberSelector(
+    selector.NumberSelectorConfig(
+        min=0,
+        max=100000,
+        step="any",
+        mode=selector.NumberSelectorMode.BOX,
+        unit_of_measurement="kWh",
+    )
+)
+_MIN_SOC = selector.NumberSelector(
+    selector.NumberSelectorConfig(
+        min=0,
+        max=100,
+        step="any",
+        mode=selector.NumberSelectorMode.BOX,
+        unit_of_measurement="%",
+    )
+)
 
 
 def _optional(
-    defaults: dict[str, Any], key: str, multiple: bool = False
+    defaults: dict[str, Any],
+    key: str,
+    multiple: bool = False,
+    single: bool = False,
 ) -> vol.Optional:
     value = defaults.get(key)
-    if value:
+    if value or value == 0:
         if multiple and isinstance(value, str):
             value = [value]  # older entries stored a single sensor as text
+        if single and isinstance(value, list):
+            value = value[0]  # a single field holds one sensor, offers come as lists
         return vol.Optional(key, description={"suggested_value": value})
     return vol.Optional(key)
 
@@ -83,12 +122,29 @@ def _storage_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(defaults, CONF_BATTERY_DISCHARGE): _MULTI,
             _optional(defaults, CONF_BATTERY_CHARGE): _MULTI,
             _optional(defaults, CONF_BATTERY_GRID_CHARGE): _SINGLE,
+            _optional(defaults, CONF_BATTERY_SOC, single=True): _SOC,
+            _optional(defaults, CONF_BATTERY_CAPACITY): _CAPACITY,
+            _optional(defaults, CONF_BATTERY_MIN_SOC): _MIN_SOC,
+        }
+    )
+
+
+def _energy_schema(defaults: dict[str, Any]) -> vol.Schema:
+    """Step 3: the energy counters of the balance tab."""
+    return vol.Schema(
+        {
+            _optional(defaults, CONF_ENERGY_SOLAR, multiple=True): _ENERGY,
+            _optional(defaults, CONF_ENERGY_GRID_IMPORT, multiple=True): _ENERGY,
+            _optional(defaults, CONF_ENERGY_GRID_EXPORT, multiple=True): _ENERGY,
+            _optional(defaults, CONF_ENERGY_CHARGE, multiple=True): _ENERGY,
+            _optional(defaults, CONF_ENERGY_DISCHARGE, multiple=True): _ENERGY,
+            _optional(defaults, CONF_ENERGY_HOUSE, multiple=True): _ENERGY,
         }
     )
 
 
 def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
-    """Step 3: individual devices."""
+    """Step 4: individual devices."""
     return vol.Schema(
         {
             _optional(defaults, CONF_DEVICE_PATTERNS): _PATTERNS,
@@ -99,6 +155,32 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(defaults, CONF_LABEL_IDS): _LABELS,
         }
     )
+
+
+def _with_cleared(schema: vol.Schema, user_input: dict[str, Any]) -> dict[str, Any]:
+    """The input plus an empty value for every field of the step that was left empty.
+
+    A cleared field is missing from the input; without this the old value would come back
+    when the options are merged with the stored ones.
+    """
+    result = dict(user_input)
+    for marker in schema.schema:
+        key = str(marker)
+        if key in result:
+            continue
+        single = key in NUMBER_KEYS or key in SINGLE_KEYS or key == CONF_HOUSE_POWER
+        result[key] = None if single else []
+    return result
+
+
+async def _energy_defaults(hass: Any, data: dict[str, Any]) -> dict[str, Any]:
+    """The settings, with the counters of the Energy dashboard filled in where none are set yet."""
+    offer = await async_energy_suggestion(hass)
+    targets = (offer or {}).get("targets", {})
+    return {
+        **{k: v for k, v in targets.items() if not data.get(k)},
+        **{k: v for k, v in data.items() if v},
+    }
 
 
 def _clean_devices(
@@ -149,13 +231,14 @@ def _validate(user_input: dict[str, Any]) -> dict[str, str]:
 
 
 class EnergyAssistantConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Setup in three steps: grid/house, solar/storage, devices."""
+    """Setup in four steps: grid/house, solar/storage, energy counters, devices."""
 
     VERSION = 1
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._pv_asked = False
+        self._energy_seeded = False
 
     async def async_step_pv(
         self, user_input: dict[str, Any] | None = None
@@ -196,9 +279,24 @@ class EnergyAssistantConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_devices()
+            return await self.async_step_energy()
         return self.async_show_form(
             step_id="storage", data_schema=_storage_schema(self._data)
+        )
+
+    async def async_step_energy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Energy counters; the Energy dashboard of Home Assistant fills them in the first time."""
+        if user_input is not None:
+            self._data.update(user_input)
+            return await self.async_step_devices()
+        defaults = self._data
+        if not self._energy_seeded:
+            self._energy_seeded = True
+            defaults = await _energy_defaults(self.hass, self._data)
+        return self.async_show_form(
+            step_id="energy", data_schema=_energy_schema(defaults)
         )
 
     async def async_step_devices(
@@ -224,11 +322,12 @@ class EnergyAssistantConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class EnergyAssistantOptionsFlow(OptionsFlow):
-    """Change sensors later, also in three steps."""
+    """Change sensors later, also in four steps."""
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._pv_asked = False
+        self._energy_seeded = False
 
     @property
     def _current(self) -> dict[str, Any]:
@@ -258,6 +357,7 @@ class EnergyAssistantOptionsFlow(OptionsFlow):
                 return await self.async_step_pv()
         errors: dict[str, str] = {}
         if user_input is not None:
+            user_input = _with_cleared(_grid_schema({}), user_input)
             errors = _validate(user_input)
             if not errors:
                 self._data.update(user_input)
@@ -272,10 +372,25 @@ class EnergyAssistantOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
-            self._data.update(user_input)
-            return await self.async_step_devices()
+            self._data.update(_with_cleared(_storage_schema({}), user_input))
+            return await self.async_step_energy()
         return self.async_show_form(
             step_id="storage", data_schema=_storage_schema(self._current)
+        )
+
+    async def async_step_energy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Energy counters; the Energy dashboard fills them in the first time if none are set."""
+        if user_input is not None:
+            self._data.update(_with_cleared(_energy_schema({}), user_input))
+            return await self.async_step_devices()
+        defaults = self._current
+        if not self._energy_seeded:
+            self._energy_seeded = True
+            defaults = await _energy_defaults(self.hass, self._current)
+        return self.async_show_form(
+            step_id="energy", data_schema=_energy_schema(defaults)
         )
 
     async def async_step_devices(
@@ -283,7 +398,9 @@ class EnergyAssistantOptionsFlow(OptionsFlow):
     ) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            user_input, errors = _clean_devices(user_input)
+            user_input, errors = _clean_devices(
+                _with_cleared(_devices_schema({}), user_input)
+            )
             if not errors:
                 return self.async_create_entry(data={**self._current, **user_input})
         return self.async_show_form(
