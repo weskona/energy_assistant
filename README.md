@@ -8,6 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history chart of the last 24 hours, power of individual devices |
+| **Balance** (German: Bilanz) | Only with energy counters (see below): the energy of a day, week, month or year in kWh with the change to the period before, self-consumption, self-sufficiency, grid cost and feed-in revenue (with Tariffy) and bars per hour, day or month |
 | **PV** | Only with PV Assistant: production, feed-in, self-consumption, self-sufficiency, forecast, storage, plant fault and the PV power by plant |
 | **EV** | Only with EV Assistant: wallbox status and power, charge level, solar share, today's charging and the advice to charge before PV |
 | **Costs** (German: Kosten) | Only with Tariffy: electricity price, what the grid import costs, what the feed-in earns and what the solar power saves per hour, and the contract figures |
@@ -127,6 +128,12 @@ Without a house consumption sensor Energy Assistant calculates:
 Without the optional "storage charged from grid" sensor the storage is assumed to be charged entirely from solar.
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile, in the source bar and as a second line in the history. Under the tile the production is split up: how many percent go straight to the house, into the storage (the solar share of the charging) and into the grid, for example `40 % House · 60 % Storage`. The whole percentages add up to 100; parts that round to 0 % are left out.
+
+### Energy counters and the Balance tab
+
+For the **Balance** tab enter your energy counters in the Settings tab (section *Energy counters (kWh)*): PV production, grid import, grid export, to storage, from storage and, if you have one, the house consumption. These are cumulative kWh counters or utility meters; several counters per field are summed. If the **Energy dashboard** of Home Assistant is set up, a notice offers its counters with one button (read only, nothing is changed in the dashboard); save as usual.
+
+The tab reads the long-term statistics of Home Assistant, so the history that already exists is used from the first day. Day (per hour), week from Monday and month (per day) and year (per month) can be paged through with the arrows. Consumption is the measured house counter, otherwise production + import + discharge − export − charge. Self-consumption is the share of the production that was not exported, self-sufficiency the share of the consumption that did not come from the grid. With Tariffy the grid cost and the feed-in revenue are valued with the price of the contract.
 
 ### PV Assistant (optional)
 

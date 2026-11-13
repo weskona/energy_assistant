@@ -40,6 +40,11 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.bpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.bpick .segs{margin-top:0}
+.bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
+.bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
+.seg[disabled]{opacity:.4;cursor:default}
 .row[data-collapse-toggle]{cursor:pointer;user-select:none}
 .row[data-collapse-toggle] .eb-title::before{content:"▾";display:inline-block;margin-right:8px;color:var(--eb-dim);font-size:11px;transition:transform .2s}
 .eb-card.collapsed .row[data-collapse-toggle] .eb-title::before{transform:rotate(-90deg)}
@@ -161,6 +166,43 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    tabBalance: "Balance",
+    sectionEnergy: "Energy counters (kWh)",
+    f_energy_solar: "PV production",
+    f_energy_grid_import: "Grid import",
+    f_energy_grid_export: "Grid export",
+    f_energy_battery_charge: "To storage (charging)",
+    f_energy_battery_discharge: "From storage (discharging)",
+    f_energy_house: "House consumption (optional, otherwise calculated)",
+    energyHint: "Cumulative kWh counters or utility meters. The Balance tab reads their long-term statistics, so the history that already exists is used.",
+    energyAsk: "The Energy dashboard of Home Assistant has counters. Do you want to take them over?",
+    energyApply: "Take over counters",
+    energyDone: "The counters of the Energy dashboard are in use.",
+    energyOverwrite: "This replaces the counters in these fields. Save afterwards to keep them.",
+    balTitle: "Balance",
+    balChart: "Energy per period",
+    bDay: "Day",
+    bWeek: "Week",
+    bMonth: "Month",
+    bYear: "Year",
+    bPrev: "Previous period",
+    bNext: "Next period",
+    bSolar: "Production",
+    bImport: "Grid import",
+    bExport: "Feed-in",
+    bCharge: "To storage",
+    bDischarge: "From storage",
+    bHouse: "Consumption",
+    bAutarky: "Self-sufficiency",
+    bSelf: "Self-consumption",
+    bCost: "Grid cost",
+    bRevenue: "Feed-in revenue",
+    bSaldo: "Balance",
+    bVsPrev: "{arrow} {pct} % vs. previous period",
+    bNoData: "No data for this period",
+    bPriceNote: "Valued with the price of the Tariffy contract.",
+    bTime: "Period",
+    bSum: "Sum",
     autarky: "Self-sufficiency",
     tabPv: "PV",
     tabEv: "EV",
@@ -346,6 +388,43 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    tabBalance: "Bilanz",
+    sectionEnergy: "Energiezähler (kWh)",
+    f_energy_solar: "PV-Erzeugung",
+    f_energy_grid_import: "Netzbezug",
+    f_energy_grid_export: "Einspeisung",
+    f_energy_battery_charge: "In Speicher (Laden)",
+    f_energy_battery_discharge: "Aus Speicher (Entladen)",
+    f_energy_house: "Hausverbrauch (optional, sonst berechnet)",
+    energyHint: "Fortlaufende kWh-Zähler oder Utility Meter. Der Tab Bilanz liest deren Langzeitstatistik, der vorhandene Verlauf wird also genutzt.",
+    energyAsk: "Das Energie-Dashboard von Home Assistant hat Zähler. Sollen sie übernommen werden?",
+    energyApply: "Zähler übernehmen",
+    energyDone: "Die Zähler des Energie-Dashboards sind übernommen.",
+    energyOverwrite: "Dadurch werden die Zähler in diesen Feldern ersetzt. Danach speichern, damit sie bleiben.",
+    balTitle: "Bilanz",
+    balChart: "Energie je Zeitraum",
+    bDay: "Tag",
+    bWeek: "Woche",
+    bMonth: "Monat",
+    bYear: "Jahr",
+    bPrev: "Voriger Zeitraum",
+    bNext: "Nächster Zeitraum",
+    bSolar: "Erzeugung",
+    bImport: "Netzbezug",
+    bExport: "Einspeisung",
+    bCharge: "In Speicher",
+    bDischarge: "Aus Speicher",
+    bHouse: "Verbrauch",
+    bAutarky: "Autarkie",
+    bSelf: "Eigenverbrauch",
+    bCost: "Netzkosten",
+    bRevenue: "Einspeiseerlös",
+    bSaldo: "Saldo",
+    bVsPrev: "{arrow} {pct} % ggü. Vorperiode",
+    bNoData: "Keine Daten für diesen Zeitraum",
+    bPriceNote: "Bewertet mit dem Preis des Tariffy-Vertrags.",
+    bTime: "Zeitraum",
+    bSum: "Summe",
     autarky: "Autarkie",
     tabPv: "PV",
     tabEv: "EV",
@@ -534,14 +613,17 @@ const esc = (t) =>
   String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // Settings form: [key, kind]. "multi" = several sensors, "single" = one sensor.
+const BAL_CATS = [["solar", "energy_solar"], ["imp", "energy_grid_import"], ["exp", "energy_grid_export"], ["chg", "energy_battery_charge"], ["dis", "energy_battery_discharge"], ["house", "energy_house"]];
+const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"]] },
+  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids"];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -627,6 +709,24 @@ class EnergyAssistantPanel extends HTMLElement {
       this._loadLabels();
       this._loadPv();
       this._loadIntegrations();
+      this._loadEnergyOffer();
+    }
+  }
+
+  /** The counters of the Energy dashboard as an offer for the energy counters (the backend only reads them). */
+  async _loadEnergyOffer() {
+    if (this._energyLoading || !this._hass) return;
+    this._energyLoading = true;
+    try {
+      const res = await this._hass.callWS({ type: "energy_assistant/energy_suggestion" });
+      this._energyOffer = res?.targets && Object.keys(res.targets).length ? { targets: res.targets } : null;
+    } catch (e) {
+      console.info("Energy Assistant: could not ask for the Energy dashboard", e);
+      this._energyOffer = null;
+    } finally {
+      this._energyLoading = false;
+      this._settingsDirty = true;
+      this._render();
     }
   }
 
@@ -714,6 +814,7 @@ class EnergyAssistantPanel extends HTMLElement {
   _tabs() {
     const found = this._int || {};
     const tabs = ["house"];
+    if (this._balEnabled()) tabs.push("balance");
     if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
     if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
     if (found.tariffy) tabs.push("costs");
@@ -722,7 +823,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _tabLabel(tab) {
-    return this._t({ house: "tabPower", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+    return this._t({ house: "tabPower", balance: "tabBalance", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
   }
 
   /** Markup of the page of the current tab (not the settings). */
@@ -730,12 +831,296 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
     switch (this._tab) {
+      case "balance": return this._renderBalance();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
       case "costs": return stack(this._renderCosts(this._current()), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
+  }
+
+  /** The balance tab exists when at least one energy counter is configured. */
+  _balEnabled() {
+    return ENERGY_KEYS.some((k) => (this._cfg[k] || []).length > 0);
+  }
+
+  /**
+   * The period of the balance in local time: a day (per hour), a week from Monday, a month (both per day)
+   * or a calendar year (per month); `off` counts the periods back from now (0 = the current one).
+   * `edges` are the starts of the buckets plus the end of the period.
+   */
+  _balWindow(range = this._balRange ?? "day", off = this._balOff ?? 0) {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    let start, end, bucket;
+    if (range === "week") {
+      start = new Date(y, m, d - ((now.getDay() + 6) % 7) + off * 7);
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+      bucket = "day";
+    } else if (range === "month") {
+      start = new Date(y, m + off, 1);
+      end = new Date(y, m + off + 1, 1);
+      bucket = "day";
+    } else if (range === "year") {
+      start = new Date(y + off, 0, 1);
+      end = new Date(y + off + 1, 0, 1);
+      bucket = "month";
+    } else {
+      start = new Date(y, m, d + off);
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+      bucket = "hour";
+    }
+    const edges = [start.getTime()];
+    while (edges[edges.length - 1] < end.getTime()) {
+      const t = new Date(edges[edges.length - 1]);
+      edges.push(bucket === "hour" ? t.getTime() + 3600000
+        : bucket === "day" ? new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1).getTime()
+          : new Date(t.getFullYear(), t.getMonth() + 1, 1).getTime());
+    }
+    edges[edges.length - 1] = end.getTime();
+    return { range, off, start: start.getTime(), end: end.getTime(), bucket, period: bucket, edges };
+  }
+
+  /** The changes of the counters per bucket and category (null where a category has no counter). */
+  _balBuckets(win, res) {
+    const n = win.edges.length - 1;
+    const out = {};
+    for (const [cat, key] of BAL_CATS) {
+      const ids = this._cfg[key] || [];
+      if (!ids.length) continue;
+      const arr = Array(n).fill(null);
+      for (const id of ids) {
+        for (const row of res?.[id] || []) {
+          const v = row.change;
+          if (v == null || Number.isNaN(v)) continue;
+          const t = typeof row.start === "number" ? row.start : Date.parse(row.start);
+          let lo = 0, hi = n - 1, hit = -1;
+          while (lo <= hi) { // the bucket with edges[i] <= t < edges[i + 1]
+            const mid = (lo + hi) >> 1;
+            if (t < win.edges[mid]) hi = mid - 1;
+            else if (t >= win.edges[mid + 1]) lo = mid + 1;
+            else { hit = mid; break; }
+          }
+          if (hit >= 0) arr[hit] = (arr[hit] ?? 0) + v;
+        }
+      }
+      out[cat] = arr;
+    }
+    return out;
+  }
+
+  /**
+   * Rows per bucket and the totals. The consumption is the measured house counter, otherwise
+   * production + import + discharge − export − charge (it needs the import counter, like the live value).
+   * Self-consumption is the part of the production that was not exported, self-sufficiency the part of the
+   * consumption that did not come from the grid.
+   */
+  _balCompute(buckets, win) {
+    const n = win.edges.length - 1;
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      const g = (c) => (buckets[c] ? buckets[c][i] : null);
+      const solar = g("solar"), imp = g("imp"), exp = g("exp"), chg = g("chg"), dis = g("dis");
+      let cons = g("house");
+      if (cons == null && buckets.imp && imp != null) cons = Math.max(0, (solar ?? 0) + imp + (dis ?? 0) - (exp ?? 0) - (chg ?? 0));
+      rows.push({ t: win.edges[i], solar, imp, exp, chg, dis, cons });
+    }
+    const sum = (key) => (rows.some((r) => r[key] != null) ? rows.reduce((a, r) => a + (r[key] ?? 0), 0) : null);
+    const totals = { solar: sum("solar"), imp: sum("imp"), exp: sum("exp"), chg: sum("chg"), dis: sum("dis"), cons: sum("cons") };
+    const share = (v) => Math.max(0, Math.min(100, v));
+    totals.self = totals.solar > 0 ? share(((totals.solar - (totals.exp ?? 0)) / totals.solar) * 100) : null;
+    totals.autarky = totals.cons > 0 && totals.imp != null ? share(((totals.cons - totals.imp) / totals.cons) * 100) : null;
+    return { rows, totals };
+  }
+
+  async _balFetch(win) {
+    const ids = [...new Set(BAL_CATS.flatMap(([, key]) => this._cfg[key] || []))];
+    if (!ids.length) return {};
+    try {
+      return await this._hass.callWS({
+        type: "recorder/statistics_during_period",
+        start_time: new Date(win.start).toISOString(),
+        end_time: new Date(win.end).toISOString(),
+        statistic_ids: ids,
+        period: win.period,
+        types: ["change"],
+        units: { energy: "kWh" },
+      });
+    } catch (e) {
+      console.info("Energy Assistant: could not load the statistics", e);
+      return null;
+    }
+  }
+
+  /** (Re)load the balance when the period changed or the data is older than five minutes. */
+  _maybeLoadBalance() {
+    if (!this._ready || this._balLoading) return;
+    const b = this._bal;
+    if (!b || b.range !== (this._balRange ?? "day") || b.off !== (this._balOff ?? 0) || Date.now() - b.at > 5 * 60 * 1000) this._loadBalance();
+  }
+
+  async _loadBalance() {
+    if (!this._hass || this._balLoading) return;
+    this._balLoading = true;
+    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    try {
+      const win = this._balWindow(range, off), prev = this._balWindow(range, off - 1);
+      const [cur, old] = await Promise.all([this._balFetch(win), this._balFetch(prev)]);
+      const data = this._balCompute(this._balBuckets(win, cur || {}), win);
+      const before = old ? this._balCompute(this._balBuckets(prev, old), prev).totals : null;
+      this._bal = { range, off, win, ...data, before, failed: cur == null, at: Date.now() };
+    } finally {
+      this._balLoading = false;
+      this._render();
+    }
+  }
+
+  /** Label of the period: the date, the week, the month or the year. */
+  _balLabel(win) {
+    const lang = this._hass?.language || "en";
+    const fmt = (t, o) => new Date(t).toLocaleDateString(lang, o);
+    if (win.range === "week") return `${fmt(win.start, { day: "numeric", month: "short" })} – ${fmt(win.end - 1, { day: "numeric", month: "short", year: "numeric" })}`;
+    if (win.range === "month") return fmt(win.start, { month: "long", year: "numeric" });
+    if (win.range === "year") return String(new Date(win.start).getFullYear());
+    return fmt(win.start, { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+  }
+
+  /** Short label of a bucket on the axis ("" where the label is left out) and the full one for the table. */
+  _balTick(win, i) {
+    const lang = this._hass?.language || "en";
+    const d = new Date(win.edges[i]);
+    if (win.bucket === "hour") return d.getHours() % 3 === 0 ? d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" }) : "";
+    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "short" });
+    return win.range === "week" ? d.toLocaleDateString(lang, { weekday: "short", day: "numeric" }) : String(d.getDate());
+  }
+
+  _balRowLabel(win, i) {
+    const lang = this._hass?.language || "en";
+    const d = new Date(win.edges[i]);
+    if (win.bucket === "hour") return d.toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "long", year: "numeric" });
+    return d.toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "numeric" });
+  }
+
+  /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
+  _renderBalance() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const lang = this._hass?.language || "en";
+    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    const b = this._bal;
+    const win = b?.win && b.range === range && b.off === off ? b.win : this._balWindow(range, off);
+    const picker = `<div class="bpick"><div class="segs">${["day", "week", "month", "year"]
+      .map((r) => `<button type="button" class="seg${r === range ? " on" : ""}" data-brange="${r}">${esc(this._t({ day: "bDay", week: "bWeek", month: "bMonth", year: "bYear" }[r]))}</button>`).join("")}</div>
+      <div class="nav"><button type="button" class="seg" data-bnav="-1" aria-label="${esc(this._t("bPrev"))}">‹</button>
+        <span class="lab">${esc(this._balLabel(win))}</span>
+        <button type="button" class="seg" data-bnav="1" aria-label="${esc(this._t("bNext"))}" ${off >= 0 ? "disabled" : ""}>›</button></div></div>`;
+    const head = `<div class="row"><span class="eb-title">${esc(this._t("balTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>${picker}`;
+    if (!b || b.range !== range || b.off !== off) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div></div>`;
+    if (b.failed) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("bNoData")}</div></div></div>`;
+    const t = b.totals, prev = b.before;
+    const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
+    const delta = (cur, before) => {
+      if (before == null || !(before > 0) || cur == null) return "";
+      const pct = Math.round(((cur - before) / before) * 100);
+      const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "•";
+      return `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("bVsPrev", { arrow, pct: Math.abs(pct) }))}</div>`;
+    };
+    const tiles = [];
+    for (const [key, label] of [["solar", "bSolar"], ["cons", "bHouse"], ["imp", "bImport"], ["exp", "bExport"], ["chg", "bCharge"], ["dis", "bDischarge"]]) {
+      if (t[key] != null) tiles.push(tile(this._t(label), kwh(t[key]), "kWh", delta(t[key], prev?.[key])));
+    }
+    if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
+    if (t.self != null) tiles.push(tile(this._t("bSelf"), Math.round(t.self), "%", delta(t.self, prev?.self)));
+    // Money: valued with the price of the Tariffy contract (the average of a dynamic tariff, not the live price).
+    const tariffy = this._int?.tariffy;
+    const priceState = tariffy?.price && this._hass?.states?.[tariffy.price];
+    const price = priceState ? parseFloat(priceState.state) : NaN;
+    const feed = this._feedInTariff();
+    let money = "";
+    if (!Number.isNaN(price) && t.imp != null) {
+      const currency = String(priceState.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
+      const m = (label, amount) => {
+        const [n, sym] = this._money(amount, currency);
+        return tile(this._t(label), n, sym);
+      };
+      const cost = t.imp * price, revenue = t.exp != null && feed != null ? t.exp * feed : null;
+      tiles.push(m("bCost", cost));
+      if (revenue != null) {
+        tiles.push(m("bRevenue", revenue));
+        tiles.push(m("bSaldo", revenue - cost));
+      }
+      money = `<div class="hint">${esc(this._t("bPriceNote"))}</div>`;
+    }
+    const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>${money}` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
+    return `<div class="stack">${first}${this._balanceChart(b)}</div>`;
+  }
+
+  /** Grouped bars per bucket (production, consumption, import, export) with a title tooltip and the table. */
+  _balanceChart(b) {
+    const lang = this._hass?.language || "en";
+    const rows = b.rows, win = b.win;
+    const defs = [
+      { key: "solar", name: this._t("bSolar"), color: "--ea-prod" },
+      { key: "cons", name: this._t("bHouse"), color: "--ea-house" },
+      { key: "imp", name: this._t("bImport"), color: "--ea-grid" },
+      { key: "exp", name: this._t("bExport"), color: "--ea-feed" },
+    ].filter((d) => rows.some((r) => r[d.key] != null));
+    const values = rows.flatMap((r) => defs.map((d) => r[d.key] ?? 0));
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("balChart"))}</span><span class="eb-label">kWh</span></div>`;
+    if (!defs.length || !values.some((v) => v > 0)) return `<div class="eb-card">${title}<div class="empty">${this._t("bNoData")}</div></div>`;
+    this._balW = this._balW || 900;
+    const W = Math.max(280, Math.round(this._balW)), H = 260;
+    const M = { l: 52, r: 8, t: 10, b: 24 };
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const ticks = this._niceTicks(0, Math.max(...values, 0.1));
+    const hi = ticks[ticks.length - 1];
+    const n = rows.length;
+    const slot = pw / n, gap = 1.5;
+    const barW = Math.max(1.5, (slot - 4 - gap * (defs.length - 1)) / defs.length);
+    const y = (v) => M.t + (1 - v / hi) * ph;
+    const f1 = (v) => v.toFixed(1);
+    const num = (v, d = 2) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    let svg = "";
+    for (const v of ticks) {
+      svg += `<line x1="${M.l}" x2="${M.l + pw}" y1="${f1(y(v))}" y2="${f1(y(v))}" class="${v === 0 ? "haxis" : "hgrid"}"/>`;
+      svg += `<text class="htick" x="${M.l - 6}" y="${f1(y(v) + 4)}" text-anchor="end">${v.toLocaleString(lang, { maximumFractionDigits: 2 })}</text>`;
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+    rows.forEach((r, i) => {
+      const x0 = M.l + i * slot;
+      defs.forEach((d, j) => {
+        const v = r[d.key];
+        if (v != null && v > 0) svg += `<rect x="${f1(x0 + 2 + j * (barW + gap))}" y="${f1(y(v))}" width="${f1(barW)}" height="${f1(y(0) - y(v))}" fill="var(${d.color})" rx="1"/>`;
+      });
+      const label = this._balTick(win, i);
+      if (label && i % every === 0) svg += `<text class="htick" x="${f1(x0 + slot / 2)}" y="${H - 6}" text-anchor="middle">${esc(label)}</text>`;
+      const tip = [this._balRowLabel(win, i), ...defs.map((d) => `${d.name}: ${r[d.key] == null ? "–" : `${num(r[d.key])} kWh`}`)].map(esc).join("&#10;");
+      svg += `<rect x="${f1(x0)}" y="${M.t}" width="${f1(slot)}" height="${ph}" fill="transparent"><title>${tip}</title></rect>`;
+    });
+    const legend = defs.map((d) => `<span><i style="background:var(${d.color})"></i>${esc(d.name)}</span>`).join("");
+    const sumRow = `<tr><th>${esc(this._t("bSum"))}</th>${defs.map((d) => `<td>${num(rows.reduce((a, r) => a + (r[d.key] ?? 0), 0))}</td>`).join("")}</tr>`;
+    const table = rows.map((r, i) => `<tr><th>${esc(this._balRowLabel(win, i))}</th>${defs.map((d) => `<td>${r[d.key] == null ? "–" : num(r[d.key])}</td>`).join("")}</tr>`).join("");
+    return `<div class="eb-card">${title}<div class="hchart"><div class="legend">${legend}</div>
+      <div class="chartwrap bwrap"><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("balChart"))}">${svg}</svg></div>
+      <details class="tableview"${this._balTableOpen ? " open" : ""}><summary>${esc(this._t("hTable"))}</summary>
+        <table><tr><th>${esc(this._t("bTime"))}</th>${defs.map((d) => `<th>${esc(d.name)} (kWh)</th>`).join("")}</tr>${table}${sumRow}</table></details></div></div>`;
+  }
+
+  /** After a redraw of the balance: one redraw at the real width of the chart, and the state of the table. */
+  _wireBalance(content) {
+    const wrap = content.querySelector?.(".bwrap");
+    if (!wrap) return;
+    const box = Math.max(280, Math.round(wrap.clientWidth || 0));
+    if (wrap.clientWidth && Math.abs(box - (this._balW || 900)) > 24) {
+      this._balW = box;
+      this._html = null;
+      this._render();
+      return;
+    }
+    const details = content.querySelector("details.tableview");
+    if (details) details.addEventListener("toggle", () => { this._balTableOpen = details.open; });
   }
 
   /** Time of an ISO timestamp state as hh:mm in the local format (null if it is not a time). */
@@ -981,6 +1366,15 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** Power sensors offered in the picker. */
+  /** Energy counters for the datalist: sensors with the device class energy. */
+  _energyCandidates() {
+    const states = this._hass?.states || {};
+    return Object.entries(states)
+      .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "energy")
+      .map(([id, st]) => ({ id, name: st.attributes.friendly_name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   _candidates() {
     const states = this._hass?.states || {};
     return Object.entries(states)
@@ -1080,6 +1474,19 @@ class EnergyAssistantPanel extends HTMLElement {
       const [group, value] = seg.dataset.seg.split(":");
       if (group === "state") this._fState = value;
       else this._fSel = value;
+      this._edited();
+    } else if (e.target.closest("[data-brange]")) {
+      this._balRange = e.target.closest("[data-brange]").dataset.brange;
+      this._balOff = 0;
+      this._render();
+    } else if (e.target.closest("[data-bnav]")) {
+      const next = (this._balOff ?? 0) + Number(e.target.closest("[data-bnav]").dataset.bnav);
+      if (next <= 0) {
+        this._balOff = next;
+        this._render();
+      }
+    } else if (e.target.closest("[data-energyapply]") && this._isAdmin && this._energyOffer) {
+      Object.assign(this._draft, Object.fromEntries(Object.entries(this._energyOffer.targets).map(([k, v]) => [k, [...v]])));
       this._edited();
     } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
       Object.assign(this._draft, this._pvTargets());
@@ -1356,7 +1763,9 @@ class EnergyAssistantPanel extends HTMLElement {
     const states = this._hass?.states || {};
     const nameOf = (id) => states[id]?.attributes?.friendly_name || id;
     const options = this._candidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+    const energyOptions = this._energyCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const field = ([key, kind]) => {
+      if (kind === "energyoffer") return this._renderEnergyOffer(ro);
       const label = this._t(`f_${key}`);
       if (kind === "bool") {
         return `<label class="sw"><input type="checkbox" data-bool="${key}" ${this._draft[key] ? "checked" : ""} ${ro ? "disabled" : ""}>${esc(label)}</label>`;
@@ -1370,7 +1779,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       return `<div class="fld"><label>${esc(label)}</label>
         ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
+        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
@@ -1382,11 +1791,22 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (this._status === "saving") msg = `<span class="msg">${this._t("saving")}</span>`;
     else if (this._status === "saved") msg = `<span class="msg">${this._t("saved")}</span>`;
     else if (this._status === "error") msg = `<span class="msg err">${esc(this._t("saveFailed", { error: this._error }))}</span>`;
-    return `<datalist id="eb-sensors">${options}</datalist>
+    return `<datalist id="eb-sensors">${options}</datalist><datalist id="eb-energy">${energyOptions}</datalist>
       <div class="set">${this._renderIntegrations(ro)}<div class="grid">${sections}</div>
       ${ro ? `<div class="bar2">${msg}</div>` : `<div class="bar2">
         <button class="btn" data-save ${this._saveDisabled() ? "disabled" : ""}>${this._t("save")}</button>
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
+  }
+
+  /** The offer of the Energy dashboard in the energy section: hint, question and the button (admins only). */
+  _renderEnergyOffer(ro) {
+    const offer = this._energyOffer?.targets;
+    const hint = `<div class="hint">${esc(this._t("energyHint"))}</div>`;
+    if (!offer || !Object.keys(offer).length) return `<div class="fld span">${hint}</div>`;
+    const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+    const done = Object.entries(offer).every(([k, v]) => same(v, this._draftList(k)));
+    return `<div class="fld span">${hint}<p class="pvq">${esc(done ? this._t("energyDone") : this._t("energyAsk"))}</p>
+      ${done || ro ? "" : `<div class="bar2"><button type="button" class="btn" data-energyapply>${esc(this._t("energyApply"))}</button><span class="hint">${esc(this._t("energyOverwrite"))}</span></div>`}</div>`;
   }
 
   /**
@@ -1867,7 +2287,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const times = [...new Set(series.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
     this._hv = { W, H, M, pw, ph, t0, t1, lo, hi, series, lang, fmtTime, labelW, times, maps: series.map((s) => new Map(s.points)), byTs: new Map(points.map((p) => [p.t, p])), solarNames: points.meta?.solarNames || [], x, y };
     return `<div class="hchart"><div class="legend">${legend}</div>
-      <div class="chartwrap"><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("chartLabel"))}">${clip}${svg}</svg><div class="tip" hidden></div></div>
+      <div class="chartwrap" data-line><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("chartLabel"))}">${clip}${svg}</svg><div class="tip" hidden></div></div>
       <details class="tableview"${this._tableOpen ? " open" : ""}><summary>${esc(this._t("hTable"))}</summary>
         <table><tr><th>${esc(this._t("hTime"))}</th>${series.map((s) => `<th>${esc(s.name)}</th>`).join("")}</tr>${rows}</table></details></div>`;
   }
@@ -2239,12 +2659,14 @@ class EnergyAssistantPanel extends HTMLElement {
     // While a name is being typed the page is not redrawn, live updates would wipe the text field.
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
+    if (this._tab === "balance") this._maybeLoadBalance();
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);
       this._applyCollapse(content);
       this._wireChart(content);
+      this._wireBalance(content);
     }
   }
 
@@ -2297,7 +2719,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * keeps the text readable on a phone).
    */
   _wireChart(content) {
-    const wrap = content.querySelector?.(".chartwrap");
+    const wrap = content.querySelector?.(".chartwrap[data-line]");
     const hv = this._hv;
     if (!wrap || !hv) return;
     const box = Math.max(280, Math.round(wrap.clientWidth || 0));
