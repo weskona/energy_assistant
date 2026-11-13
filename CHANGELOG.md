@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Devices in two columns:** the lists of the Consumption tab (biggest consumers, always on) are shown in two columns side by side, one column on narrow screens. The Power tab is unchanged.
+- **Consumption tab in two columns:** the cards *Biggest consumers today* and *Always on (standby)* stand side by side in one row, one below the other on narrow screens. The Power tab is unchanged.
 
 ### Added
 
