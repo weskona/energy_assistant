@@ -303,9 +303,88 @@ async def test_entity_ids_and_names_follow_the_language_of_home_assistant(
     cost = registry.async_get_entity_id(
         "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST + "week")
     )
-    assert energy == "sensor.energy_assistant_klima_verbrauch_heute"
-    assert cost == "sensor.energy_assistant_klima_kosten_diese_woche"
+    assert energy == "sensor.energy_assistant_klima_verbrauch_taglich"
+    assert cost == "sensor.energy_assistant_klima_kosten_wochentlich"
     assert (
         hass.states.get(energy).attributes["friendly_name"]
-        == "Energy Assistant Klima Verbrauch heute"
+        == "Energy Assistant Klima Verbrauch täglich"
     )
+
+
+def _tracker_for(hass: HomeAssistant, tariffs: dict[str, str]) -> LabelEnergy:
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options={"label_tariffs": tariffs})
+    return LabelEnergy(hass, entry, "waermepumpe")
+
+
+async def test_a_label_uses_the_tariff_that_was_chosen_for_it(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(
+        "sensor.haus_preis", "0.30", {"unit_of_measurement": "EUR/kWh"}
+    )
+    hass.states.async_set("sensor.wp_preis", "0.22", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.haus_preis"},
+    ):
+        chosen = _tracker_for(hass, {"waermepumpe": "sensor.wp_preis"})
+        chosen._refresh_price()
+        assert chosen.price == 0.22  # the heat pump tariff, not the household one
+        default = _tracker_for(hass, {})
+        default._refresh_price()
+        assert default.price == 0.30  # without a choice: the first electricity contract
+        other = _tracker_for(
+            hass, {"licht": "sensor.wp_preis"}
+        )  # chosen for another label
+        other._refresh_price()
+        assert other.price == 0.30
+
+
+async def test_a_chosen_tariff_is_never_replaced_by_another_contract(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(
+        "sensor.haus_preis", "0.30", {"unit_of_measurement": "EUR/kWh"}
+    )
+    hass.states.async_set("sensor.wp_preis", "0.22", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.haus_preis"},
+    ):
+        tracker = _tracker_for(hass, {"waermepumpe": "sensor.wp_preis"})
+        tracker._refresh_price()
+        # briefly unavailable: the last good price of that tariff stays
+        hass.states.async_set("sensor.wp_preis", "unavailable")
+        tracker._refresh_price()
+        assert tracker.price == 0.22
+        # the contract is gone: no price (no cost) instead of the household tariff
+        hass.states.async_remove("sensor.wp_preis")
+        tracker._refresh_price()
+        assert tracker.price is None
+
+
+async def test_changing_the_tariff_closes_the_running_interval_with_the_old_price(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(
+        "sensor.haus_preis", "0.30", {"unit_of_measurement": "EUR/kWh"}
+    )
+    hass.states.async_set("sensor.wp_preis", "0.10", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.haus_preis"},
+    ):
+        tracker = _tracker_for(hass, {})
+        tracker.powers = {"sensor.a": 1.0}
+        tracker.last = datetime.now(tz=BERLIN)
+        tracker.starts = {p: period_start(tracker.last, p) for p in PERIODS}
+        tracker._refresh_price()
+        _run(tracker, 60)  # 1 kWh at 0.30
+        tracker.entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={},
+            options={"label_tariffs": {"waermepumpe": "sensor.wp_preis"}},
+        )
+        tracker._refresh_price()
+        _run(tracker, 60)  # 1 kWh at 0.10
+    assert round(tracker.costs["year"], 6) == 0.40

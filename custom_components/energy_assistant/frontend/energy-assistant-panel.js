@@ -145,6 +145,11 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .sw input{accent-color:var(--eb-green);width:18px;height:18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;max-width:100%}
+.sec .fields>.fld.chipfld{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
+.chips.cap{max-height:150px;overflow:auto}
+.trow{display:flex;align-items:center;gap:12px;margin:6px 0}
+.trow .tn{font-size:14px;flex:0 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow select{flex:1 1 220px;min-width:0;max-width:420px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font:14px var(--eb-font)}
 .chip button{border:0;background:none;color:var(--eb-muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
 .chip button:hover{color:var(--eb-red)}
 .set input[type=text]{width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:9px 12px;color:var(--eb-text);font:14px var(--eb-font)}
@@ -349,7 +354,11 @@ const STRINGS = {
     f_battery_charge: "To storage (charging)",
     f_battery_grid_charge: "Storage charged from grid",
     f_device_power: "Additional device sensors (optional)",
-    f_device_standby: "Standby devices (shown as always on; none = detected automatically)",
+    f_device_standby: "Standby devices",
+    f_label_tariffs: "Tariff per label (for the cost sensors)",
+    h_label_tariffs: "Which Tariffy electricity contract prices the cost of a label, e.g. the heat pump tariff for the heat pump label. The cost sensors count with the price of that contract from then on; what was counted before stays.",
+    tariffDefault: "Default ({name})",
+    h_device_standby: "Shown as always on in the Consumption tab. None selected = detected automatically.",
     f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
@@ -624,7 +633,11 @@ const STRINGS = {
     f_battery_charge: "Zum Speicher (Laden)",
     f_battery_grid_charge: "Speicher aus dem Netz geladen",
     f_device_power: "Zusätzliche Geräte-Sensoren (optional)",
-    f_device_standby: "Standby-Geräte (werden als Dauerlast gezeigt; leer = automatisch erkannt)",
+    f_device_standby: "Standby-Geräte",
+    f_label_tariffs: "Tarif pro Label (für die Kostensensoren)",
+    h_label_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Labels bewertet, z. B. der Wärmepumpentarif für das Wärmepumpen-Label. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
+    tariffDefault: "Standard ({name})",
+    h_device_standby: "Werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
     f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
@@ -770,9 +783,9 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"], ["device_standby", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
-  { title: "sectionLabels", fields: [["label_ids", "labels"]] },
+  { title: "sectionLabels", fields: [["label_ids", "labels"], ["label_tariffs", "labeltariffs"]] },
 ];
 const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
@@ -2115,6 +2128,7 @@ class EnergyAssistantPanel extends HTMLElement {
     for (const k of BOOL_KEYS) out[k] = !!cfg[k];
     for (const k of NUMBER_KEYS) out[k] = typeof cfg[k] === "number" && Number.isFinite(cfg[k]) ? cfg[k] : null;
     out.device_names = { ...(cfg.device_names || {}) };
+    out.label_tariffs = { ...(cfg.label_tariffs || {}) };
     return out;
   }
 
@@ -2340,6 +2354,13 @@ class EnergyAssistantPanel extends HTMLElement {
       const rest = this._draft.area_ids.filter((x) => x !== id);
       this._draft.area_ids = t.checked ? [...rest, id] : rest;
       this._edited();
+    } else if (t.dataset?.labeltariff) {
+      const id = t.dataset.labeltariff;
+      const next = { ...(this._draft.label_tariffs || {}) };
+      if (t.value) next[id] = t.value;
+      else delete next[id];
+      this._draft.label_tariffs = next;
+      this._edited();
     } else if (t.dataset?.label) {
       const id = t.dataset.label;
       const rest = this._draft.label_ids.filter((x) => x !== id);
@@ -2551,6 +2572,29 @@ class EnergyAssistantPanel extends HTMLElement {
   _renderLabelRows(ro) { return this._renderPickerRows("label", ro); }
   _renderLabelPicker(ro) { return this._renderPicker("label", ro); }
 
+  /**
+   * Tariff per selected label (Tariffy): which electricity contract prices the cost sensors of the label,
+   * e.g. the heat pump tariff for the heat pump label. Only offered when Tariffy has more than one electricity
+   * contract; the first contract is the default.
+   */
+  _renderLabelTariffs(ro) {
+    const prices = this._int?.tariffy?.prices;
+    const selected = this._draft.label_ids || [];
+    if (!Array.isArray(prices) || prices.length < 2 || !selected.length) return "";
+    const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
+    const chosen = this._draft.label_tariffs || {};
+    const rows = selected
+      .map((id) => {
+        const options = [
+          `<option value="">${esc(this._t("tariffDefault", { name: prices[0].name }))}</option>`,
+          ...prices.map((p) => `<option value="${esc(p.entity)}"${chosen[id] === p.entity ? " selected" : ""}>${esc(p.name)}</option>`),
+        ].join("");
+        return `<div class="trow"><span class="tn" title="${esc(names[id] || id)}">${esc(names[id] || id)}</span><select data-labeltariff="${esc(id)}" ${ro ? "disabled" : ""}>${options}</select></div>`;
+      })
+      .join("");
+    return `<div class="fld span"><label>${esc(this._t("f_label_tariffs"))}</label>${rows}<div class="hint">${esc(this._t("h_label_tariffs"))}</div></div>`;
+  }
+
   _renderMatches(ro) {
     const { found, counts } = this._matchList();
     if (!found.length) return `<div class="hint">${esc(this._t("noMatches"))}</div>`;
@@ -2578,6 +2622,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const socOptions = this._socCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const field = ([key, kind]) => {
       if (kind === "energyoffer") return this._renderEnergyOffer(ro);
+      if (kind === "labeltariffs") return this._renderLabelTariffs(ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
         const v = this._draft[key];
@@ -2593,9 +2638,11 @@ class EnergyAssistantPanel extends HTMLElement {
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
       if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
-      return `<div class="fld"><label>${esc(label)}</label>
-        ${chips ? `<div class="chips">${chips}</div>` : ""}
-        ${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>`;
+      const hint = key === "device_standby" ? `<div class="hint">${esc(this._t("h_device_standby"))}</div>` : "";
+      const long = key === "device_exclude"; // can be a long list: full width, chips flow and scroll
+      return `<div class="fld chipfld${long ? " span" : ""}"><label>${esc(label)}</label>
+        <div class="inp">${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>
+        <div class="cl">${chips ? `<div class="chips${long ? " cap" : ""}">${chips}</div>` : ""}${hint}</div></div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
       (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,

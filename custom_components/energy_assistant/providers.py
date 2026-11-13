@@ -91,8 +91,20 @@ def tariffy(hass: HomeAssistant) -> dict[str, Any] | None:
         ),
         None,
     )
+    prices = []
+    for _entry_id, keys in sorted(contracts.items()):
+        entity_id = keys.get("arbeitspreis")
+        state = hass.states.get(entity_id) if entity_id else None
+        if state and state.attributes.get("sparte") in _ELECTRICITY:
+            prices.append(
+                {
+                    "entity": entity_id,
+                    "name": state.attributes.get("friendly_name") or entity_id,
+                }
+            )
     return {
         "price": price_contract["arbeitspreis"],
+        "prices": prices,  # every electricity contract, for the choice per label
         "feed_in": feed_in,
         "cost_so_far": price_contract.get("kosten_bisher"),
         "balance": price_contract.get("guthaben_bisher"),

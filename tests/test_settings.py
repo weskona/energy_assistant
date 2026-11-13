@@ -164,3 +164,24 @@ def test_numbers_are_floats_or_none() -> None:
     assert (
         to_storage({"battery_min_soc": 0})["battery_min_soc"] == 0.0
     )  # 0 % is a value
+
+
+def test_label_tariffs_keep_only_valid_entries() -> None:
+    from custom_components.energy_assistant.settings import clean_label_tariffs
+
+    result = clean_label_tariffs(
+        {
+            "waermepumpe": "sensor.wp_preis",
+            "Bad Label": "sensor.x",  # not a slug
+            "licht": "light.x",  # not a sensor
+            "klima": 5,
+            3: "sensor.y",
+        }
+    )
+    assert result == {"waermepumpe": "sensor.wp_preis"}
+    assert clean_label_tariffs(None) == {}
+    assert normalize({})["label_tariffs"] == {}
+    assert to_storage({"label_tariffs": {"waermepumpe": "sensor.wp_preis"}})[
+        "label_tariffs"
+    ] == {"waermepumpe": "sensor.wp_preis"}
+    assert "label_tariffs" not in to_storage({"label_tariffs": {}})

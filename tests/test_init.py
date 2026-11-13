@@ -64,6 +64,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "label_ids": ["klima", "licht"],
         "area_ids": ["kueche"],
         "device_names": {"sensor.oven": "Ofen"},
+        "label_tariffs": {},
         "battery_soc": [],
         "battery_capacity": None,
         "battery_min_soc": None,

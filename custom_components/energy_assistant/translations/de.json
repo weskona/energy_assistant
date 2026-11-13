@@ -138,28 +138,28 @@
   "entity": {
     "sensor": {
       "label_energy_day": {
-        "name": "{label} Verbrauch heute"
+        "name": "{label} Verbrauch täglich"
       },
       "label_energy_week": {
-        "name": "{label} Verbrauch diese Woche"
+        "name": "{label} Verbrauch wöchentlich"
       },
       "label_energy_month": {
-        "name": "{label} Verbrauch diesen Monat"
+        "name": "{label} Verbrauch monatlich"
       },
       "label_energy_year": {
-        "name": "{label} Verbrauch dieses Jahr"
+        "name": "{label} Verbrauch jährlich"
       },
       "label_cost_day": {
-        "name": "{label} Kosten heute"
+        "name": "{label} Kosten täglich"
       },
       "label_cost_week": {
-        "name": "{label} Kosten diese Woche"
+        "name": "{label} Kosten wöchentlich"
       },
       "label_cost_month": {
-        "name": "{label} Kosten diesen Monat"
+        "name": "{label} Kosten monatlich"
       },
       "label_cost_year": {
-        "name": "{label} Kosten dieses Jahr"
+        "name": "{label} Kosten jährlich"
       }
     }
   }

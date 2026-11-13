@@ -80,6 +80,8 @@ ID_KEYS = (CONF_AREA_IDS, CONF_LABEL_IDS)
 # Own display names for sensors in the lists: {entity_id: name}.
 CONF_DEVICE_NAMES = "device_names"
 DICT_KEYS = (CONF_DEVICE_NAMES,)
+# Tariffy price sensor per label ({label_id: entity_id}); a label without one uses the first electricity contract.
+CONF_LABEL_TARIFFS = "label_tariffs"
 # Longest allowed display name.
 NAME_MAX_LEN = 80
 # Keys that hold exactly one entity in storage (the panel always sees lists).
@@ -107,6 +109,7 @@ CONFIG_KEYS = (
     *LIST_KEYS,
     *ID_KEYS,
     *DICT_KEYS,
+    CONF_LABEL_TARIFFS,
     *BOOL_KEYS,
     *NUMBER_KEYS,
 )

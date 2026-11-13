@@ -42,7 +42,7 @@ from .const import (
     SYSTEM_KEYS,
 )
 from .providers import tariffy
-from .settings import as_list, clean_ids
+from .settings import as_list, clean_ids, clean_label_tariffs
 
 PERIODS = ("day", "week", "month", "year")
 COST = "cost_"  # prefix of the period in the unique id of a cost sensor
@@ -87,6 +87,12 @@ def _selected(entry: ConfigEntry) -> list[str]:
     return clean_ids({**entry.data, **entry.options}.get("label_ids"))
 
 
+def _chosen_tariff(entry: ConfigEntry, label_id: str) -> str | None:
+    """The Tariffy price sensor the user chose for the label, if any."""
+    config = {**entry.data, **entry.options}
+    return clean_label_tariffs(config.get("label_tariffs")).get(label_id)
+
+
 def _excluded(entry: ConfigEntry) -> Callable[[str], bool]:
     """Sensors that never count for a label: balance sensors and the excluded ones."""
     config = {**entry.data, **entry.options}
@@ -126,10 +132,21 @@ class LabelEnergy:
 
     # -- members -----------------------------------------------------------------
 
+    def _price_entity_id(self) -> str | None:
+        """The price sensor of the label: the chosen contract, else the first electricity contract.
+
+        A chosen contract is never replaced by another one: a heat pump tariff must not be costed
+        with the household tariff.
+        """
+        if chosen := _chosen_tariff(self.entry, self.label_id):
+            return chosen
+        offer = tariffy(self.hass)
+        return offer["price"] if offer else None
+
     def _read_price(self) -> tuple[float, str] | None:
         """Unit price and currency of Tariffy: the live price of a dynamic tariff, else the state."""
-        offer = tariffy(self.hass)
-        state = self.hass.states.get(offer["price"]) if offer else None
+        entity_id = self._price_entity_id()
+        state = self.hass.states.get(entity_id) if entity_id else None
         if state is None:
             return None
         for raw in (state.attributes.get("arbeitspreis_aktuell"), state.state):
@@ -144,8 +161,7 @@ class LabelEnergy:
 
     def _refresh_price(self) -> None:
         """Take the current price (keep the last one while the source has none) and watch it."""
-        offer = tariffy(self.hass)
-        entity_id = offer["price"] if offer else None
+        entity_id = self._price_entity_id()
         if entity_id != self._price_entity:
             if self._unsub_price:
                 self._unsub_price()
@@ -157,6 +173,12 @@ class LabelEnergy:
                 )
         if (found := self._read_price()) is not None:
             self.price, self.currency = found
+        elif (
+            entity_id
+            and _chosen_tariff(self.entry, self.label_id)
+            and (self.hass.states.get(entity_id) is None)
+        ):
+            self.price = None  # the chosen contract is gone: no cost rather than the wrong tariff
 
     def _find_members(self) -> set[str]:
         """Power sensors (W or kW) of the entity registry that carry the label."""
@@ -250,6 +272,12 @@ class LabelEnergy:
         self._integrate(dt_util.now())
         entity_id = event.data["entity_id"]
         self.powers[entity_id] = self._power(entity_id, self.powers.get(entity_id, 0.0))
+
+    @callback
+    def options_changed(self) -> None:
+        """The settings changed (maybe the tariff of the label): close the interval, then switch."""
+        self._integrate(dt_util.now())
+        self._refresh_price()
 
     @callback
     def _on_price(self, _event: Event) -> None:
@@ -405,6 +433,8 @@ async def async_setup_entry(
         wanted = _selected(entry)
         # Only labels that exist; a deleted label would give a sensor without a name.
         wanted = [i for i in wanted if lr.async_get(hass).async_get_label(i)]
+        for tracker in trackers.values():
+            tracker.options_changed()
         entities: list[LabelEnergySensor] = []
         for label_id in wanted:
             if label_id not in trackers:

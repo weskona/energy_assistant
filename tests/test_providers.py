@@ -57,6 +57,7 @@ async def test_electricity_contract_gives_price_and_balance(hass) -> None:
     offer = tariffy(hass)
     assert offer == {
         "price": ids["arbeitspreis"],
+        "prices": [{"entity": ids["arbeitspreis"], "name": ids["arbeitspreis"]}],
         "feed_in": ids["einspeiseverguetung"],
         "cost_so_far": ids["kosten_bisher"],
         "balance": ids["guthaben_bisher"],
@@ -299,4 +300,15 @@ async def test_the_wallbox_power_sensor_of_ev_assistant_is_passed_on(hass) -> No
         "ev3": None,
         "id3": "sensor.wallbox_leistung",
         "zoe": "sensor.neu",
+    }
+
+
+async def test_every_electricity_contract_is_offered_as_a_price(hass) -> None:
+    house = _contract(hass, "haus", keys=("arbeitspreis",))
+    heat = _contract(hass, "waermepumpe", keys=("arbeitspreis",))
+    _contract(hass, "gas", sparte="gas", keys=("arbeitspreis",))  # not electricity
+    prices = tariffy(hass)["prices"]
+    assert {p["entity"] for p in prices} == {
+        house["arbeitspreis"],
+        heat["arbeitspreis"],
     }

@@ -489,3 +489,19 @@ async def test_label_energy_lists_the_sensors_of_the_selected_labels(
     assert msg["success"]
     assert set(msg["result"]["klima"]) == {"day", "week"}
     assert msg["result"]["klima"]["day"].startswith("sensor.")
+
+
+async def test_update_config_stores_the_tariff_per_label(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"label_tariffs": {"waermepumpe": "sensor.wp_preis"}},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["label_tariffs"] == {"waermepumpe": "sensor.wp_preis"}
+    assert entry.options["label_tariffs"] == {"waermepumpe": "sensor.wp_preis"}

@@ -3693,3 +3693,44 @@ test("device evaluation: the device list of the Power tab has the lines and the 
   assert.match(html, /Solar share 72 %/); // the tooltip of the wallbox row is kept
   assert.doesNotMatch(html.slice(html.indexOf("Wallbox"), html.indexOf("Herd")), /<svg class="spk"/); // no history for the wallbox row
 });
+
+function tariffPanel(extra = {}) {
+  const p = panel({ house_power: "h" }, { h: st(1) });
+  p._hass.language = "en";
+  p._ready = true;
+  p._render = () => {};
+  p._labelData = { labels: [{ label_id: "wp", name: "Wärmepumpe" }, { label_id: "licht", name: "Licht" }], entities: {} };
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
+  p._draft = p._normalize({ house_power: "h", label_ids: ["wp", "licht"], ...extra });
+  return p;
+}
+
+test("settings: a tariff can be chosen per selected label when Tariffy has several contracts", () => {
+  const p = tariffPanel({ label_tariffs: { wp: "sensor.wp" } });
+  const html = p._renderLabelTariffs(false);
+  assert.match(html, /Tariff per label/);
+  assert.match(html, /Wärmepumpe[\s\S]*<option value="sensor\.wp" selected>/);
+  assert.match(html, /Default \(Haushalt\)/);
+  assert.equal((html.match(/data-labeltariff=/g) || []).length, 2); // one per selected label
+});
+
+test("settings: no tariff choice with a single contract or without selected labels", () => {
+  const p = tariffPanel();
+  p._int.tariffy.prices = [{ entity: "sensor.haus", name: "Haushalt" }];
+  assert.equal(p._renderLabelTariffs(false), "");
+  const q = tariffPanel();
+  q._draft.label_ids = [];
+  assert.equal(q._renderLabelTariffs(false), "");
+});
+
+test("settings: choosing a tariff changes the draft and the default removes it again", () => {
+  const p = tariffPanel();
+  p._hass.user = { is_admin: true };
+  p._edited = () => {};
+  const change = (value) => p._onChange({ target: { dataset: { labeltariff: "wp" }, value } });
+  change("sensor.wp");
+  assert.deepEqual(p._draft.label_tariffs, { wp: "sensor.wp" });
+  assert.equal(p._isDirty(), true);
+  change("");
+  assert.deepEqual(p._draft.label_tariffs, {});
+});
