@@ -60,9 +60,65 @@ test("inverting the sign", () => {
   assert.equal(c.charge, 300);
 });
 
-test("separate and combined sensors are added", () => {
+test("separate sensors win over the combined one, the combined only fills the gaps", () => {
+  // a combined meter often shows the same flow again: adding both would count it twice
   const p = panel({ grid_import: ["gi"], grid_power: ["g"] }, { gi: st(200), g: st(300) });
-  assert.equal(p._current().gridIn, 500);
+  assert.equal(p._current().gridIn, 200);
+  assert.equal(p._current().gridOut, 0);
+  // no separate export sensor: the negative part of the combined sensor is the export
+  const q = panel({ grid_import: ["gi"], grid_power: ["g"] }, { gi: st(0), g: st(-300) });
+  assert.equal(q._current().gridIn, 0);
+  assert.equal(q._current().gridOut, 300);
+});
+
+test("separate production, import and export sensors ignore negative readings", () => {
+  const p = panel(
+    { solar_power: ["pv1", "pv2"], grid_import: ["gi"], grid_export: ["ge"] },
+    { pv1: st(2000), pv2: st(-50), gi: st(-90), ge: st(-10) },
+  );
+  const c = p._current();
+  assert.equal(c.solar, 2000);
+  assert.equal(c.gridIn, 0);
+  assert.equal(c.gridOut, 0);
+});
+
+test("a signed meter that is also the import sensor does not make import and export at the same time", () => {
+  // PV 2978 W, the meter reads -90 W (feeding in), the import sensor shows the same meter as -90 W
+  const p = panel(
+    { solar_power: ["pv"], grid_power: ["meter"], grid_import: ["imp"] },
+    { pv: st(2978), meter: st(-90), imp: st(-90) },
+  );
+  const c = p._current();
+  assert.equal(c.gridIn, 0);
+  assert.equal(c.gridOut, 90);
+  assert.equal(c.house, 2888); // 2978 - 90, not 2798
+  assert.equal(c.direct, 2888);
+});
+
+test("autarky: the share of the consumption that does not come from the grid", () => {
+  const some = panel({ solar_power: ["pv"], grid_import: ["gi"], house_power: "h" }, { pv: st(1000), gi: st(250), h: st(1000) });
+  assert.equal(some._current().autarky, 75);
+  const none = panel({ grid_import: ["gi"], house_power: "h" }, { gi: st(800), h: st(800) });
+  assert.equal(none._current().autarky, 0);
+  const full = panel({ solar_power: ["pv"], grid_import: ["gi"], house_power: "h" }, { pv: st(2000), gi: st(0), h: st(1500) });
+  assert.equal(full._current().autarky, 100);
+  const over = panel({ grid_import: ["gi"], house_power: "h" }, { gi: st(900), h: st(800) }); // import above the house power
+  assert.equal(over._current().autarky, 0);
+  const unknown = panel({ grid_export: ["ge"], house_power: "h" }, { ge: st(0), h: st(500) }); // no import information
+  assert.equal(unknown._current().autarky, null);
+  const idle = panel({ grid_import: ["gi"], house_power: "h" }, { gi: st(0), h: st(0) });
+  assert.equal(idle._current().autarky, null);
+});
+
+test("autarky: shows as a tile on the Power tab", () => {
+  const p = panel({ solar_power: ["pv"], grid_import: ["gi"], house_power: "h" }, { pv: st(1000), gi: st(250), h: st(1000) });
+  p._ready = true;
+  p._hass.language = "en";
+  assert.match(p._renderHouse(), /Self-sufficiency<\/div><div class="eb-value">75<small>%/);
+  const none = panel({ grid_export: ["ge"], house_power: "h" }, { ge: st(0), h: st(500) });
+  none._ready = true;
+  none._hass.language = "en";
+  assert.doesNotMatch(none._renderHouse(), /Self-sufficiency/);
 });
 
 test("grid charging of the storage is subtracted from direct PV", () => {

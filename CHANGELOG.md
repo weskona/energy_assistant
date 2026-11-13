@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-12
+
+### Fixed
+
+- Wrong house power when a signed meter was also used as an import sensor (for example after taking over the sensors of PV Assistant): import and feed-in showed at the same time and the house power came out too low. Separate production, import and export sensors now ignore negative readings (like PV Assistant does), and **separate sensors win over the combined sensor**: the combined sensor only fills in what no separate sensor covers (its negative part is the export, its positive part the import). Before, both were added, which counted the same flow twice. This applies to grid and storage, also in the history chart.
+
+### Added
+
+- **Self-sufficiency** tile on the Power tab: the share of the current consumption that does not come from the grid. It needs an import value and a house power above zero.
+
 ## [0.14.0] - 2026-11-12
 
 ### Changed

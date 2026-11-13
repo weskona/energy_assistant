@@ -132,6 +132,7 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    autarky: "Self-sufficiency",
     tabPv: "PV",
     tabEv: "EV",
     tabCosts: "Costs",
@@ -302,6 +303,7 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    autarky: "Autarkie",
     tabPv: "PV",
     tabEv: "EV",
     tabCosts: "Kosten",
@@ -1396,6 +1398,12 @@ class EnergyAssistantPanel extends HTMLElement {
     return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
   }
 
+  /** Sum that ignores negative readings of single sensors (production, import and export cannot be negative). */
+  _sumPos(ids) {
+    const vals = (ids || []).map((id) => this._watts(id)).filter((v) => v != null);
+    return vals.length ? vals.reduce((a, b) => a + Math.max(0, b), 0) : null;
+  }
+
   /** Sum of the magnitudes: separate charging/discharging sensors may report their direction as negative values. */
   _sumAbs(ids) {
     const vals = (ids || []).map((id) => this._watts(id)).filter((v) => v != null);
@@ -1410,15 +1418,17 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** Merge separate and combined sensors into positive quantities. */
   _split({ solar, gridIn, gridOut, discharge, charge, gridCharge, grid, battery }) {
-    const add = (a, b) => (a == null && b == null ? null : (a ?? 0) + (b ?? 0));
+    // Separate sensors win over the combined one: a combined meter often shows the same flow again, adding
+    // both would count it twice. The combined sensor only fills in what no separate sensor covers.
+    const pick = (separate, combined) => (separate != null ? separate : combined);
     const pos = (v) => (v == null ? null : Math.max(0, v));
     const neg = (v) => (v == null ? null : Math.max(0, -v));
     return {
       solar,
-      gridIn: add(gridIn, pos(grid)),
-      gridOut: add(gridOut, neg(grid)),
-      discharge: add(discharge, pos(battery)),
-      charge: add(charge, neg(battery)),
+      gridIn: pick(gridIn, pos(grid)),
+      gridOut: pick(gridOut, neg(grid)),
+      discharge: pick(discharge, pos(battery)),
+      charge: pick(charge, neg(battery)),
       gridCharge,
     };
   }
@@ -1427,9 +1437,9 @@ class EnergyAssistantPanel extends HTMLElement {
   _current() {
     const c = this._cfg;
     const parts = this._split({
-      solar: this._sum(c.solar_power),
-      gridIn: this._sum(c.grid_import),
-      gridOut: this._sum(c.grid_export),
+      solar: this._sumPos(c.solar_power),
+      gridIn: this._sumPos(c.grid_import),
+      gridOut: this._sumPos(c.grid_export),
       discharge: this._sumAbs(c.battery_discharge),
       charge: this._sumAbs(c.battery_charge),
       gridCharge: this._sum(c.battery_grid_charge),
@@ -1437,7 +1447,9 @@ class EnergyAssistantPanel extends HTMLElement {
       battery: this._signed(c.battery_power, c.invert_battery),
     });
     const house = c.house_power ? this._watts(c.house_power) : this._calcHouse(parts);
-    return { house, direct: this._calcDirect(parts, house), ...parts };
+    // Self-sufficiency right now: the share of the consumption that does not come from the grid.
+    const autarky = house != null && house > 0 && parts.gridIn != null ? Math.max(0, Math.min(100, ((house - parts.gridIn) / house) * 100)) : null;
+    return { house, direct: this._calcDirect(parts, house), autarky, ...parts };
   }
   /** Individual devices with their current power in W, highest first. */
   /** Display name of a sensor in the lists: the own name if one is set, else the friendly name. */
@@ -1577,18 +1589,19 @@ class EnergyAssistantPanel extends HTMLElement {
       return out;
     };
     // Add up several sensors per category (null if there is no value at that time).
-    const group = (ids, invert = false, magnitude = false) => {
+    // mode: "abs" counts the magnitude of every sensor, "pos" ignores negative readings.
+    const group = (ids, invert = false, mode = "") => {
       const list = (ids || []).map(sample).filter(Boolean);
       if (!list.length) return null;
       return Array.from({ length: n + 1 }, (_, k) => {
-        const v = list.map((l) => l[k]).filter((x) => x != null).map((x) => (magnitude ? Math.abs(x) : x));
+        const v = list.map((l) => l[k]).filter((x) => x != null).map((x) => (mode === "abs" ? Math.abs(x) : mode === "pos" ? Math.max(0, x) : x));
         return v.length ? (invert ? -1 : 1) * v.reduce((a, b) => a + b, 0) : null;
       });
     };
     const house = c.house_power ? sample(c.house_power) : null;
     const g = {
-      solar: group(c.solar_power), gridIn: group(c.grid_import), gridOut: group(c.grid_export),
-      discharge: group(c.battery_discharge, false, true), charge: group(c.battery_charge, false, true),
+      solar: group(c.solar_power, false, "pos"), gridIn: group(c.grid_import, false, "pos"), gridOut: group(c.grid_export, false, "pos"),
+      discharge: group(c.battery_discharge, false, "abs"), charge: group(c.battery_charge, false, "abs"),
       gridCharge: group(c.battery_grid_charge),
       grid: group(c.grid_power, c.invert_grid), battery: group(c.battery_power, c.invert_battery),
     };
@@ -1683,6 +1696,7 @@ class EnergyAssistantPanel extends HTMLElement {
             ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>${this._t("storage")} ${Math.round(mix.battery * 100)} %</span>` : ""}
             <span><i style="background:var(--eb-grid)"></i>${this._t("grid")} ${Math.round(mix.grid * 100)} %</span></div>` : ""}
         <div class="tiles">
+          ${cur.autarky == null ? "" : `<div class="eb-tile"><div class="eb-label">${this._t("autarky")}</div><div class="eb-value">${Math.round(cur.autarky)}<small>%</small></div></div>`}
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
         </div>
