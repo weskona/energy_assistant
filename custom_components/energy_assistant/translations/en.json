@@ -48,6 +48,7 @@
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",
           "device_exclude": "Excluded sensors (never added by a pattern)",
           "device_power": "Additional device sensors (optional)",
+          "device_standby": "Standby devices (shown as always on; none = detected automatically)",
           "area_ids": "Areas (their power sensors are summed up per area, none = all areas)",
           "label_ids": "Labels (their power sensors are summed up per label)"
         }
@@ -116,6 +117,7 @@
           "device_exclude_patterns": "Exclude patterns (e.g. alpha_ess_*)",
           "device_exclude": "Excluded sensors (never added by a pattern)",
           "device_power": "Additional device sensors (optional)",
+          "device_standby": "Standby devices (shown as always on; none = detected automatically)",
           "area_ids": "Areas (their power sensors are summed up per area, none = all areas)",
           "label_ids": "Labels (their power sensors are summed up per label)"
         }

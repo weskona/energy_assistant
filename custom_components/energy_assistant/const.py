@@ -13,6 +13,8 @@ CONF_BATTERY_DISCHARGE = "battery_discharge"  # from storage, one or more
 CONF_BATTERY_CHARGE = "battery_charge"  # to storage, one or more
 CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # part of the above from grid
 CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
+# Devices that count as standby (always on). When set, the Consumption tab lists exactly these.
+CONF_DEVICE_STANDBY = "device_standby"
 # Name patterns like "*_leistung": every power sensor that matches is listed as a device.
 CONF_DEVICE_PATTERNS = "device_patterns"
 # Sensors that a pattern must not add to the device list.
@@ -61,6 +63,7 @@ LIST_KEYS = (
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_SOC,
     CONF_DEVICE_POWER,
+    CONF_DEVICE_STANDBY,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,

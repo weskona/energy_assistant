@@ -219,6 +219,7 @@ const STRINGS = {
     uAlwaysHintStat: "Lowest hourly mean of each device in the period (at most the last 31 days), from 2 W on.",
     uNeedStats: "Past periods come from the long-term statistics: the power sensors need the state class measurement.",
     uAlwaysTitle: "Always on (standby)",
+    uAlwaysDefined: "The standby devices you defined in the settings, with their lowest power in the period.",
     uAlwaysHint: "Lowest 30-minute average of each device in the last 24 hours, from 2 W on.",
     uYear: "{kwh} kWh · {cost} per year",
     uYearKwh: "{kwh} kWh per year",
@@ -336,6 +337,7 @@ const STRINGS = {
     f_battery_charge: "To storage (charging)",
     f_battery_grid_charge: "Storage charged from grid",
     f_device_power: "Additional device sensors (optional)",
+    f_device_standby: "Standby devices (shown as always on; none = detected automatically)",
     f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
@@ -487,6 +489,7 @@ const STRINGS = {
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",
     uNeedStats: "Vergangene Zeiträume kommen aus der Langzeitstatistik: die Leistungssensoren brauchen die State Class measurement.",
     uAlwaysTitle: "Dauerlast (Standby)",
+    uAlwaysDefined: "Die Standby-Geräte, die du in den Einstellungen festgelegt hast, mit ihrer niedrigsten Leistung im Zeitraum.",
     uAlwaysHint: "Niedrigster 30-Minuten-Durchschnitt jedes Geräts in den letzten 24 Stunden, ab 2 W.",
     uYear: "{kwh} kWh · {cost} pro Jahr",
     uYearKwh: "{kwh} kWh pro Jahr",
@@ -604,6 +607,7 @@ const STRINGS = {
     f_battery_charge: "Zum Speicher (Laden)",
     f_battery_grid_charge: "Speicher aus dem Netz geladen",
     f_device_power: "Zusätzliche Geräte-Sensoren (optional)",
+    f_device_standby: "Standby-Geräte (werden als Dauerlast gezeigt; leer = automatisch erkannt)",
     f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
@@ -749,11 +753,11 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_matches", "matches"], ["device_exclude", "multi"], ["device_power", "multi"], ["device_standby", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -1013,7 +1017,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** The consumption tab exists when devices are set up (single sensors or name patterns). */
   _usageEnabled() {
-    return (this._cfg.device_power || []).length > 0 || (this._cfg.device_patterns || []).length > 0;
+    return (this._cfg.device_power || []).length > 0 || (this._cfg.device_standby || []).length > 0 || (this._cfg.device_patterns || []).length > 0;
   }
 
   /** Watts per bucket of a history answer (null before the first value), in the unit of the sensor. */
@@ -1272,7 +1276,11 @@ class EnergyAssistantPanel extends HTMLElement {
     const sub = (text) => `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(text)}</div>`;
     // 1) base load of the house
     const houseBase = u.houseBase !== undefined ? u.houseBase : this._baseline((this._history || []).map((p) => p.v));
-    const always = u.devices.filter((d) => d.baseW != null && d.baseW >= 2).sort((a, b) => b.baseW - a.baseW);
+    // Defined standby devices replace the automatic detection (a defined device is listed from 0 W).
+    const defined = new Set(this._cfg.device_standby || []);
+    const always = defined.size
+      ? u.devices.filter((d) => defined.has(d.id) && d.baseW != null).sort((a, b) => b.baseW - a.baseW)
+      : u.devices.filter((d) => d.baseW != null && d.baseW >= 2).sort((a, b) => b.baseW - a.baseW);
     const baseTiles = [];
     if (houseBase != null) {
       const perYear = (houseBase / 1000) * 8760;
@@ -1324,10 +1332,10 @@ class EnergyAssistantPanel extends HTMLElement {
       const year = (d.baseW / 1000) * 8760;
       const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
       const [v, unit] = fmtPower(d.baseW);
-      return row("always", d, d.name, v, unit, null, (d.baseW / always[0].baseW) * 100, text);
+      return row("always", d, d.name, v, unit, null, always[0].baseW > 0 ? (d.baseW / always[0].baseW) * 100 : 0, text);
     }).join("");
     const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
-      <div class="hint">${esc(this._t(today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
+      <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))}</div>
       <div class="devgrid">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return `<div class="stack">${baseCard}${topCard}${alwaysCard}${note}</div>`;
@@ -2638,7 +2646,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** The sensors of the device list: the single ones plus the ones the name patterns find. */
   _deviceIds() {
-    const explicit = this._cfg.device_power || [];
+    const explicit = [...(this._cfg.device_power || []), ...(this._cfg.device_standby || [])];
     return [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
   }
 

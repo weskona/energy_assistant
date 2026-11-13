@@ -48,6 +48,7 @@
           "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)",
+          "device_standby": "Standby-Geräte (werden als Dauerlast gezeigt; leer = automatisch erkannt)",
           "area_ids": "Bereiche (ihre Leistungssensoren werden je Bereich zusammengefasst, keiner = alle Bereiche)",
           "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
         }
@@ -116,6 +117,7 @@
           "device_exclude_patterns": "Ausschluss-Muster (z. B. alpha_ess_*)",
           "device_exclude": "Ausgeschlossene Sensoren (nie durch ein Muster)",
           "device_power": "Zusätzliche Geräte-Sensoren (optional)",
+          "device_standby": "Standby-Geräte (werden als Dauerlast gezeigt; leer = automatisch erkannt)",
           "area_ids": "Bereiche (ihre Leistungssensoren werden je Bereich zusammengefasst, keiner = alle Bereiche)",
           "label_ids": "Labels (ihre Leistungssensoren werden je Label zusammengefasst)"
         }

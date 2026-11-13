@@ -2844,6 +2844,28 @@ test("usage: base load with its cost per year, the share of the always-on device
   assert.doesNotMatch(html, /Backofen<\/span> <small class="cnt">[^<]*per year/); // 0 W standby: not listed
 });
 
+test("usage: defined standby devices replace the automatic detection", () => {
+  const p = loadedUsage();
+  p._cfg.device_standby = ["sensor.c", "sensor.b"];
+  const html = p._renderUsage();
+  assert.match(html, /The standby devices you defined/);
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.match(card, /Router/);
+  assert.match(card, /Backofen/); // a defined device is listed even at 0 W
+  assert.doesNotMatch(card, /Kühlschrank/); // detected automatically before, now not defined
+  assert.match(html, /Always-on devices<\/div><div class="eb-value">12<small>W/); // only the router counts
+});
+
+test("usage: defined standby devices are part of the device list", () => {
+  const p = loadedUsage();
+  p._cfg.device_power = ["sensor.a"];
+  p._cfg.device_standby = ["sensor.b"];
+  assert.deepEqual(p._deviceIds(), ["sensor.a", "sensor.b"]);
+  p._cfg.device_power = [];
+  p._cfg.device_patterns = [];
+  assert.equal(p._usageEnabled(), true);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();

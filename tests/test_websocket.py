@@ -152,6 +152,20 @@ async def test_update_config_stores_device_exclude(hass, hass_ws_client, entry) 
     assert entry.options["device_exclude"] == ["sensor.a_leistung", "sensor.b_leistung"]
 
 
+async def test_update_config_stores_device_standby(hass, hass_ws_client, entry) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"device_standby": ["sensor.router_leistung"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["device_standby"] == ["sensor.router_leistung"]
+    assert entry.options["device_standby"] == ["sensor.router_leistung"]
+
+
 async def test_update_config_rejects_invalid_exclude(
     hass, hass_ws_client, entry
 ) -> None:

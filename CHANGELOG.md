@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Standby devices can be defined:** a new field *Standby devices* in the settings, the config flow and the options. When set, the *Always on (standby)* card of the Consumption tab lists exactly these devices (also below 2 W) and the *Always-on devices* tile sums them up; empty keeps the automatic detection.
+
 ## [0.22.0] - 2026-11-13
 
 ### Changed

@@ -23,6 +23,7 @@ from .const import (
     CONF_DEVICE_EXCLUDE_PATTERNS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_POWER,
+    CONF_DEVICE_STANDBY,
     CONF_ENERGY_CHARGE,
     CONF_ENERGY_DISCHARGE,
     CONF_ENERGY_GRID_EXPORT,
@@ -151,6 +152,7 @@ def _devices_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(defaults, CONF_DEVICE_EXCLUDE_PATTERNS): _PATTERNS,
             _optional(defaults, CONF_DEVICE_EXCLUDE): _MULTI,
             _optional(defaults, CONF_DEVICE_POWER): _MULTI,
+            _optional(defaults, CONF_DEVICE_STANDBY): _MULTI,
             _optional(defaults, CONF_AREA_IDS): _AREAS,
             _optional(defaults, CONF_LABEL_IDS): _LABELS,
         }
