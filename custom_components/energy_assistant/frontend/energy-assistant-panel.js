@@ -88,6 +88,11 @@ svg .hair{stroke:var(--eb-muted);stroke-width:1;stroke-dasharray:3 3}
 svg .hdot{stroke:var(--eb-panel);stroke-width:2}
 .tip{position:absolute;pointer-events:none;z-index:2;background:var(--eb-panel);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap}
 .tip[hidden]{display:none}
+.tip.gtip{position:fixed;z-index:50;white-space:normal;max-width:min(380px,92vw)}
+.tip .tp{color:var(--eb-text)}
+.tip .tp+.tp{color:var(--eb-muted);margin-top:2px}
+.bslot{fill:transparent}
+.bslot:hover{fill:rgba(128,128,128,.14)}
 .tip .tt{color:var(--eb-muted);margin-bottom:4px}
 .tip .tr{display:flex;align-items:center;gap:8px}
 .tip .tr b{font-weight:600;color:var(--eb-text)}
@@ -2007,8 +2012,9 @@ class EnergyAssistantPanel extends HTMLElement {
       });
       const label = this._balTick(win, i);
       if (label && i % every === 0) svg += `<text class="htick" x="${f1(x0 + slot / 2)}" y="${H - 6}" text-anchor="middle">${esc(label)}</text>`;
-      const tip = [this._balRowLabel(win, i), ...defs.map((d) => `${d.name}: ${r[d.key] == null ? "–" : `${num(r[d.key])} kWh`}`)].map(esc).join("&#10;");
-      svg += `<rect x="${f1(x0)}" y="${M.t}" width="${f1(slot)}" height="${ph}" fill="transparent"><title>${tip}</title></rect>`;
+      // The tooltip is drawn by the panel (see _wireTips), in the style of the history chart.
+      const tip = { t: this._balRowLabel(win, i), r: defs.map((d) => [d.color, r[d.key] == null ? "–" : `${num(r[d.key])} kWh`, d.name]) };
+      svg += `<rect class="bslot" x="${f1(x0)}" y="${M.t}" width="${f1(slot)}" height="${ph}" data-tipj="${esc(JSON.stringify(tip))}"/>`;
     });
     const legend = defs.map((d) => `<span><i style="background:var(${d.color})"></i>${esc(d.name)}</span>`).join("");
     const sumRow = `<tr><th>${esc(this._t("bSum"))}</th>${defs.map((d) => `<td>${num(rows.reduce((a, r) => a + (r[d.key] ?? 0), 0))}</td>`).join("")}</tr>`;
@@ -3428,7 +3434,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const active = all.filter((d) => d.w >= IDLE_W).map((d) => {
       const u = d.id ? byId.get(d.id) : null;
       const kwh = u?.kwh >= 0.005 ? u.kwh.toLocaleString(this._hass?.language || "en", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
-      return { ...d, editable: this._isAdmin, spark: u?.spark, tip: [d.tip, kwh ? this._t("uTodayKwh", { kwh }) : ""].filter(Boolean).join(" · ") || undefined };
+      return { ...d, editable: this._isAdmin, spark: u?.spark, tip: [d.tip, kwh ? this._t("uTodayKwh", { kwh }) : ""].filter(Boolean).join("\n") || undefined };
     });
     const sum = all.reduce((a, d) => a + d.w, 0);
     const other = house != null && house - sum >= IDLE_W ? { name: this._t("otherDevices"), w: house - sum, other: true } : null;
@@ -3583,7 +3589,7 @@ class EnergyAssistantPanel extends HTMLElement {
         // Share of the house power, only known when the house power is known.
         const share = house > 0 ? Math.round((d.w / house) * 100) : null;
         const renamed = d.original && d.original !== d.name;
-        const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || "", renamed ? this._t("originalName", { name: d.original }) : ""].filter(Boolean).join(" · ");
+        const tip = [share != null ? this._t("share", { pct: share }) : "", d.tip || "", renamed ? this._t("originalName", { name: d.original }) : ""].filter(Boolean).join("\n");
         const editing = d.id && d.editable && this._editName === d.id;
         const pencil = globalThis.customElements?.get?.("ha-icon") ? `<ha-icon icon="mdi:pencil"></ha-icon>` : "✎";
         const nameHtml = editing
@@ -3623,7 +3629,9 @@ class EnergyAssistantPanel extends HTMLElement {
             <div class="tabs"><button class="tab active" data-tab="house">Power</button></div>
             <div class="right"><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
           </div>
-          <div id="content"></div></div>`;
+          <div id="content"></div></div>
+        <div class="tip gtip" hidden></div>`;
+      this._wireTips();
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
         this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })));
       const content = this.shadowRoot.getElementById("content");
@@ -3849,6 +3857,76 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const details = content.querySelector("details.tableview");
     if (details) details.addEventListener("toggle", () => { this._tableOpen = details.open; });
+  }
+
+  /**
+   * One tooltip for the whole panel, in the style of the history chart: every element with a `title` (it is
+   * taken over, so the plain browser tooltip does not show as well), `data-tip` (text, one line per row) or
+   * `data-tipj` (a title and rows with a color dot, a bold value and a name, as JSON) gets it on hover.
+   */
+  _wireTips() {
+    const root = this.shadowRoot;
+    const tip = root.querySelector(".gtip");
+    let current = null;
+    const hide = () => { current = null; tip.hidden = true; };
+    const fill = (el) => {
+      if (el.hasAttribute("title")) { // keep the text, drop the native tooltip
+        el.dataset.tip = el.getAttribute("title");
+        el.removeAttribute("title");
+      }
+      tip.replaceChildren();
+      if (el.dataset.tipj) {
+        let data;
+        try { data = JSON.parse(el.dataset.tipj); } catch (e) { return false; }
+        const title = document.createElement("div");
+        title.className = "tt";
+        title.textContent = data.t || "";
+        tip.append(title);
+        for (const [color, value, name] of data.r || []) {
+          const line = document.createElement("div");
+          line.className = "tr";
+          const key = document.createElement("i");
+          key.style.background = `var(${color})`;
+          const val = document.createElement("b");
+          val.textContent = value;
+          const label = document.createElement("span");
+          label.textContent = name;
+          line.append(key, val, label);
+          tip.append(line);
+        }
+        return true;
+      }
+      const text = el.dataset.tip;
+      if (!text) return false;
+      for (const part of text.split("\n")) {
+        const line = document.createElement("div");
+        line.className = "tp";
+        line.textContent = part;
+        tip.append(line);
+      }
+      return true;
+    };
+    const place = (x, y) => {
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const vw = globalThis.innerWidth || Infinity, vh = globalThis.innerHeight || Infinity;
+      const left = x + 16 + w > vw ? x - w - 16 : x + 16;
+      const top = y + 18 + h > vh ? y - h - 12 : y + 18;
+      tip.style.left = `${Math.max(4, left)}px`;
+      tip.style.top = `${Math.max(4, top)}px`;
+    };
+    root.addEventListener("pointermove", (e) => {
+      if (e.pointerType === "touch") return;
+      const el = e.target.closest?.("[data-tipj],[data-tip],[title]");
+      if (!el) { hide(); return; }
+      if (el !== current) {
+        if (!fill(el)) { hide(); return; }
+        current = el;
+      }
+      tip.hidden = false;
+      place(e.clientX, e.clientY);
+    });
+    root.addEventListener("pointerleave", hide);
+    root.addEventListener("pointerdown", hide);
   }
 
   /** Titles of the cards the user folded, remembered in the browser (only a convenience, it may be unavailable). */

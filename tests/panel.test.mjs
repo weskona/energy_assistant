@@ -654,7 +654,7 @@ test("areas: card lists areas strongest first, with the sensor count, share and 
   assert.match(html, /2 power sensors/);
   assert.match(html, /1 power sensor</);
   assert.match(html, /Wohnzimmer[\s\S]*?<small class="pct">6 %<\/small>/);
-  assert.match(html, /title="6 % of house · Media 124 W"/);
+  assert.match(html, /title="6 % of house\nMedia 124 W"/); // one line per fact in the tooltip
 });
 
 test("areas: idle areas are only counted", () => {
@@ -846,7 +846,7 @@ test("labels: card with sums, shares, sensor counts, colors and tooltips", () =>
   assert.match(html, /Licht[\s\S]*?1 power sensor</);
   assert.ok(html.indexOf("Klima") < html.indexOf("Licht")); // strongest first
   assert.match(html, /var\(--blue-color/);
-  assert.match(html, /title="81 % of house · Klimaanlage 900 W/);
+  assert.match(html, /title="81 % of house\nKlimaanlage 900 W/);
 });
 
 test("labels: the card folds like the others and has its own toggle", () => {
@@ -2626,11 +2626,17 @@ test("balance: the picker marks the range, 'next' is off for the current period 
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
 });
 
-test("balance: the bar chart has a bar per bucket and series, a title tooltip and the table with the sum", () => {
+test("balance: the bar chart has a bar per bucket and series, a styled tooltip and the table with the sum", () => {
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Energy per period<\/span>/);
   assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // two days with production
-  assert.match(html, /<title>[^<]*Production: 10[.,]00 kWh&#10;/);
+  // the tooltip is drawn by the panel from the data of the slot: a title and one row per series
+  const slot = html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/);
+  assert.ok(slot);
+  const tip = JSON.parse(slot[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.ok(tip.t.length > 0);
+  assert.ok(tip.r.some(([color, value, name]) => color === "--ea-prod" && /^\d+[.,]\d{2} kWh$|^–$/.test(value) && name === "Production"));
+  assert.doesNotMatch(html, /<title>/); // no plain browser tooltip any more
   assert.match(html, /<summary>Show as table<\/summary>/);
   assert.match(html, /<th>Sum<\/th><td>30[.,]00<\/td>/);
   assert.equal((html.match(/<tr><th>/g) || []).length, 1 + 7 + 1); // the header, seven days and the sum row
@@ -3900,4 +3906,74 @@ test("comparison: the text names the chosen period, and the one before when look
   assert.equal(p._vsText("▲", 30, "week", 0), "▲ 30 % ggü. letzter Woche");
   assert.equal(p._vsText("▲", 30, "month", -1), "▲ 30 % ggü. Vormonat");
   assert.equal(p._vsText("▲", 30, "day", -1), "▲ 30 % ggü. Vortag");
+});
+
+// --- the one tooltip of the panel -------------------------------------------------------------------
+function tipDom() {
+  const make = () => {
+    const el = { children: [], hidden: true, style: {}, className: "", textContent: "", dataset: {}, attrs: {}, offsetWidth: 120, offsetHeight: 40 };
+    el.append = (...kids) => { el.children.push(...kids); };
+    el.replaceChildren = () => { el.children = []; };
+    el.hasAttribute = (n) => n in el.attrs;
+    el.getAttribute = (n) => el.attrs[n];
+    el.removeAttribute = (n) => { delete el.attrs[n]; };
+    return el;
+  };
+  return make;
+}
+
+function tipPanel() {
+  const make = tipDom();
+  const tip = make();
+  const listeners = {};
+  const realDoc = globalThis.document;
+  globalThis.document = { createElement: () => make() };
+  const p = new Panel();
+  p.shadowRoot = { querySelector: () => tip, addEventListener: (type, fn) => { listeners[type] = fn; } };
+  p._wireTips();
+  return { p, tip, listeners, restore: () => { globalThis.document = realDoc; } };
+}
+
+test("tooltip: an element with a title gets the styled tooltip and loses the native one", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const el = { dataset: {}, attrs: { title: "6 % of house\nMedia 124 W" }, hasAttribute(n) { return n in this.attrs; }, getAttribute(n) { return this.attrs[n]; }, removeAttribute(n) { delete this.attrs[n]; } };
+    el.closest = () => el;
+    listeners.pointermove({ target: el, clientX: 100, clientY: 50, pointerType: "mouse" });
+    assert.equal(tip.hidden, false);
+    assert.equal("title" in el.attrs, false); // no second, native tooltip
+    assert.deepEqual(tip.children.map((c) => c.textContent), ["6 % of house", "Media 124 W"]);
+    listeners.pointerleave();
+    assert.equal(tip.hidden, true);
+  } finally { restore(); }
+});
+
+test("tooltip: structured data gives a title and rows with a color, a value and a name", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const el = { dataset: { tipj: JSON.stringify({ t: "13.11., 12:00", r: [["--ea-prod", "4,10 kWh", "Production"]] }) }, attrs: {}, hasAttribute: () => false };
+    el.closest = () => el;
+    listeners.pointermove({ target: el, clientX: 10, clientY: 10, pointerType: "mouse" });
+    assert.equal(tip.children[0].className, "tt");
+    assert.equal(tip.children[0].textContent, "13.11., 12:00");
+    const row = tip.children[1];
+    assert.equal(row.className, "tr");
+    assert.deepEqual(row.children.map((c) => c.textContent || c.style.background), ["var(--ea-prod)", "4,10 kWh", "Production"]);
+  } finally { restore(); }
+});
+
+test("tooltip: nothing under the pointer hides it, a broken structure and touch do nothing", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const none = { closest: () => null };
+    tip.hidden = false;
+    listeners.pointermove({ target: none, clientX: 1, clientY: 1, pointerType: "mouse" });
+    assert.equal(tip.hidden, true);
+    const broken = { dataset: { tipj: "{not json" }, attrs: {}, hasAttribute: () => false, closest() { return this; } };
+    listeners.pointermove({ target: broken, clientX: 1, clientY: 1, pointerType: "mouse" });
+    assert.equal(tip.hidden, true);
+    const text = { dataset: { tip: "x" }, attrs: {}, hasAttribute: () => false, closest() { return this; } };
+    listeners.pointermove({ target: text, clientX: 1, clientY: 1, pointerType: "touch" });
+    assert.equal(tip.hidden, true); // touch devices have no hover
+  } finally { restore(); }
 });

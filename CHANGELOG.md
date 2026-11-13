@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One tooltip style everywhere:** the bars of the energy chart (balance) and every other element with a hint (device, area and label rows, filter buttons, chips, names) now show the tooltip of the history chart instead of the plain browser tooltip: a title, rows with a colored dot, the value in bold and the name. The bar under the pointer is highlighted.
+
 ### Added
 
 - **Period picker in the Costs tab:** a new card *Costs in the period* shows the grid cost, the feed-in revenue and the balance of the chosen day, week, month or year with the change to the period before. It uses the same period as the Consumption tab. The three money tiles moved there from the balance of the Consumption tab. The *Cost per label* table keeps showing the running day, week, month and year.
