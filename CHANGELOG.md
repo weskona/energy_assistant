@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- In the Consumption tab the rows of *Biggest consumers* and *Always on (standby)* line up: the hint of the standby card moved below its list, so both lists start at the same height.
+
 ## [0.23.0] - 2026-11-13
 
 ### Fixed
