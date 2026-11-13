@@ -22,7 +22,22 @@
           "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
-          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)",
+          "battery_soc": "Storage charge level sensor (%) (optional)",
+          "battery_capacity": "Storage capacity in kWh (optional)",
+          "battery_min_soc": "Minimum charge level in % (optional)"
+        }
+      },
+      "energy": {
+        "title": "Energy counters",
+        "description": "Optional: cumulative kWh counters or utility meters for the Balance tab, several per field are summed. If the Energy dashboard of Home Assistant is set up, its counters are suggested here; change or remove them as you like.",
+        "data": {
+          "energy_solar": "PV production",
+          "energy_grid_import": "Grid import",
+          "energy_grid_export": "Grid export",
+          "energy_battery_charge": "To storage (charging)",
+          "energy_battery_discharge": "From storage (discharging)",
+          "energy_house": "House consumption (optional, otherwise calculated)"
         }
       },
       "devices": {
@@ -75,7 +90,22 @@
           "invert_battery": "Invert storage sign",
           "battery_discharge": "From storage / discharging (optional, multiple allowed)",
           "battery_charge": "To storage / charging (optional, multiple allowed)",
-          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)"
+          "battery_grid_charge": "Storage charged from grid (optional, part of “To storage”)",
+          "battery_soc": "Storage charge level sensor (%) (optional)",
+          "battery_capacity": "Storage capacity in kWh (optional)",
+          "battery_min_soc": "Minimum charge level in % (optional)"
+        }
+      },
+      "energy": {
+        "title": "Energy counters",
+        "description": "Optional: cumulative kWh counters or utility meters for the Balance tab, several per field are summed. If the Energy dashboard of Home Assistant is set up, its counters are suggested here; change or remove them as you like.",
+        "data": {
+          "energy_solar": "PV production",
+          "energy_grid_import": "Grid import",
+          "energy_grid_export": "Grid export",
+          "energy_battery_charge": "To storage (charging)",
+          "energy_battery_discharge": "From storage (discharging)",
+          "energy_house": "House consumption (optional, otherwise calculated)"
         }
       },
       "devices": {
