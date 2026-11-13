@@ -55,10 +55,6 @@ const STYLE = `
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
-.row[data-collapse-toggle]{cursor:pointer;user-select:none}
-.row[data-collapse-toggle] .eb-title::before{content:"▾";display:inline-block;margin-right:8px;color:var(--eb-dim);font-size:11px;transition:transform .2s}
-.eb-card.collapsed .row[data-collapse-toggle] .eb-title::before{transform:rotate(-90deg)}
-.eb-card.collapsed > *:not(.row){display:none}
 .stack{display:grid;gap:var(--eb-gap)}
 .pair{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:800px){.pair{grid-template-columns:minmax(0,1fr)}}
@@ -2464,8 +2460,6 @@ class EnergyAssistantPanel extends HTMLElement {
     } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
       Object.assign(this._draft, this._pvTargets());
       this._edited();
-    } else if (e.target.closest("[data-collapse-toggle]")) {
-      this._toggleCollapse(e.target.closest("[data-collapse-toggle]"));
     } else if (e.target.closest("[data-open]")) {
       // Click on an area or label row: show or hide the sensors it sums up.
       const key = e.target.closest("[data-open]").dataset.open;
@@ -3639,7 +3633,7 @@ class EnergyAssistantPanel extends HTMLElement {
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
       content.addEventListener("keydown", (e) => {
-        const row = e.target.closest?.("[data-open], [data-collapse-toggle]");
+        const row = e.target.closest?.("[data-open]");
         if (row && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
           row.click();
@@ -3720,7 +3714,6 @@ class EnergyAssistantPanel extends HTMLElement {
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);
-      this._applyCollapse(content);
       this._wireChart(content);
       this._wireBalance(content);
     }
@@ -3927,53 +3920,6 @@ class EnergyAssistantPanel extends HTMLElement {
     });
     root.addEventListener("pointerleave", hide);
     root.addEventListener("pointerdown", hide);
-  }
-
-  /** Titles of the cards the user folded, remembered in the browser (only a convenience, it may be unavailable). */
-  _collapsedSet() {
-    if (!this._collapsed) {
-      try {
-        const saved = JSON.parse(globalThis.localStorage?.getItem("energy_assistant.collapsed") || "[]");
-        this._collapsed = new Set(Array.isArray(saved) ? saved.filter((x) => typeof x === "string") : []);
-      } catch (e) {
-        this._collapsed = new Set();
-      }
-    }
-    return this._collapsed;
-  }
-
-  /**
-   * Every card with a title row can be folded with a click on the title (the house card stays open). The
-   * state is applied after each redraw, because a new markup starts unfolded.
-   */
-  _applyCollapse(content) {
-    const folded = this._collapsedSet();
-    for (const card of content.querySelectorAll(".eb-card")) {
-      if (card.classList.contains("eb-card--glow")) continue;
-      const row = card.querySelector(":scope > .row");
-      const title = row?.querySelector(".eb-title")?.textContent?.trim();
-      if (!title) continue;
-      row.setAttribute("data-collapse-toggle", "");
-      row.setAttribute("role", "button");
-      row.setAttribute("tabindex", "0");
-      const isFolded = folded.has(title);
-      card.classList.toggle("collapsed", isFolded);
-      row.setAttribute("aria-expanded", isFolded ? "false" : "true");
-    }
-  }
-
-  /** Fold or unfold the card of a clicked title row and remember the choice. */
-  _toggleCollapse(row) {
-    const card = row.closest(".eb-card");
-    const title = row.querySelector(".eb-title")?.textContent?.trim();
-    if (!card || !title) return;
-    const folded = this._collapsedSet();
-    if (!folded.delete(title)) folded.add(title);
-    card.classList.toggle("collapsed", folded.has(title));
-    row.setAttribute("aria-expanded", folded.has(title) ? "false" : "true");
-    try {
-      globalThis.localStorage?.setItem("energy_assistant.collapsed", JSON.stringify([...folded]));
-    } catch (e) { /* private window or blocked storage: the choice only lasts until the next reload */ }
   }
 
   /**

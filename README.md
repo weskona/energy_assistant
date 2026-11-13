@@ -15,8 +15,6 @@ The UI is English with a German translation (follows your Home Assistant languag
 | **Payback** (German: Amortisation) | Only with Amortix: savings, investment, progress, remaining amount, savings per day, time left and payback date |
 | **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the Power tab. |
 
-**Folding:** every card except the house card folds with a click on its title (arrow in front of it). The choice is remembered in the browser.
-
 **History chart:** the card next to the house shows the power of the last 24 hours in watts, in the style of the power chart of PV Assistant but computed from your own sensors (PV Assistant is not needed): production (with a light area), feed-in, storage (turquoise from the storage, pink into the storage), solar used directly, grid import and house consumption. Series without data are left out. The names stand at the line ends on wide screens; a tooltip with all values follows the pointer (the crosshair stays while the values update), and **Show as table** lists the hourly means.
 
 **Tooltips:** all tooltips of the panel look the same, in the style of the history chart: the bars of the energy chart (title with the time, one row per series with a colored dot, the value in bold and the name), the rows of the device, area and label lists (share, sensors, original name), the filter buttons and the chips of the settings. The plain browser tooltip is not used any more; touch screens have no hover and so no tooltips.

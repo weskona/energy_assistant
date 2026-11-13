@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Folding of cards:** the cards can no longer be folded with a click on their title (arrow in front of the title); the cards are always open. The lists still unfold with *Show all*.
+
 ### Changed
 
 - **One tooltip style everywhere:** the bars of the energy chart (balance) and every other element with a hint (device, area and label rows, filter buttons, chips, names) now show the tooltip of the history chart instead of the plain browser tooltip: a title, rows with a colored dot, the value in bold and the name. The bar under the pointer is highlighted.
