@@ -2888,6 +2888,16 @@ test("usage: both lists show as many rows as the shorter one (at least 5), the r
   assert.match(top, /devgrid devlist/);
 });
 
+test("usage: the bar of a consumer is its share of the total energy, not of the biggest one", () => {
+  const p = loadedUsage();
+  const html = p._renderUsage();
+  const top = html.slice(html.indexOf("Biggest consumers"), html.indexOf("Always on (standby)"));
+  const widths = [...top.matchAll(/class="fill" style="width:([\d.]+)%/g)].map((m) => Number(m[1]));
+  assert.ok(Math.abs(widths[0] - (2.5 / 4.3) * 100) < 0.01); // Backofen: 2.5 of 4.3 kWh
+  assert.ok(Math.abs(widths[1] - (1.5 / 4.3) * 100) < 0.01); // Kühlschrank
+  assert.ok(widths[0] < 100);
+});
+
 test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
   const p = loadedUsage();
   const html = p._renderUsage();

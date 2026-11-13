@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The bar of a device in *Biggest consumers* shows its share of the total energy of the selected period (day, week, month, year), no longer its share of the biggest device.
+
 ### Changed
 
 - **Consumption tab in two columns:** the cards *Biggest consumers today* and *Always on (standby)* stand side by side in one row, one below the other on narrow screens. Both cards have the same height and show as many rows as the shorter list has (at least 5, at most 8); the rest unfolds with *Show all* per list, and an unfolded long list scrolls inside its card, like in the Power tab. The *Biggest consumers* list is no longer cut at 10 devices.

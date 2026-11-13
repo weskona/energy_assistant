@@ -1335,7 +1335,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const alwaysFold = fold(always, this._usAlwaysExpanded, "data-usalwaystoggle");
     const topRows = topFold.shown.map((d) => {
       const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
-      return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
+      return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, total > 0 ? (d.kwh / total) * 100 : 0, cost); // bar = share of the whole period
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
       <div class="devgrid${topFold.cls}">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${topFold.button}</div>`;
