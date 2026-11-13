@@ -145,8 +145,22 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .sw input{accent-color:var(--eb-green);width:18px;height:18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .chip{display:inline-flex;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;max-width:100%}
-.sec .fields>.fld.chipfld{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
-.chips.cap{max-height:150px;overflow:auto}
+.tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:6px 8px;min-height:44px;cursor:text}
+.tags:focus-within{border-color:var(--eb-green)}
+.tags.cap{max-height:130px;overflow:auto}
+.set .tags input[type=text]{flex:1 1 150px;width:auto;min-width:150px;border:0;background:none;padding:5px 4px}
+.set .tags input[type=text]:focus{outline:none}
+.devsec .fields{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
+.devsec .fld{display:flex;flex-direction:column}
+.devsec .fld>.tags{flex:1;min-height:104px;max-height:132px;overflow:auto;align-content:flex-start}
+.devsec .fld.span>.tags{flex:none;min-height:44px}
+.devsec .fld.note{margin-top:8px;font-size:12.5px;color:var(--eb-muted)}
+@media (max-width:1100px){.devsec .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.devsec .fields{grid-template-columns:minmax(0,1fr)}.devsec .fld>.tags{min-height:44px}}
+.mtoggle{display:flex;align-items:center;gap:10px;width:100%;background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:10px;padding:10px 12px;color:var(--eb-text);font:14px var(--eb-font);cursor:pointer;text-align:left}
+.mtoggle .chev{font-size:11px;color:var(--eb-dim);display:inline-block;transition:transform .2s}
+.mtoggle .chev.on{transform:rotate(90deg)}
+.mtoggle .go{margin-left:auto;color:var(--eb-green);font-weight:600;font-size:13px}
 .trow{display:flex;align-items:center;gap:12px;margin:6px 0}
 .trow .tn{font-size:14px;flex:0 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow select{flex:1 1 220px;min-width:0;max-width:420px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font:14px var(--eb-font)}
@@ -230,8 +244,9 @@ const STRINGS = {
     uLabelsTitle: "Labels",
     labelCostTitle: "Cost per label",
     labelCostHint: "Cost of the label sensors, priced step by step with the unit price valid at that moment. A tariff change does not change what was already counted. The sensors count from the moment they were created.",
-    uLabelsHint: "Energy of the sensors that carry the label, summed up since the start of the period. Energy Assistant creates the sensors when a label is selected in the settings; they count from then on.",
-    uLabelsPast: "The label sensors only count the running period. Go back to the current one to see them.",
+    uLabelsHint: "Energy of the sensors that carry the label in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per label for dashboards and automations, they count from the moment they were created.",
+    uLabelsCoverage: "{n} of {m} sensors",
+    uLabelsCoverageTip: "Only these sensors have statistics; the others are not counted.",
     uBaseHintStat: "Lowest hourly mean of the house power in the period (at most the last 31 days).",
     uAlwaysHintStat: "Lowest hourly mean of each device in the period (at most the last 31 days), from 2 W on.",
     uNeedStats: "Past periods come from the long-term statistics: the power sensors need the state class measurement.",
@@ -358,11 +373,14 @@ const STRINGS = {
     f_label_tariffs: "Tariff per label (for the cost sensors)",
     h_label_tariffs: "Which Tariffy electricity contract prices the cost of a label, e.g. the heat pump tariff for the heat pump label. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     tariffDefault: "Default ({name})",
-    h_device_standby: "Shown as always on in the Consumption tab. None selected = detected automatically.",
-    f_device_patterns: "Name patterns for device sensors (e.g. *_power)",
+    h_device_standby: "Standby devices are shown as always on in the Consumption tab. None selected = detected automatically.",
+    f_device_patterns: "Name patterns for device sensors",
     addPattern: "e.g. *_power",
     invalidPattern: "Only letters, digits, _ . * and ? are allowed.",
     matchesCount: "{n} matching, {x} excluded. Untick a sensor to exclude it.",
+    matchesSummary: "{n} matching sensors, {x} excluded",
+    matchesShow: "Show list",
+    matchesHide: "Hide list",
     filterMatches: "Filter matches …",
     filterAll: "All",
     filterGroupState: "Activity",
@@ -460,7 +478,7 @@ const STRINGS = {
     deviceCount1: "1 device",
     deviceCountN: "{n} devices",
     f_device_exclude: "Excluded sensors (never added by a pattern)",
-    f_device_exclude_patterns: "Exclude patterns (e.g. alpha_ess_*)",
+    f_device_exclude_patterns: "Exclude patterns",
     addExcludePattern: "e.g. alpha_ess_*",
     excludedByPattern: "Excluded by an exclude pattern",
     noMatches: "No power sensor matches yet",
@@ -509,8 +527,9 @@ const STRINGS = {
     uLabelsTitle: "Labels",
     labelCostTitle: "Kosten pro Label",
     labelCostHint: "Kosten der Label-Sensoren, Schritt für Schritt mit dem Arbeitspreis des jeweiligen Moments berechnet. Eine Preisänderung ändert nichts an dem, was schon gezählt wurde. Die Sensoren zählen ab dem Anlegen.",
-    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, aufsummiert seit Beginn des Zeitraums. Energy Assistant legt die Sensoren an, sobald ein Label in den Einstellungen ausgewählt wird; sie zählen ab dann.",
-    uLabelsPast: "Die Label-Sensoren zählen nur den laufenden Zeitraum. Gehe zum aktuellen zurück, um sie zu sehen.",
+    uLabelsHint: "Verbrauch der Sensoren, die das Label tragen, im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro Label für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
+    uLabelsCoverage: "{n} von {m} Sensoren",
+    uLabelsCoverageTip: "Nur diese Sensoren haben Statistik; die anderen zählen nicht mit.",
     uBaseHintStat: "Niedrigster Stundenmittelwert der Hausleistung im Zeitraum (höchstens die letzten 31 Tage).",
     uAlwaysHintStat: "Niedrigster Stundenmittelwert jedes Geräts im Zeitraum (höchstens die letzten 31 Tage), ab 2 W.",
     uNeedStats: "Vergangene Zeiträume kommen aus der Langzeitstatistik: die Leistungssensoren brauchen die State Class measurement.",
@@ -637,11 +656,14 @@ const STRINGS = {
     f_label_tariffs: "Tarif pro Label (für die Kostensensoren)",
     h_label_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Labels bewertet, z. B. der Wärmepumpentarif für das Wärmepumpen-Label. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     tariffDefault: "Standard ({name})",
-    h_device_standby: "Werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
-    f_device_patterns: "Namensmuster für Geräte-Sensoren (z. B. *_leistung)",
+    h_device_standby: "Standby-Geräte werden im Verbrauch-Tab als Dauerlast gezeigt. Keine Auswahl = automatisch erkannt.",
+    f_device_patterns: "Namensmuster für Geräte-Sensoren",
     addPattern: "z. B. *_leistung",
     invalidPattern: "Erlaubt sind nur Buchstaben, Ziffern, _ . * und ?.",
     matchesCount: "{n} passend, {x} ausgeschlossen. Häkchen entfernen schließt einen Sensor aus.",
+    matchesSummary: "{n} passende Sensoren, {x} ausgeschlossen",
+    matchesShow: "Liste zeigen",
+    matchesHide: "Liste ausblenden",
     filterMatches: "Treffer filtern …",
     filterAll: "Alle",
     filterGroupState: "Aktivität",
@@ -739,7 +761,7 @@ const STRINGS = {
     deviceCount1: "1 Gerät",
     deviceCountN: "{n} Geräte",
     f_device_exclude: "Ausgeschlossene Sensoren (nie durch ein Muster)",
-    f_device_exclude_patterns: "Ausschluss-Muster (z. B. alpha_ess_*)",
+    f_device_exclude_patterns: "Ausschluss-Muster",
     addExcludePattern: "z. B. alpha_ess_*",
     excludedByPattern: "Durch ein Ausschluss-Muster ausgeschlossen",
     noMatches: "Noch kein Leistungssensor passt",
@@ -783,7 +805,7 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["label_tariffs", "labeltariffs"]] },
 ];
@@ -983,8 +1005,8 @@ class EnergyAssistantPanel extends HTMLElement {
   _tabs() {
     const found = this._int || {};
     const tabs = ["house"];
-    if (this._usageEnabled()) tabs.push("usage");
-    if (this._balEnabled()) tabs.push("balance");
+    // Balance (energy counters) and consumption (devices) are one tab with one period picker.
+    if (this._usageEnabled() || this._balEnabled()) tabs.push("usage");
     if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
     if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
     if (found.tariffy) tabs.push("costs");
@@ -993,7 +1015,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _tabLabel(tab) {
-    return this._t({ house: "tabPower", usage: "tabUsage", balance: "tabBalance", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+    return this._t({ house: "tabPower", usage: "tabUsage", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
   }
 
   /** Markup of the page of the current tab (not the settings). */
@@ -1001,8 +1023,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
     switch (this._tab) {
-      case "usage": return this._renderUsage();
-      case "balance": return this._renderBalance();
+      case "usage": return this._renderConsumption();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
       case "costs": return stack(this._renderCosts(this._current()), this._renderLabelCosts(), this._renderContract());
@@ -1287,17 +1308,19 @@ class EnergyAssistantPanel extends HTMLElement {
    * The consumption tab: the base load of the house (what never goes away) with its yearly cost, the
    * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
    */
-  _renderUsage() {
+  _renderUsage({ bare = false } = {}) {
+    // bare: the cards only, the period picker and the stack come from the consumption tab
+    const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const lang = this._hass?.language || "en";
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const today = range === "day" && off === 0;
     const win = this._balWindow(range, off);
-    const picker = this._rangePicker("u", range, off, win);
+    const picker = bare ? "" : this._rangePicker("u", range, off, win);
     const v = this._usageView;
     const u = today ? this._usage : v && v.range === range && v.off === off ? v : null;
     const head = `<div class="row"><span class="eb-title">${esc(this._t("uBaseTitle"))}</span>${!today && this._usageViewLoading ? `<span class="eb-label">…</span>` : ""}</div>${picker}`;
-    if (!u) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div></div>`;
+    if (!u) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div>`);
     const priceState = this._int?.tariffy?.price && this._hass?.states?.[this._int.tariffy.price];
     const price = priceState ? parseFloat(priceState.state) : NaN;
     const currency = String(priceState?.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
@@ -1381,7 +1404,7 @@ class EnergyAssistantPanel extends HTMLElement {
     // 4) energy per selected label, from the sensors Energy Assistant creates for them
     const labelsCard = this._renderLabelEnergy({ range, off, num });
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
-    return `<div class="stack">${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}</div>`;
+    return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${labelsCard}${note}`);
   }
 
   /**
@@ -1392,27 +1415,106 @@ class EnergyAssistantPanel extends HTMLElement {
     const selected = this._cfg.label_ids || [];
     if (!selected.length) return "";
     const names = Object.fromEntries((this._labelData?.labels || []).map((l) => [l.label_id, l.name]));
-    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span></div>`;
-    if (off !== 0) {
-      return `<div class="eb-card">${title}<div class="hint">${esc(this._t("uLabelsPast"))}</div></div>`;
-    }
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("uLabelsTitle"))}</span>${this._labelUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
+    const u = this._labelUsage;
+    if (!u || u.key !== this._labelUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
     const rows = selected
-      .map((id) => {
-        const entityId = this._labelEnergy?.[id]?.[range];
-        const value = entityId ? parseFloat(this._hass?.states?.[entityId]?.state) : NaN;
-        return { id, name: names[id] || id, kwh: value };
-      })
-      .filter((r) => Number.isFinite(r.kwh))
+      .map((id) => ({ id, name: names[id] || id, ...(u.rows?.[id] || { kwh: 0, covered: 0, total: 0 }) }))
+      .filter((r) => r.covered > 0)
       .sort((a, b) => b.kwh - a.kwh);
     const max = Math.max(0, ...rows.map((r) => r.kwh));
     const html = rows
       .map((r) => {
-        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span></span>
+        const cover = r.covered < r.total ? ` <small class="cnt" title="${esc(this._t("uLabelsCoverageTip"))}">${esc(this._t("uLabelsCoverage", { n: r.covered, m: r.total }))}</small>` : "";
+        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span>${cover}</span>
           <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t("uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t("uLabelsHint"))}</div></div>`;
+  }
+
+  /** The selected labels with the power sensors that carry them: {label_id: [entity_id]}. */
+  _labelMemberMap() {
+    const out = {};
+    for (const id of this._cfg.label_ids || []) out[id] = this._labelMembers(id);
+    return out;
+  }
+
+  _labelUsageKey(range, off) {
+    return `${range}:${off}:${Object.entries(this._labelMemberMap()).map(([l, m]) => `${l}=${m.join(",")}`).join(";")}`;
+  }
+
+  _maybeLoadLabelUsage() {
+    if (!this._ready || this._labelUsageLoading || !this._labelData || !(this._cfg.label_ids || []).length) return;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const v = this._labelUsage;
+    if (!v || v.key !== this._labelUsageKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadLabelUsage();
+  }
+
+  /** Energy per label for the shown period: the statistics of the sensors that carry it, summed up. */
+  async _loadLabelUsage() {
+    if (!this._hass || this._labelUsageLoading) return;
+    this._labelUsageLoading = true;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const key = this._labelUsageKey(range, off);
+    try {
+      const map = this._labelMemberMap();
+      const ids = [...new Set(Object.values(map).flat())];
+      const kwh = await this._statsKwh(ids, this._balWindow(range, off), range);
+      this._labelUsage = kwh == null
+        ? { key, rows: null, failed: true, at: Date.now() }
+        : {
+          key, at: Date.now(),
+          rows: Object.fromEntries(Object.entries(map).map(([label, members]) => {
+            const have = members.filter((m) => kwh.has(m));
+            return [label, { kwh: have.reduce((a, m) => a + kwh.get(m), 0), covered: have.length, total: members.length }];
+          })),
+        };
+    } finally {
+      this._labelUsageLoading = false;
+      this._render();
+    }
+  }
+
+  /**
+   * Energy in kWh per sensor for a window from the long-term statistics (hourly or daily means of the power times
+   * their duration), complete up to now: the statistics of an hour or a day only exist when it is over, so the
+   * running day is taken from the hourly and the running hour from the 5-minute statistics. A Map of the sensors
+   * that have statistics; null when a request fails.
+   */
+  async _statsKwh(ids, win, range) {
+    if (!ids.length) return new Map();
+    const now = Date.now(), tz = this._tz();
+    const to = Math.min(win.end, now);
+    const live = win.end > now;
+    const hourStart = live ? Math.floor(to / 3600000) * 3600000 : to;
+    const p = tzParts(now, tz);
+    const todayStart = zonedTime(p.y, p.m - 1, p.d, 0, tz);
+    const parts = [];
+    if (range === "month" || range === "year") {
+      parts.push([win.start, Math.min(to, todayStart), "day"]);
+      if (live) parts.push([Math.max(win.start, todayStart), hourStart, "hour"]);
+    } else parts.push([win.start, hourStart, "hour"]);
+    if (live && to > hourStart) parts.push([Math.max(hourStart, win.start), to, "5minute"]);
+    const results = await Promise.all(parts.map(([from, end, period]) => this._usStats(ids, from, end, period)));
+    if (results.some((r) => r == null)) return null;
+    const kwh = new Map();
+    results.forEach((res, i) => {
+      const period = parts[i][2];
+      for (const id of ids) {
+        const rows = res?.[id];
+        if (!rows || !rows.length) continue;
+        let sum = kwh.get(id) ?? 0;
+        for (const row of rows) {
+          if (row.mean == null || Number.isNaN(row.mean)) continue;
+          const hours = row.end != null && row.start != null ? (Number(row.end) - Number(row.start)) / 3600000 : period === "day" ? 24 : period === "5minute" ? 1 / 12 : 1;
+          sum += (Math.max(0, row.mean) * hours) / 1000;
+        }
+        kwh.set(id, sum);
+      }
+    });
+    return kwh;
   }
 
   /**
@@ -1584,7 +1686,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * or a calendar year (per month); `off` counts the periods back from now (0 = the current one).
    * `edges` are the starts of the buckets plus the end of the period.
    */
-  _balWindow(range = this._balRange ?? "day", off = this._balOff ?? 0) {
+  _balWindow(range = this._usRange ?? "day", off = this._usOff ?? 0) {
     const tz = this._tz();
     const now = tzParts(Date.now(), tz);
     const y = now.y, m = now.m - 1, d = now.d;
@@ -1695,13 +1797,13 @@ class EnergyAssistantPanel extends HTMLElement {
   _maybeLoadBalance() {
     if (!this._ready || this._balLoading) return;
     const b = this._bal;
-    if (!b || b.range !== (this._balRange ?? "day") || b.off !== (this._balOff ?? 0) || Date.now() - b.at > 5 * 60 * 1000) this._loadBalance();
+    if (!b || b.range !== (this._usRange ?? "day") || b.off !== (this._usOff ?? 0) || Date.now() - b.at > 5 * 60 * 1000) this._loadBalance();
   }
 
   async _loadBalance() {
     if (!this._hass || this._balLoading) return;
     this._balLoading = true;
-    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
     try {
       const win = this._balWindow(range, off), prev = this._balWindow(range, off - 1);
       const [cur, old] = await Promise.all([this._balFetch(win), this._balFetch(prev)]);
@@ -1757,17 +1859,34 @@ class EnergyAssistantPanel extends HTMLElement {
         <button type="button" class="seg" data-${kind}nav="1" aria-label="${esc(this._t("bNext"))}" ${off >= 0 ? "disabled" : ""}>›</button></div></div>`;
   }
 
+  /**
+   * The consumption tab: one period picker for everything below it, the balance of the energy counters
+   * (totals, change to the period before, costs, bars) and then the devices (base load, biggest consumers,
+   * standby, labels). Each part only when its data is set up.
+   */
+  _renderConsumption() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
+    const parts = [picker];
+    if (this._balEnabled()) parts.push(this._renderBalance({ bare: true }));
+    if (this._usageEnabled()) parts.push(this._renderUsage({ bare: true }));
+    return `<div class="stack">${parts.join("")}</div>`;
+  }
+
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
-  _renderBalance() {
+  _renderBalance({ bare = false } = {}) {
+    // bare: the cards only, the period picker and the stack come from the consumption tab
+    const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const lang = this._hass?.language || "en";
-    const range = this._balRange ?? "day", off = this._balOff ?? 0;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const b = this._bal;
     const win = b?.win && b.range === range && b.off === off ? b.win : this._balWindow(range, off);
-    const picker = this._rangePicker("b", range, off, win);
+    const picker = bare ? "" : this._rangePicker("u", range, off, win);
     const head = `<div class="row"><span class="eb-title">${esc(this._t("balTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>${picker}`;
-    if (!b || b.range !== range || b.off !== off) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div></div>`;
-    if (b.failed) return `<div class="stack"><div class="eb-card">${head}<div class="empty">${this._t("bNoData")}</div></div></div>`;
+    if (!b || b.range !== range || b.off !== off) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("loading")}</div></div>`);
+    if (b.failed) return wrap(`<div class="eb-card">${head}<div class="empty">${this._t("bNoData")}</div></div>`);
     const t = b.totals, prev = b.before;
     const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
@@ -1804,7 +1923,7 @@ class EnergyAssistantPanel extends HTMLElement {
       money = `<div class="hint">${esc(this._t("bPriceNote"))}</div>`;
     }
     const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>${money}` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
-    return `<div class="stack">${first}${this._balanceChart(b)}</div>`;
+    return wrap(`${first}${this._balanceChart(b)}`);
   }
 
   /** Grouped bars per bucket (production, consumption, import, export) with a title tooltip and the table. */
@@ -2255,6 +2374,9 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _onClick(e) {
+    // A click on the empty part of a tag box goes to its input.
+    const tagBox = e.target.closest?.(".tags");
+    if (tagBox && !e.target.closest("button, input")) tagBox.querySelector("input")?.focus();
     const ren = e.target.closest("[data-rename]");
     if (ren) {
       this._startRename(ren.dataset.rename);
@@ -2278,10 +2400,6 @@ class EnergyAssistantPanel extends HTMLElement {
       if (group === "state") this._fState = value;
       else this._fSel = value;
       this._edited();
-    } else if (e.target.closest("[data-brange]")) {
-      this._balRange = e.target.closest("[data-brange]").dataset.brange;
-      this._balOff = 0;
-      this._render();
     } else if (e.target.closest("[data-urange]")) {
       this._usRange = e.target.closest("[data-urange]").dataset.urange;
       this._usOff = 0;
@@ -2290,12 +2408,6 @@ class EnergyAssistantPanel extends HTMLElement {
       const next = (this._usOff ?? 0) + Number(e.target.closest("[data-unav]").dataset.unav);
       if (next <= 0) {
         this._usOff = next;
-        this._render();
-      }
-    } else if (e.target.closest("[data-bnav]")) {
-      const next = (this._balOff ?? 0) + Number(e.target.closest("[data-bnav]").dataset.bnav);
-      if (next <= 0) {
-        this._balOff = next;
         this._render();
       }
     } else if (e.target.closest("[data-energyapply]") && this._isAdmin && this._energyOffer) {
@@ -2622,6 +2734,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const socOptions = this._socCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const field = ([key, kind]) => {
       if (kind === "energyoffer") return this._renderEnergyOffer(ro);
+      if (kind === "note") return `<div class="fld span note">${esc(this._t(key))}</div>`;
       if (kind === "labeltariffs") return this._renderLabelTariffs(ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
@@ -2636,16 +2749,25 @@ class EnergyAssistantPanel extends HTMLElement {
         .join("");
       if (kind === "areas") return `<div class="fld span"><label>${esc(label)}</label>${this._renderPicker("area", ro)}${this._draft.area_ids.length ? "" : `<div class="hint">${esc(this._t("areaAutoHint"))}</div>`}</div>`;
       if (kind === "labels") return `<div class="fld span"><label>${esc(label)}</label>${this._renderLabelPicker(ro)}</div>`;
-      if (kind === "matches") return this._draft.device_patterns.length ? `<div class="fld span">${this._renderMatches(ro)}</div>` : "";
+      if (kind === "matches") {
+        if (!this._draft.device_patterns.length) return "";
+        const { found } = this._matchList();
+        const open = this._open?.has("settings:matches");
+        const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+        const off = new Set(this._draft.device_exclude);
+        const x = found.filter((id) => off.has(id) || byPattern(id)).length;
+        const head = `<button type="button" class="mtoggle" data-open="settings:matches" aria-expanded="${open ? "true" : "false"}"><span class="chev${open ? " on" : ""}" aria-hidden="true">▶</span>${esc(this._t("matchesSummary", { n: found.length, x }))}<span class="go">${esc(this._t(open ? "matchesHide" : "matchesShow"))}</span></button>`;
+        return `<div class="fld span">${head}${open ? this._renderMatches(ro) : ""}</div>`;
+      }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
-      const hint = key === "device_standby" ? `<div class="hint">${esc(this._t("h_device_standby"))}</div>` : "";
-      const long = key === "device_exclude"; // can be a long list: full width, chips flow and scroll
-      return `<div class="fld chipfld${long ? " span" : ""}"><label>${esc(label)}</label>
-        <div class="inp">${ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`}${err}</div>
-        <div class="cl">${chips ? `<div class="chips${long ? " cap" : ""}">${chips}</div>` : ""}${hint}</div></div>`;
+      const long = key === "device_exclude"; // can be a long list: full width, scrolls when very long
+      const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
+      // The chips and the input share one box, so a list only grows as much as it has entries.
+      return `<div class="fld${long ? " span" : ""}"><label>${esc(label)}</label>
+        <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
+      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}${sec.title === "sectionDevices" ? " devsec" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";
@@ -3507,6 +3629,7 @@ class EnergyAssistantPanel extends HTMLElement {
     this.shadowRoot.querySelector(".menu").setAttribute("aria-label", this._t("menu"));
     // Tabs come and go with the integrations that were found; a tab that vanished leads back to Power.
     const tabs = this._tabs();
+    if (this._tab === "balance") this._tab = "usage"; // the balance is part of the consumption tab
     if (this._tab !== "settings" && !tabs.includes(this._tab)) {
       this._tab = "house";
       this._html = null;
@@ -3538,9 +3661,10 @@ class EnergyAssistantPanel extends HTMLElement {
     // While a name is being typed the page is not redrawn, live updates would wipe the text field.
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
-    if (this._tab === "balance") this._maybeLoadBalance();
-    if (this._tab === "usage" || (this._tab === "house" && this._usageEnabled())) this._maybeLoadUsage();
-    if (this._tab === "usage") this._maybeLoadUsageView();
+    if (this._tab === "usage" && this._balEnabled()) this._maybeLoadBalance();
+    if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
+    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
+    if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadLabelUsage();
     if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {

@@ -429,6 +429,7 @@ test("matches: unticking a match excludes it, ticking brings it back", () => {
 test("matches: excluded sensors stay in the list (unticked) so they can be re-included", () => {
   const p = matchPanel();
   p._onChange(checkbox("sensor.ofen_leistung", false));
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /4 matching, 1 excluded/);
   const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
@@ -533,6 +534,7 @@ test("exclude patterns: the settings list shows them excluded and locked", () =>
   p._hass.user = { is_admin: true };
   p._draft = p._normalize(p._cfg);
   p._ready = true;
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /4 matching, 2 excluded/);
   const box = (id) => html.match(new RegExp(`<input type="checkbox" data-device="${id}"[^>]*>`))[0];
@@ -762,6 +764,7 @@ test("list filters: bulk exclude acts on what the filters show, e.g. all inactiv
 test("list filters: the buttons show the counts and mark the chosen filters", () => {
   const p = filterPanel();
   p._onClick(seg("state:active"));
+  p._open = new Set(["settings:matches"]); // the list of matches is folded by default
   const html = p._renderSettings();
   assert.match(html, /class="seg on" data-seg="state:active"[^>]*>Active <small>2<\/small>/);
   assert.match(html, /class="seg" data-seg="state:idle"[^>]*>Inactive <small>3<\/small>/);
@@ -2541,7 +2544,7 @@ test("balance: the statistics are asked for with the counters, the period and kW
   p._maybeLoadBalance(); // fresh data: no new request
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(calls.length, 2);
-  p._balRange = "month";
+  p._usRange = "month";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(calls.length, 4);
@@ -2563,8 +2566,8 @@ function loadedBalance(extra = {}, off = 0) {
   const buckets = { solar: col(10, 20), imp: col(4, 2), exp: col(2, 5), chg: col(3), dis: col(1) };
   const prevBuckets = { solar: col(10), imp: col(8), exp: col(1) };
   const prevWin = p._balWindow("week", off - 1);
-  p._balRange = "week";
-  p._balOff = off;
+  p._usRange = "week";
+  p._usOff = off;
   p._bal = {
     range: "week", off, win, at: Date.now(), failed: false,
     ...p._balCompute(buckets, win),
@@ -2605,16 +2608,16 @@ test("balance: with Tariffy the grid cost, the feed-in revenue and the balance a
 test("balance: the picker marks the range, 'next' is off for the current period and the label follows", () => {
   const p = loadedBalance();
   let html = p._renderBalance();
-  assert.match(html, /<button type="button" class="seg on" data-brange="week">Week<\/button>/);
-  assert.match(html, /data-bnav="1"[^>]*disabled/);
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "-1" } } : null) } });
-  assert.equal(p._balOff, -1);
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
-  p._onClick({ target: { closest: (sel) => (sel === "[data-bnav]" ? { dataset: { bnav: "1" } } : null) } });
-  assert.equal(p._balOff, 0); // never into the future
-  p._onClick({ target: { closest: (sel) => (sel === "[data-brange]" ? { dataset: { brange: "year" } } : null) } });
-  assert.equal(p._balRange, "year");
-  assert.equal(p._balOff, 0);
+  assert.match(html, /<button type="button" class="seg on" data-urange="week">Week<\/button>/);
+  assert.match(html, /data-unav="1"[^>]*disabled/);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "-1" } } : null) } });
+  assert.equal(p._usOff, -1);
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "1" } } : null) } });
+  p._onClick({ target: { closest: (sel) => (sel === "[data-unav]" ? { dataset: { unav: "1" } } : null) } });
+  assert.equal(p._usOff, 0); // never into the future
+  p._onClick({ target: { closest: (sel) => (sel === "[data-urange]" ? { dataset: { urange: "year" } } : null) } });
+  assert.equal(p._usRange, "year");
+  assert.equal(p._usOff, 0);
   html = p._renderBalance(); // data of another range: loading until the new data is there
   assert.match(html, /Loading/);
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
@@ -2640,16 +2643,16 @@ test("balance: a period without any energy says so, the table state is kept", ()
   assert.match(q._renderBalance(), /<details class="tableview" open>/);
 });
 
-test("balance: the tab exists only with energy counters and comes right after Power", () => {
+test("balance: energy counters give the consumption tab, which comes right after Power", () => {
   const none = panel({ house_power: "h" }, { h: st(1) });
   assert.equal(none._balEnabled(), false);
   assert.deepEqual(none._tabs(), ["house"]);
   const p = balPanel({ energy_solar: ["sensor.pv_e"] });
   p._int = { tariffy: { price: "x" } };
-  assert.deepEqual(p._tabs(), ["house", "balance", "costs"]);
+  assert.deepEqual(p._tabs(), ["house", "usage", "costs"]); // no tab of its own any more
   p._hass.language = "de";
-  assert.equal(p._tabLabel("balance"), "Bilanz");
-  p._tab = "balance";
+  assert.equal(p._tabLabel("usage"), "Verbrauch");
+  p._tab = "usage";
   p._bal = null;
   assert.match(p._renderPage(), /Lädt …/);
 });
@@ -2770,7 +2773,7 @@ test("usage: the consumption tab exists only with devices and comes right after 
   assert.equal(byPattern._usageEnabled(), true);
   const p = usagePanel({});
   p._cfg.energy_solar = ["sensor.pv_e"];
-  assert.deepEqual(p._tabs(), ["house", "usage", "balance"]);
+  assert.deepEqual(p._tabs(), ["house", "usage"]); // devices and counters share one tab
   p._hass.language = "de";
   assert.equal(p._tabLabel("usage"), "Verbrauch");
 });
@@ -2923,16 +2926,103 @@ function labelEnergyPanel(range = "day", off = 0) {
   return p;
 }
 
+function withLabelUsage(p, rows, range = "day", off = 0) {
+  p._labelUsage = { key: p._labelUsageKey(range, off), at: Date.now(), rows };
+  return p;
+}
+
 test("usage: the labels card shows the kWh of every selected label for the shown period, biggest first", () => {
-  const html = labelEnergyPanel()._renderUsage();
+  const p = withLabelUsage(labelEnergyPanel(), {
+    klima: { kwh: 1.25, covered: 1, total: 2 },
+    licht: { kwh: 4.5, covered: 3, total: 3 },
+    kaputt: { kwh: 0, covered: 0, total: 2 },
+  });
+  const html = p._renderUsage();
   const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
   assert.ok(card.indexOf("Licht") < card.indexOf("Klima"));
   assert.match(card, /Licht[\s\S]*4[.,]50<small>kWh/);
-  assert.match(card, /Klima[\s\S]*1[.,]25<small>kWh/);
-  assert.doesNotMatch(card, /Kaputt/); // an unavailable sensor is left out
+  assert.match(card, /Klima[\s\S]*1 of 2 sensors[\s\S]*1[.,]25<small>kWh/); // not all of its sensors have statistics
+  assert.doesNotMatch(card.slice(card.indexOf("Licht"), card.indexOf("Klima")), /sensors<\/small>/); // Licht is complete
+  assert.doesNotMatch(card, /Kaputt/); // no sensor with statistics at all
   assert.match(card, /width:100%/); // the biggest label fills the bar
-  assert.match(card, /creates the sensors/);
-  assert.doesNotMatch(card, /€/); // no cost sensor, so no cost (never today's price times the energy)
+  assert.match(card, /long-term statistics/);
+});
+
+test("usage: the labels card waits for the data of the shown period", () => {
+  const p = withLabelUsage(labelEnergyPanel(), { licht: { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
+  p._usRange = "week"; // another period than the data
+  p._usageView = { range: "week", off: 0, devices: p._usage.devices, houseBase: 150 };
+  const html = p._renderUsage();
+  assert.match(html.slice(html.indexOf('<span class="eb-title">Labels</span>')), /Loading/);
+  assert.doesNotMatch(html, /4[.,]50<small>kWh/);
+});
+
+function statsPanel(calls, byPeriod) {
+  const p = labelPanel({ label_ids: ["klima", "licht"] });
+  p._hass.language = "en";
+  p._hass.config = { time_zone: "Europe/Berlin" };
+  p._ready = true;
+  p._render = () => {};
+  p._hass.callWS = async (m) => {
+    calls.push({ period: m.period, from: m.start_time, to: m.end_time, ids: m.statistic_ids });
+    return byPeriod[m.period] || {};
+  };
+  return p;
+}
+const hourRow = (startIso, mean) => ({ start: Date.parse(startIso), end: Date.parse(startIso) + 3600000, mean });
+const minRow = (startIso, mean) => ({ start: Date.parse(startIso), end: Date.parse(startIso) + 300000, mean });
+
+test("label usage: today is the finished hours plus the running hour from the 5-minute statistics", async () => {
+  const calls = [];
+  const p = statsPanel(calls, {
+    hour: {
+      "sensor.klimaanlage_leistung": [hourRow("2026-11-13T00:00:00Z", 1000), hourRow("2026-11-13T01:00:00Z", 500)], // 1.5 kWh
+      "sensor.lueftung_leistung": [hourRow("2026-11-13T00:00:00Z", 100)], // 0.1 kWh
+    },
+    "5minute": { "sensor.klimaanlage_leistung": [minRow("2026-11-13T14:00:00Z", 1200), minRow("2026-11-13T14:05:00Z", 1200)] }, // 0.2 kWh
+  });
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["hour", "5minute"]);
+  assert.equal(calls[0].from, "2026-11-12T23:00:00.000Z"); // midnight of Berlin
+  assert.equal(calls[0].to, "2026-11-13T14:00:00.000Z"); // up to the running hour
+  assert.equal(calls[1].from, "2026-11-13T14:00:00.000Z");
+  assert.equal(calls[1].to, "2026-11-13T14:20:00.000Z");
+  const klima = p._labelUsage.rows.klima;
+  assert.ok(Math.abs(klima.kwh - (1.5 + 0.1 + 0.2)) < 1e-9);
+  assert.equal(klima.covered, 2); // two of the three sensors of the label have statistics
+  assert.equal(klima.total, 3);
+});
+
+test("label usage: a month uses daily statistics, today's hours and the running hour", async () => {
+  const calls = [];
+  const p = statsPanel(calls, {
+    day: { "sensor.klimaanlage_leistung": [{ start: Date.parse("2026-10-31T23:00:00Z"), end: Date.parse("2026-11-01T23:00:00Z"), mean: 240 }] }, // 5.76 kWh
+  });
+  p._usRange = "month";
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["day", "hour", "5minute"]);
+  assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z"); // the day statistics end at the start of today
+  assert.equal(calls[1].from, "2026-11-12T23:00:00.000Z"); // today by the hour
+  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 5.76) < 1e-9);
+});
+
+test("label usage: a past period needs the finished statistics only", async () => {
+  const calls = [];
+  const p = statsPanel(calls, { hour: { "sensor.klimaanlage_leistung": [hourRow("2026-11-12T10:00:00Z", 2000)] } });
+  p._usOff = -1;
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.deepEqual(calls.map((c) => c.period), ["hour"]);
+  assert.equal(calls[0].from, "2026-11-11T23:00:00.000Z");
+  assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z");
+  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 2) < 1e-9);
+});
+
+test("label usage: a failed request says so instead of showing zeros", async () => {
+  const p = statsPanel([], {});
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  assert.equal(p._labelUsage.failed, true);
+  assert.match(p._renderLabelEnergy({ range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
 });
 
 test("usage: the labels card shows kWh only, the cost belongs to the Costs tab", () => {
@@ -2972,15 +3062,6 @@ test("costs: no card without cost sensors", () => {
   assert.match(p._renderLabelCosts(), /Cost per label/);
   p._labelEnergy = {};
   assert.equal(p._renderLabelCosts(), "");
-});
-
-test("usage: the labels card follows the period picker and says when only the running period exists", () => {
-  const week = labelEnergyPanel("week", 0)._renderUsage();
-  assert.match(week, /Licht[\s\S]*20[.,]10<small>kWh/);
-  assert.doesNotMatch(week.slice(week.indexOf('<span class="eb-title">Labels</span>')), /Klima/); // no weekly sensor for it
-  const past = labelEnergyPanel("day", -1)._renderUsage();
-  assert.match(past, /only count the running period/);
-  assert.doesNotMatch(past, /4[.,]50<small>kWh/);
 });
 
 test("usage: without selected labels there is no labels card", () => {
@@ -3302,17 +3383,45 @@ test("notices: the card on the Power tab shows warnings and information, escaped
 // --- the period picker of the consumption tab -----------------------------------------------------
 const hourRows = (start, means) => means.map((m, i) => ({ start: start + i * 3600000, end: start + (i + 1) * 3600000, mean: m }));
 
-test("usage picker: the same picker as in the balance, with its own data attributes", () => {
+test("usage picker: one picker on top of the whole tab, none inside the cards", () => {
   const p = usagePanel();
-  const html = p._renderUsage();
+  const html = p._renderConsumption();
   assert.match(html, /<button type="button" class="seg on" data-urange="day">Day<\/button>/);
   for (const r of ["week", "month", "year"]) assert.match(html, new RegExp(`data-urange="${r}"`));
   assert.match(html, /data-unav="-1"/);
   assert.match(html, /data-unav="1"[^>]*disabled/);
-  assert.doesNotMatch(html, /data-brange|data-bnav/);
+  assert.equal((html.match(/data-urange="day"/g) || []).length, 1); // one picker for balance and devices
+  assert.doesNotMatch(p._renderUsage({ bare: true }), /data-urange|data-unav/);
   const bal = balPanel();
   bal._bal = null;
-  assert.match(bal._renderBalance(), /data-brange="day"/); // the balance keeps its attributes
+  assert.doesNotMatch(bal._renderBalance({ bare: true }), /data-urange/);
+  assert.match(bal._renderBalance(), /data-urange="day"/); // alone it still brings its picker
+});
+
+test("consumption tab: the balance comes first, then the devices, both for the same period", () => {
+  const p = loadedUsage();
+  p._cfg.energy_solar = ["sensor.pv_e"];
+  p._cfg.energy_grid_import = ["sensor.imp_e"];
+  p._bal = {
+    range: "day", off: 0, win: p._balWindow("day", 0), failed: false, before: null,
+    rows: [{ t: 0, solar: 3, imp: 2, exp: 1, chg: null, dis: null, cons: 4 }],
+    totals: { solar: 3, imp: 2, exp: 1, chg: null, dis: null, cons: 4, self: 66, autarky: 50 },
+    at: Date.now(),
+  };
+  const html = p._renderConsumption();
+  assert.ok(html.indexOf("data-urange") < html.indexOf('<span class="eb-title">Balance</span>')); // picker first
+  assert.ok(html.indexOf('<span class="eb-title">Balance</span>') < html.indexOf('<span class="eb-title">Base load</span>')); // then the devices
+  assert.match(html, /Energy per period/); // the chart of the balance
+});
+
+test("consumption tab: only devices or only counters show only their part", () => {
+  const devices = usagePanel();
+  assert.doesNotMatch(devices._renderConsumption(), /eb-title">Balance</);
+  const counters = balPanel({ energy_solar: ["sensor.pv_e"] });
+  counters._bal = null;
+  const html = counters._renderConsumption();
+  assert.match(html, /eb-title">Balance</);
+  assert.doesNotMatch(html, /Base load/);
 });
 
 test("usage picker: clicks change the period, 'next' never goes into the future", () => {
@@ -3733,4 +3842,24 @@ test("settings: choosing a tariff changes the draft and the default removes it a
   assert.equal(p._isDirty(), true);
   change("");
   assert.deepEqual(p._draft.label_tariffs, {});
+});
+
+test("settings: the list of matches is folded by default and shows its counts in a header", () => {
+  const p = matchPanel();
+  p._onChange(checkbox("sensor.ofen_leistung", false));
+  const folded = p._renderSettings();
+  assert.match(folded, /class="mtoggle" data-open="settings:matches" aria-expanded="false"/);
+  assert.match(folded, /4 matching sensors, 1 excluded[\s\S]*Show list/);
+  assert.doesNotMatch(folded, /data-device="sensor\.herd_leistung"/); // the rows are not drawn
+  p._open = new Set(["settings:matches"]);
+  const open = p._renderSettings();
+  assert.match(open, /aria-expanded="true"[\s\S]*Hide list/);
+  assert.match(open, /data-device="sensor\.herd_leistung"/);
+});
+
+test("settings: a sensor list keeps its chips and its input in one box", () => {
+  const p = matchPanel();
+  p._draft.device_standby = ["sensor.herd_leistung"];
+  const html = p._renderSettings();
+  assert.match(html, /<div class="tags"><span class="chip"[^>]*>[^<]*<button data-remove="device_standby"[\s\S]*?<input type="text" data-add="device_standby"/);
 });

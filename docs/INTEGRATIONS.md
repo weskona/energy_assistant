@@ -11,7 +11,7 @@ them runs on its own:
 | [Amortix](https://github.com/weskona/amortix) | savings, investment, progress, remaining amount, savings per day, time left, payback date | **Payback** tab |
 
 Besides the sibling integrations Energy Assistant reads the **Energy dashboard of Home Assistant** (its preferences, read
-only) to offer its energy counters for the Balance tab, and the long-term statistics (recorder) for the Balance tab.
+only) to offer its energy counters for the balance (Consumption tab), and the long-term statistics (recorder) for the balance and the consumption per period.
 
 ## The rules
 
