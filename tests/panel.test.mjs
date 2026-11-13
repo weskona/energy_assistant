@@ -2289,3 +2289,157 @@ test("fold: without usable storage everything still works for the session", () =
   none._toggleCollapse(card.row);
   assert.equal(card.card.classes.has("collapsed"), true);
 });
+
+// --- the history chart (in the style of the power chart of PV Assistant, from our own sensors) -----
+const T0 = Date.UTC(2026, 10, 12, 0, 0, 0);
+function historyPoints({ storage = true, gridOut = true } = {}) {
+  const pts = [];
+  for (let k = 0; k <= 288; k++) {
+    const hour = k / 12;
+    const solar = hour > 8 && hour < 16 ? 4000 : 0;
+    const charge = hour > 11 && hour < 14 ? 2500 : 0;
+    pts.push({
+      t: T0 + k * 5 * 60000,
+      v: 400 + (hour > 9 && hour < 10 ? 10000 : 0),
+      d: Math.min(solar, 1500),
+      solar,
+      gridOut: gridOut ? (hour > 13 ? 300 : 0) : null,
+      gridIn: hour > 9 && hour < 10 ? 9500 : 100,
+      net: storage ? (hour > 18 ? 800 : -charge) : null,
+    });
+  }
+  return pts;
+}
+
+test("history chart: the axis rounds like the power chart of PV Assistant", () => {
+  const p = new Panel();
+  assert.deepEqual(p._niceTicks(-3500, 11500), [-5000, 0, 5000, 10000, 15000]);
+  assert.deepEqual(p._niceTicks(0, 0), [0, 0.25, 0.5, 0.75, 1]);
+  assert.deepEqual(p._niceTicks(0, 4300), [0, 2000, 4000, 6000]);
+});
+
+test("history chart: the series come in the order and with the legend of PV Assistant, empty ones are left out", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  const all = p._historySeries(historyPoints());
+  assert.deepEqual(all.map((s) => s.key), ["prod", "feed", "net", "direct", "grid", "house"]);
+  assert.deepEqual(all.map((s) => s.name), ["Production", "Feed-in", "Storage", "Used directly", "Grid import", "House consumption"]);
+  assert.deepEqual(all[2].legendItems.map((i) => i.name), ["From storage (+)", "To storage (−)"]);
+  const none = p._historySeries(historyPoints({ storage: false, gridOut: false }));
+  assert.deepEqual(none.map((s) => s.key), ["prod", "direct", "grid", "house"]);
+  p._hass = { language: "de" };
+  assert.deepEqual(p._historySeries(historyPoints()).map((s) => s.name), ["Erzeugung", "Einspeisung", "Speicher", "Direkt verbraucht", "Netzbezug", "Hausverbrauch"]);
+});
+
+test("history chart: markup with lines, legend, end labels, storage in two colors and the table", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  const html = p._historyChart(historyPoints());
+  assert.match(html, /class="hchart"/);
+  assert.equal((html.match(/<path d="M/g) || []).length, 6 + 1 + 1); // 6 lines, the storage drawn twice (above/below zero), plus the area
+  assert.match(html, /<path d="M[^"]*Z" fill="var\(--ea-prod\)" opacity="\.12"\/>/); // light area under the production
+  assert.match(html, /clip-path="url\(#ea-clip-n\)"/);
+  assert.match(html, /<span><i style="background:var\(--ea-bout\)"><\/i>From storage \(\+\)<\/span>/);
+  assert.match(html, /<span><i style="background:var\(--ea-bin\)"><\/i>To storage \(−\)<\/span>/);
+  for (const label of ["Production", "Feed-in", "Storage", "Direct", "Grid", "House"]) assert.match(html, new RegExp(`class="hend"[^>]*>${label}<`));
+  assert.match(html, /<summary>Show as table<\/summary>/);
+  assert.ok((html.match(/<tr><th>/g) || []).length >= 24); // one row per hour
+  assert.match(html, />-?5[.,]?000<\/text>/); // axis in whole watts
+});
+
+test("history chart: a narrow chart has no end labels, the table state is kept", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  p._chartW = 400;
+  assert.doesNotMatch(p._historyChart(historyPoints()), /class="hend"/);
+  assert.doesNotMatch(p._historyChart(historyPoints()), /<details class="tableview" open>/);
+  p._tableOpen = true;
+  assert.match(p._historyChart(historyPoints()), /<details class="tableview" open>/);
+});
+
+test("history chart: names in the table and legend are HTML-escaped; too little data says so", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  assert.match(p._historyChart([{ t: T0, v: 100 }, { t: T0 + 300000, v: null }]), /No history available yet/);
+  assert.match(p._historyChart([]), /No history available yet/);
+  assert.equal(p._hv, null);
+});
+
+test("history chart: the tooltip shows the nearest bucket with all values, the storage in the color of its direction", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  p._historyChart(historyPoints());
+  const at = (hour) => p._tipAt(T0 + hour * 3600000 + 60000); // a minute after the full hour
+  const noon = at(12); // charging 2500 W
+  const storageNoon = noon.rows.find((r) => r.name === "Storage (+ discharge / − charge)");
+  assert.equal(storageNoon.value, -2500);
+  assert.equal(storageNoon.color, "--ea-bin");
+  assert.equal(noon.ts, T0 + 12 * 3600000);
+  const evening = at(19);
+  const out = evening.rows.find((r) => r.name === "Storage (+ discharge / − charge)");
+  assert.deepEqual([out.value, out.color], [800, "--ea-bout"]);
+  assert.equal(noon.rows.length, 6);
+  assert.equal(p._tipAt(T0 - 99999999).ts, T0); // outside: the first bucket
+  const none = new Panel();
+  assert.equal(none._tipAt(0), null);
+});
+
+// points with the data of the sources, as _buildSeries delivers them
+function partsPoints(extra) {
+  const pts = historyPoints();
+  Object.assign(pts[0], { sp: [168, 2241, 633, 167] }); // overwritten below for the tested bucket
+  pts.meta = { solarNames: ["Anbau", "Garage", "BKW 1", "BKW 2"] };
+  return { pts, set: (k, o) => Object.assign(pts[k], o) };
+}
+
+test("tooltip parts: the production shows its plants with their share, the direct use what it is made of", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  const { pts, set } = partsPoints();
+  const k = 12 * 12; // 12:00
+  set(k, { solar: 3209, sp: [168, 2241, 633, 167], v: 3107, d: 3107, measured: true, gridIn: 0, discharge: 0, gridOut: 103, charge: 0 });
+  p._historyChart(pts);
+  const tip = p._tipAt(pts[k].t);
+  const prod = tip.rows.find((r) => r.name === "Production");
+  assert.deepEqual(prod.parts.map((x) => [x.name, x.value, x.note]), [["Anbau", 168, "5 %"], ["Garage", 2241, "70 %"], ["BKW 1", 633, "20 %"], ["BKW 2", 167, "5 %"]]);
+  // measured house: the house consumption minus import and storage; zero parts are left out
+  const direct = tip.rows.find((r) => r.name === "Used directly");
+  assert.deepEqual(direct.parts.map((x) => [x.name, x.value]), [["House consumption", 3107]]);
+  // a house that is only calculated: production minus feed-in and charging
+  set(k, { measured: false, gridOut: 103, charge: 500, gridCharge: 0, d: 2606, v: 2606 });
+  p._historyChart(pts);
+  const calc = p._tipAt(pts[k].t).rows.find((r) => r.name === "Used directly");
+  assert.deepEqual(calc.parts.map((x) => [x.name, x.value]), [["Production", 3209], ["− Feed-in", -103], ["− To storage", -500]]);
+});
+
+test("tooltip parts: a single plant has no split, other series have none", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  const { pts, set } = partsPoints();
+  pts.meta = { solarNames: ["Garage"] };
+  set(12 * 12, { sp: [3000], solar: 3000 });
+  p._historyChart(pts);
+  const tip = p._tipAt(pts[12 * 12].t);
+  assert.deepEqual(tip.rows.find((r) => r.name === "Production").parts, []);
+  assert.deepEqual(tip.rows.find((r) => r.name === "Grid import").parts, []);
+});
+
+test("history: the buckets carry production, feed-in, import and the storage balance", () => {
+  const p = panel(
+    { solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_charge: ["bc"], battery_discharge: ["bd"] },
+    {},
+  );
+  const rows = (v) => [{ s: String(v), lu: 0 }];
+  const pts = p._buildSeries({ pv: rows(3000), gi: rows(100), ge: rows(200), bc: rows(500), bd: rows(50) }, 0, 3600 * 1000);
+  assert.equal(pts[0].solar, 3000);
+  assert.equal(pts[0].gridIn, 100);
+  assert.equal(pts[0].gridOut, 200);
+  assert.equal(pts[0].net, -450); // 50 W out, 500 W in
+  assert.equal(pts[0].discharge, 50);
+  assert.equal(pts[0].charge, 500);
+  assert.deepEqual(pts[0].sp, [3000]);
+  assert.deepEqual(pts.meta.solarNames, ["pv"]);
+  assert.equal(pts[0].measured, false);
+  const without = panel({ solar_power: ["pv"], grid_import: ["gi"] }, {})._buildSeries({ pv: rows(3000), gi: rows(100) }, 0, 3600 * 1000);
+  assert.equal(without[0].net, null);
+});

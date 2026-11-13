@@ -7,7 +7,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 | Tab | Content |
 |-----|---------|
-| **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history of the last 24 hours, power of individual devices |
+| **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history chart of the last 24 hours, power of individual devices |
 | **PV** | Only with PV Assistant: production, feed-in, self-consumption, self-sufficiency, forecast, storage, plant fault and the PV power by plant |
 | **EV** | Only with EV Assistant: wallbox status and power, charge level, solar share, today's charging and the advice to charge before PV |
 | **Costs** (German: Kosten) | Only with Tariffy: electricity price, what the grid import costs, what the feed-in earns and what the solar power saves per hour, and the contract figures |
@@ -15,6 +15,8 @@ The UI is English with a German translation (follows your Home Assistant languag
 | **Settings** (gear icon, top right) | Change all sensors directly in the panel (see below). A second click on the gear leads back to the Power tab. |
 
 **Folding:** every card except the house card folds with a click on its title (arrow in front of it). The choice is remembered in the browser.
+
+**History chart:** the card next to the house shows the power of the last 24 hours in watts, in the style of the power chart of PV Assistant but computed from your own sensors (PV Assistant is not needed): production (with a light area), feed-in, storage (turquoise from the storage, pink into the storage), solar used directly, grid import and house consumption. Series without data are left out. The names stand at the line ends on wide screens; a tooltip with all values follows the pointer (the crosshair stays while the values update), and **Show as table** lists the hourly means.
 
 **Layout:** the first row shows the house card and the history. Below it **Devices**, **Areas** and **Labels** sit side by
 side in one row, in this order and with the same height (missing cards leave more room to the others). On narrow screens
