@@ -109,6 +109,8 @@ If your sensor counts the other way round (e.g. charging positive), enable "Inve
 Direct house consumption (one sensor) is optional. If set, it is shown instead of being calculated.
 Required: grid import, grid combined or house consumption.
 
+Separate sensors win over combined ones: a combined sensor only fills in what no separate sensor covers, so the same flow is never counted twice. Separate production, import and export sensors ignore negative readings. **Self-sufficiency** is the share of the consumption that does not come from the grid, `(house − grid import) ÷ house`.
+
 Without a house consumption sensor Energy Assistant calculates:
 
 **House = solar + grid import + from storage − grid export − to storage**
