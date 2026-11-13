@@ -2580,9 +2580,9 @@ test("balance: tiles with totals, the change to the period before and the shares
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Balance<\/span>/);
   assert.match(html, /Production<\/div><div class="eb-value">30\.0<small>kWh/);
-  assert.match(html, /▲ 200 % vs\. previous period/); // 30 kWh against 10
+  assert.match(html, /▲ 200 % vs\. last week/); // 30 kWh against 10
   assert.match(html, /Grid import<\/div><div class="eb-value">6\.0<small>kWh/);
-  assert.match(html, /▼ 25 % vs\. previous period/); // 6 against 8
+  assert.match(html, /▼ 25 % vs\. last week/); // 6 against 8
   assert.match(html, /Feed-in<\/div><div class="eb-value">7\.0<small>kWh/);
   assert.match(html, /To storage<\/div><div class="eb-value">3\.0/);
   assert.match(html, /From storage<\/div><div class="eb-value">1\.0/);
@@ -3875,7 +3875,7 @@ test("costs: the period costs compare with the period before and wait for the da
   p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
   p._bal.before = { imp: 8, exp: 5 };
   const html = p._renderPeriodCosts();
-  assert.match(html, /Grid cost[\s\S]*▼ 25 % vs\. previous period/); // 1.80 against 2.40
+  assert.match(html, /Grid cost[\s\S]*▼ 25 % vs\. last week/); // 1.80 against 2.40
   p._usOff = -1; // another period than the data: loading
   assert.match(p._renderPeriodCosts(), /Loading/);
   const none = loadedBalance();
@@ -3883,4 +3883,21 @@ test("costs: the period costs compare with the period before and wait for the da
   const noCounters = usagePanel();
   noCounters._int = { tariffy: { price: "x" } };
   assert.equal(noCounters._renderPeriodCosts(), ""); // without energy counters
+});
+
+test("comparison: the text names the chosen period, and the one before when looking back", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  assert.equal(p._vsText("▲", 30, "day", 0), "▲ 30 % vs. yesterday");
+  assert.equal(p._vsText("▼", 5, "week", 0), "▼ 5 % vs. last week");
+  assert.equal(p._vsText("▲", 1, "month", 0), "▲ 1 % vs. last month");
+  assert.equal(p._vsText("▲", 2, "year", 0), "▲ 2 % vs. last year");
+  assert.equal(p._vsText("▲", 3, "day", -2), "▲ 3 % vs. the day before");
+  assert.equal(p._vsText("▲", 3, "week", -1), "▲ 3 % vs. the week before");
+  assert.equal(p._vsText("▲", 3, "year", -1), "▲ 3 % vs. the year before");
+  p._hass.language = "de";
+  assert.equal(p._vsText("▲", 30, "day", 0), "▲ 30 % ggü. gestern");
+  assert.equal(p._vsText("▲", 30, "week", 0), "▲ 30 % ggü. letzter Woche");
+  assert.equal(p._vsText("▲", 30, "month", -1), "▲ 30 % ggü. Vormonat");
+  assert.equal(p._vsText("▲", 30, "day", -1), "▲ 30 % ggü. Vortag");
 });

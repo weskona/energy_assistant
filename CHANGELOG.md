@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Period picker in the Costs tab:** a new card *Costs in the period* shows the grid cost, the feed-in revenue and the balance of the chosen day, week, month or year with the change to the period before. It uses the same period as the Consumption tab. The three money tiles moved there from the balance of the Consumption tab. The *Cost per label* table keeps showing the running day, week, month and year.
+- **The comparison names the period:** instead of *vs. previous period* the tiles say *vs. yesterday*, *vs. last week*, *vs. last month* or *vs. last year* (German: *ggü. gestern*, *letzter Woche*, *letztem Monat*, *letztem Jahr*); when you look back they say *the day before*, *the week before* and so on (*Vortag*, *Vorwoche*, *Vormonat*, *Vorjahr*). It applies to the balance and to the period costs.
 
 ## [0.26.0] - 2026-11-13
 

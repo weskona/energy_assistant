@@ -289,7 +289,14 @@ const STRINGS = {
     bCost: "Grid cost",
     bRevenue: "Feed-in revenue",
     bSaldo: "Balance",
-    bVsPrev: "{arrow} {pct} % vs. previous period",
+    bVs_day: "{arrow} {pct} % vs. yesterday",
+    bVs_day_past: "{arrow} {pct} % vs. the day before",
+    bVs_week: "{arrow} {pct} % vs. last week",
+    bVs_week_past: "{arrow} {pct} % vs. the week before",
+    bVs_month: "{arrow} {pct} % vs. last month",
+    bVs_month_past: "{arrow} {pct} % vs. the month before",
+    bVs_year: "{arrow} {pct} % vs. last year",
+    bVs_year_past: "{arrow} {pct} % vs. the year before",
     bNoData: "No data for this period",
     bPriceNote: "Valued with the price of the Tariffy contract.",
     bTime: "Period",
@@ -573,7 +580,14 @@ const STRINGS = {
     bCost: "Netzkosten",
     bRevenue: "Einspeiseerlös",
     bSaldo: "Saldo",
-    bVsPrev: "{arrow} {pct} % ggü. Vorperiode",
+    bVs_day: "{arrow} {pct} % ggü. gestern",
+    bVs_day_past: "{arrow} {pct} % ggü. Vortag",
+    bVs_week: "{arrow} {pct} % ggü. letzter Woche",
+    bVs_week_past: "{arrow} {pct} % ggü. Vorwoche",
+    bVs_month: "{arrow} {pct} % ggü. letztem Monat",
+    bVs_month_past: "{arrow} {pct} % ggü. Vormonat",
+    bVs_year: "{arrow} {pct} % ggü. letztem Jahr",
+    bVs_year_past: "{arrow} {pct} % ggü. Vorjahr",
     bNoData: "Keine Daten für diesen Zeitraum",
     bPriceNote: "Bewertet mit dem Preis des Tariffy-Vertrags.",
     bTime: "Zeitraum",
@@ -1876,6 +1890,11 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="stack">${parts.join("")}</div>`;
   }
 
+  /** "30 % vs. yesterday" and so on: the change to the period before, named after the chosen period. */
+  _vsText(arrow, pct, range, off) {
+    return this._t(`bVs_${range}${off < 0 ? "_past" : ""}`, { arrow, pct });
+  }
+
   /**
    * Costs of the shown period (needs Tariffy and energy counters): what the grid import cost, what the feed-in
    * earned and the balance of both, from the totals of the balance, with the change to the period before. The
@@ -1903,7 +1922,7 @@ class EnergyAssistantPanel extends HTMLElement {
       let extra = "";
       if (before != null && Math.abs(before) > 0.005) {
         const pct = Math.round(((amount - before) / Math.abs(before)) * 100);
-        extra = `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("bVsPrev", { arrow: pct > 0 ? "▲" : pct < 0 ? "▼" : "•", pct: Math.abs(pct) }))}</div>`;
+        extra = `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
       }
       return `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div>${extra}</div>`;
     };
@@ -1937,7 +1956,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (before == null || !(before > 0) || cur == null) return "";
       const pct = Math.round(((cur - before) / before) * 100);
       const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "•";
-      return `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("bVsPrev", { arrow, pct: Math.abs(pct) }))}</div>`;
+      return `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
     };
     const tiles = [];
     for (const [key, label] of [["solar", "bSolar"], ["cons", "bHouse"], ["imp", "bImport"], ["exp", "bExport"], ["chg", "bCharge"], ["dis", "bDischarge"]]) {
