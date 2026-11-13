@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-13
+
+### Added
+
+- **Consumption tab** (appears as soon as devices are set up, no extra setting): the **base load** of the house (the lowest 30-minute average of the last 24 hours) extrapolated to kWh per year and, with Tariffy, to the cost per year, with the share the always-on devices explain; the **biggest consumers of today** in kWh with their share and, with Tariffy, the cost; the **always-on devices** (standby, lowest 30-minute average of the last 24 hours from 2 W on) with kWh and cost per year. The energy of a device is its power of the 5-minute steps since midnight, read from the history of Home Assistant.
+
 ## [0.18.0] - 2026-11-13
 
 ### Added

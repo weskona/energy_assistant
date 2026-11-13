@@ -2708,3 +2708,167 @@ test("energy settings: no dashboard, no offer, and an error changes nothing", as
   await p._loadEnergyOffer();
   assert.equal(p._energyOffer, null);
 });
+
+// --- consumption tab: base load, biggest consumers today, always-on devices ----------------------------
+const STEP = 5 * 60000;
+function usageNow() {
+  const t1 = new Date();
+  t1.setHours(12, 0, 0, 0);
+  return { t1: t1.getTime(), t0: t1.getTime() - 24 * 3600000 };
+}
+// history rows of a power sensor: [hour from t0, watts] pairs held until the next one
+const hrows = (t0, pairs) => pairs.map(([h, w]) => ({ lu: (t0 + h * 3600000) / 1000, s: String(w) }));
+
+function usagePanel(extra = {}) {
+  const p = panel({ house_power: "h", device_power: ["sensor.a", "sensor.b", "sensor.c"] }, { h: st(1), ...extra });
+  p._hass.language = "en";
+  p._ready = true;
+  p._render = () => {};
+  return p;
+}
+
+test("base load: the lowest half hour of the values without a gap", () => {
+  const p = new Panel();
+  const v = Array(40).fill(500);
+  for (let k = 10; k < 26; k++) v[k] = 80; // eighty minutes at 80 W
+  assert.equal(p._baseline(v), 80);
+  v[14] = null; // a gap breaks the windows that contain it, the rest of the dip still has a full half hour
+  assert.equal(p._baseline(v), 80);
+  const short = Array(40).fill(500);
+  for (let k = 10; k < 14; k++) short[k] = 80; // only twenty minutes low: the half hour includes higher values
+  assert.ok(p._baseline(short) > 80);
+  assert.equal(p._baseline(Array(40).fill(null)), null); // nothing
+  assert.equal(p._baseline(Array(8).fill(300)), null); // too little data
+  assert.equal(p._baseline(null), null);
+  const negative = Array(20).fill(-5);
+  assert.equal(p._baseline(negative), 0); // negative readings count as 0
+});
+
+test("usage: the energy since midnight and the always-on power per device", () => {
+  const p = usagePanel();
+  const { t0, t1 } = usageNow();
+  const res = {
+    "sensor.a": hrows(t0, [[0, 1000]]), // 1 kW the whole time: 12 h since midnight = 12 kWh
+    "sensor.b": hrows(t0, [[0, 300], [3, 5], [20, 300]]), // 5 W standby for hours
+    "sensor.c": undefined, // no history: left out
+  };
+  const u = p._usageCompute(res, ["sensor.a", "sensor.b", "sensor.c"], t0, t1);
+  assert.deepEqual(u.devices.map((d) => d.id), ["sensor.a", "sensor.b"]);
+  const a = u.devices[0], b = u.devices[1];
+  assert.ok(Math.abs(a.kwh - 12) < 1e-9);
+  assert.equal(a.baseW, 1000);
+  assert.equal(b.baseW, 5);
+  // b: 300 W until 03:00 (before midnight? t0 is 12:00 yesterday, so 12 h before midnight), 5 W from 15:00 to 08:00, 300 W after
+  assert.ok(b.kwh > 0 && b.kwh < 12);
+});
+
+test("usage: the consumption tab exists only with devices and comes right after Power", () => {
+  const none = panel({ house_power: "h" }, { h: st(1) });
+  assert.equal(none._usageEnabled(), false);
+  assert.deepEqual(none._tabs(), ["house"]);
+  const byPattern = panel({ house_power: "h", device_patterns: ["*_leistung"] }, { h: st(1) });
+  assert.equal(byPattern._usageEnabled(), true);
+  const p = usagePanel({});
+  p._cfg.energy_solar = ["sensor.pv_e"];
+  assert.deepEqual(p._tabs(), ["house", "usage", "balance"]);
+  p._hass.language = "de";
+  assert.equal(p._tabLabel("usage"), "Verbrauch");
+});
+
+test("usage: the history of the devices is asked for once and refreshed after five minutes", async () => {
+  const p = usagePanel();
+  const calls = [];
+  p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
+  p._tab = "usage";
+  p._maybeLoadUsage();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].type, "history/history_during_period");
+  assert.deepEqual(calls[0].entity_ids, ["sensor.a", "sensor.b", "sensor.c"]);
+  assert.equal(calls[0].minimal_response, true);
+  p._maybeLoadUsage();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  p._usage.at = Date.now() - 6 * 60000;
+  p._maybeLoadUsage();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(calls.length, 2);
+});
+
+test("usage: a failing request leaves an empty page that says so", async () => {
+  const p = usagePanel();
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  await p._loadUsage();
+  assert.equal(p._usage.failed, true);
+  assert.match(p._renderUsage(), /Not enough data yet/);
+});
+
+function loadedUsage(extra = {}, house = 120) {
+  const p = usagePanel({
+    "sensor.a": { state: "1", attributes: { friendly_name: "Kühlschrank" } },
+    "sensor.b": { state: "1", attributes: { friendly_name: "Router" } },
+    "sensor.c": { state: "1", attributes: { friendly_name: "Backofen" } },
+    ...extra,
+  });
+  p._history = [];
+  for (let k = 0; k < 60; k++) p._history.push({ t: k * STEP, v: k < 30 ? 600 : house });
+  p._usage = {
+    at: Date.now(),
+    devices: [
+      { id: "sensor.a", name: "Kühlschrank", kwh: 1.5, baseW: 40 },
+      { id: "sensor.b", name: "Router", kwh: 0.3, baseW: 12 },
+      { id: "sensor.c", name: "Backofen", kwh: 2.5, baseW: 0 },
+    ],
+  };
+  return p;
+}
+
+test("usage: base load with its cost per year, the share of the always-on devices and the consumers of today", () => {
+  const p = loadedUsage({
+    "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } },
+  });
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  const html = p._renderUsage();
+  assert.match(html, /<span class="eb-title">Base load<\/span>/);
+  assert.match(html, /Base load<\/div><div class="eb-value">120<small>W/);
+  assert.match(html, /Per year<\/div><div class="eb-value">1[.,]?051<small>kWh/); // 120 W x 8760 h
+  assert.match(html, /Cost per year<\/div><div class="eb-value">315<small>[^<]*</); // 1051 kWh x 0.30
+  assert.match(html, /Always-on devices<\/div><div class="eb-value">52<small>W[\s\S]*43 % of the base load/); // 40 + 12 of 120
+  // the biggest consumers: strongest first, with share and cost
+  assert.ok(html.indexOf("Backofen") < html.indexOf("Kühlschrank"));
+  assert.match(html, /Backofen<\/span> <small class="cnt">0[.,]75 [^<]*<\/small>[\s\S]*2[.,]50<small>kWh<\/small><small class="pct">58 %/); // 2.5 of 4.3 kWh
+  // always on: from 2 W, strongest first, with the cost per year
+  assert.match(html, /Always on \(standby\)/);
+  assert.ok(html.indexOf("40<small>W") < html.indexOf("12<small>W"));
+  assert.match(html, /350 kWh · [^<]*105[^<]* per year/); // 40 W x 8760 h = 350 kWh, 105 EUR
+  assert.doesNotMatch(html, /Backofen<\/span> <small class="cnt">[^<]*per year/); // 0 W standby: not listed
+});
+
+test("usage: without Tariffy only the energy per year, without a house history no base load tile", () => {
+  const p = loadedUsage();
+  const html = p._renderUsage();
+  assert.doesNotMatch(html, /Cost per year/);
+  assert.match(html, /350 kWh per year/);
+  p._history = null;
+  const without = p._renderUsage();
+  assert.doesNotMatch(without, /Base load<\/div>/);
+  assert.match(without, /Always-on devices/);
+});
+
+test("usage: loading and an empty list say so", () => {
+  const p = usagePanel();
+  assert.match(p._renderUsage(), /Loading/);
+  p._usage = { devices: [], at: Date.now() };
+  p._history = null;
+  const html = p._renderUsage();
+  assert.equal((html.match(/Not enough data yet/g) || []).length, 3);
+});
+
+test("usage: the virtual wallbox row of EV Assistant is not asked for in the history", async () => {
+  const p = usagePanel({ "sensor.ev_home": { state: "1", attributes: { evcc_live: { charge_power: 7.4 } } } });
+  p._int = { ev_assistant: { vehicles: [{ name: "ID.3", live: "sensor.ev_home" }] } };
+  const calls = [];
+  p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
+  await p._loadUsage();
+  assert.deepEqual(calls[0].entity_ids, ["sensor.a", "sensor.b", "sensor.c"]); // no id of the wallbox row
+});

@@ -8,6 +8,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 | Tab | Content |
 |-----|---------|
 | **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history chart of the last 24 hours, power of individual devices |
+| **Consumption** (German: Verbrauch) | Only with devices set up: the base load of the house with its cost per year, the biggest consumers of today in kWh and euro, and the devices that are always on (standby) |
 | **Balance** (German: Bilanz) | Only with energy counters (see below): the energy of a day, week, month or year in kWh with the change to the period before, self-consumption, self-sufficiency, grid cost and feed-in revenue (with Tariffy) and bars per hour, day or month |
 | **PV** | Only with PV Assistant: production, feed-in, self-consumption, self-sufficiency, forecast, storage, plant fault and the PV power by plant |
 | **EV** | Only with EV Assistant: wallbox status and power, charge level, solar share, today's charging and the advice to charge before PV |
@@ -128,6 +129,16 @@ Without a house consumption sensor Energy Assistant calculates:
 Without the optional "storage charged from grid" sensor the storage is assumed to be charged entirely from solar.
 If it actually charges from the grid, the value is too low then.
 The panel shows it as a tile, in the source bar and as a second line in the history. Under the tile the production is split up: how many percent go straight to the house, into the storage (the solar share of the charging) and into the grid, for example `40 % House · 60 % Storage`. The whole percentages add up to 100; parts that round to 0 % are left out.
+
+### Consumption tab: base load and devices
+
+The **Consumption** tab appears as soon as devices are set up (single sensors or name patterns) and needs no further setting. It reads the history of the last 24 hours (5-minute steps) of the device power sensors and the house power:
+
+- **Base load:** the lowest 30-minute average of the house power, what never goes away, extrapolated to kWh per year and, with Tariffy, to the cost per year (price of the contract). It also says how much of it the always-on devices explain.
+- **Biggest consumers today:** the power of the devices summed up since midnight in kWh, with the share and, with Tariffy, the cost of today.
+- **Always on (standby):** the devices whose lowest 30-minute average of the last 24 hours is at least 2 W, with kWh and cost per year.
+
+Devices that are unavailable now still count with their history; the wallbox row of EV Assistant has no history of its own and is not part of it.
 
 ### Energy counters and the Balance tab
 

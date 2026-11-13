@@ -166,6 +166,20 @@ const STRINGS = {
   en: {
     house: "House",
     tabPower: "Power",
+    tabUsage: "Consumption",
+    uBaseTitle: "Base load",
+    uBase: "Base load",
+    uBaseHint: "Lowest 30-minute average of the house power in the last 24 hours.",
+    uPerYear: "Per year",
+    uCostYear: "Cost per year",
+    uExplained: "Always-on devices",
+    uOfBase: "{pct} % of the base load",
+    uTopTitle: "Biggest consumers today",
+    uAlwaysTitle: "Always on (standby)",
+    uAlwaysHint: "Lowest 30-minute average of each device in the last 24 hours, from 2 W on.",
+    uYear: "{kwh} kWh · {cost} per year",
+    uYearKwh: "{kwh} kWh per year",
+    uNone: "Not enough data yet",
     tabBalance: "Balance",
     sectionEnergy: "Energy counters (kWh)",
     f_energy_solar: "PV production",
@@ -388,6 +402,20 @@ const STRINGS = {
   de: {
     house: "Haus",
     tabPower: "Leistung",
+    tabUsage: "Verbrauch",
+    uBaseTitle: "Grundlast",
+    uBase: "Grundlast",
+    uBaseHint: "Niedrigster 30-Minuten-Durchschnitt der Hausleistung der letzten 24 Stunden.",
+    uPerYear: "Pro Jahr",
+    uCostYear: "Kosten pro Jahr",
+    uExplained: "Dauerläufer unter den Geräten",
+    uOfBase: "{pct} % der Grundlast",
+    uTopTitle: "Größte Verbraucher heute",
+    uAlwaysTitle: "Dauerlast (Standby)",
+    uAlwaysHint: "Niedrigster 30-Minuten-Durchschnitt jedes Geräts in den letzten 24 Stunden, ab 2 W.",
+    uYear: "{kwh} kWh · {cost} pro Jahr",
+    uYearKwh: "{kwh} kWh pro Jahr",
+    uNone: "Noch zu wenig Daten",
     tabBalance: "Bilanz",
     sectionEnergy: "Energiezähler (kWh)",
     f_energy_solar: "PV-Erzeugung",
@@ -814,6 +842,7 @@ class EnergyAssistantPanel extends HTMLElement {
   _tabs() {
     const found = this._int || {};
     const tabs = ["house"];
+    if (this._usageEnabled()) tabs.push("usage");
     if (this._balEnabled()) tabs.push("balance");
     if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
     if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
@@ -823,7 +852,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _tabLabel(tab) {
-    return this._t({ house: "tabPower", balance: "tabBalance", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+    return this._t({ house: "tabPower", usage: "tabUsage", balance: "tabBalance", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
   }
 
   /** Markup of the page of the current tab (not the settings). */
@@ -831,6 +860,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
     switch (this._tab) {
+      case "usage": return this._renderUsage();
       case "balance": return this._renderBalance();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
@@ -838,6 +868,160 @@ class EnergyAssistantPanel extends HTMLElement {
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
+  }
+
+  /** The consumption tab exists when devices are set up (single sensors or name patterns). */
+  _usageEnabled() {
+    return (this._cfg.device_power || []).length > 0 || (this._cfg.device_patterns || []).length > 0;
+  }
+
+  /** Watts per bucket of a history answer (null before the first value), in the unit of the sensor. */
+  _sampleW(rows, id, t0, n, step) {
+    if (!rows) return null;
+    const f = this._unitFactor(id);
+    const pts = rows
+      .map((r) => ({ t: (r.lu ?? r.lc ?? 0) * 1000, v: parseFloat(r.s) }))
+      .filter((p) => !Number.isNaN(p.v));
+    let i = 0, last = null;
+    const out = [];
+    for (let k = 0; k <= n; k++) {
+      const t = t0 + k * step;
+      while (i < pts.length && pts[i].t <= t) last = pts[i++].v;
+      out.push(last == null ? null : last * f);
+    }
+    return out;
+  }
+
+  /**
+   * The lowest average over half an hour (6 buckets without a gap): the power that never goes away. Null when
+   * there are less than 12 values or no complete half hour.
+   */
+  _baseline(values) {
+    const win = 6;
+    if (!values || values.filter((v) => v != null).length < win * 2) return null;
+    let best = null;
+    for (let k = 0; k + win <= values.length; k++) {
+      const part = values.slice(k, k + win);
+      if (part.some((v) => v == null)) continue;
+      const mean = part.reduce((a, v) => a + Math.max(0, v), 0) / win;
+      if (best == null || mean < best) best = mean;
+    }
+    return best;
+  }
+
+  /**
+   * Per device: the energy since midnight in kWh (the power of the 5-minute buckets summed up) and the base
+   * load of the last 24 hours. The devices that have no history are left out.
+   */
+  _usageCompute(res, ids, t0, t1) {
+    const step = BUCKET_MIN * 60 * 1000;
+    const n = Math.floor((t1 - t0) / step);
+    const midnight = new Date(t1);
+    midnight.setHours(0, 0, 0, 0);
+    const from = Math.max(0, Math.ceil((midnight.getTime() - t0) / step));
+    const devices = [];
+    for (const id of ids) {
+      const arr = this._sampleW(res?.[id], id, t0, n, step);
+      if (!arr) continue;
+      let kwh = 0;
+      for (let k = from; k < n; k++) kwh += (Math.max(0, arr[k] ?? 0) * step) / 3600000 / 1000;
+      devices.push({ id, name: this._deviceName(id), kwh, baseW: this._baseline(arr) });
+    }
+    return { devices, at: Date.now() };
+  }
+
+  _maybeLoadUsage() {
+    if (!this._ready || this._usageLoading) return;
+    if (!this._usage || Date.now() - this._usage.at > 5 * 60 * 1000) this._loadUsage();
+  }
+
+  async _loadUsage() {
+    if (!this._hass || this._usageLoading) return;
+    this._usageLoading = true;
+    try {
+      const ids = this._deviceIds();
+      const end = Date.now(), start = end - HISTORY_HOURS * 3600 * 1000;
+      const res = ids.length
+        ? await this._hass.callWS({
+          type: "history/history_during_period",
+          start_time: new Date(start).toISOString(),
+          end_time: new Date(end).toISOString(),
+          entity_ids: ids,
+          include_start_time_state: true,
+          significant_changes_only: false,
+          minimal_response: true,
+          no_attributes: true,
+        })
+        : {};
+      this._usage = this._usageCompute(res, ids, start, end);
+    } catch (e) {
+      console.info("Energy Assistant: could not load the history of the devices", e);
+      this._usage = { devices: [], failed: true, at: Date.now() };
+    } finally {
+      this._usageLoading = false;
+      this._render();
+    }
+  }
+
+  /**
+   * The consumption tab: the base load of the house (what never goes away) with its yearly cost, the
+   * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
+   */
+  _renderUsage() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const lang = this._hass?.language || "en";
+    const u = this._usage;
+    if (!u) return `<div class="stack"><div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uBaseTitle"))}</span></div><div class="empty">${this._t("loading")}</div></div></div>`;
+    const priceState = this._int?.tariffy?.price && this._hass?.states?.[this._int.tariffy.price];
+    const price = priceState ? parseFloat(priceState.state) : NaN;
+    const currency = String(priceState?.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
+    const money = (v) => this._money(v, currency).join(" ");
+    const num = (v, d) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
+    const sub = (text) => `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(text)}</div>`;
+    // 1) base load of the house
+    const houseBase = this._baseline((this._history || []).map((p) => p.v));
+    const always = u.devices.filter((d) => d.baseW != null && d.baseW >= 2).sort((a, b) => b.baseW - a.baseW);
+    const baseTiles = [];
+    if (houseBase != null) {
+      const perYear = (houseBase / 1000) * 8760;
+      const [bv, bu] = fmtPower(houseBase);
+      baseTiles.push(tile(this._t("uBase"), bv, bu, sub(this._t("uBaseHint"))));
+      baseTiles.push(tile(this._t("uPerYear"), num(perYear, 0), "kWh"));
+      if (!Number.isNaN(price)) {
+        const [cn, cs] = this._money(perYear * price, currency, 0);
+        baseTiles.push(tile(this._t("uCostYear"), cn, cs));
+      }
+    }
+    if (always.length) {
+      const sum = always.reduce((a, d) => a + d.baseW, 0);
+      const [sv, su] = fmtPower(sum);
+      baseTiles.push(tile(this._t("uExplained"), sv, su, houseBase > 0 ? sub(this._t("uOfBase", { pct: Math.round((sum / houseBase) * 100) })) : ""));
+    }
+    const baseCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uBaseTitle"))}</span></div>${baseTiles.length ? `<div class="tiles">${baseTiles.join("")}</div>` : `<div class="empty">${this._t("uNone")}</div>`}</div>`;
+    // 2) biggest consumers today
+    const top = u.devices.filter((d) => d.kwh >= 0.005).sort((a, b) => b.kwh - a.kwh).slice(0, 10);
+    const total = u.devices.reduce((a, d) => a + d.kwh, 0);
+    const row = (name, value, unit, share, width, subtitle = "") => `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(name)}">${esc(name)}</span>${subtitle ? ` <small class="cnt">${esc(subtitle)}</small>` : ""}</span>
+      <span class="val">${value}<small>${esc(unit)}</small>${share != null ? `<small class="pct">${share} %</small>` : ""}</span></div>
+      <div class="track"><div class="fill" style="width:${Math.min(100, width)}%"></div></div></div>`;
+    const topRows = top.map((d) => {
+      const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
+      return row(d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, (d.kwh / top[0].kwh) * 100, cost);
+    }).join("");
+    const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
+      <div class="devgrid">${topRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+    // 3) always on
+    const alwaysRows = always.map((d) => {
+      const year = (d.baseW / 1000) * 8760;
+      const text = !Number.isNaN(price) ? this._t("uYear", { kwh: num(year, 0), cost: money(year * price) }) : this._t("uYearKwh", { kwh: num(year, 0) });
+      const [v, unit] = fmtPower(d.baseW);
+      return row(d.name, v, unit, null, (d.baseW / always[0].baseW) * 100, text);
+    }).join("");
+    const alwaysCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uAlwaysTitle"))}</span></div>
+      <div class="hint">${esc(this._t("uAlwaysHint"))}</div>
+      <div class="devgrid">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div></div>`;
+    return `<div class="stack">${baseCard}${topCard}${alwaysCard}</div>`;
   }
 
   /** The balance tab exists when at least one energy counter is configured. */
@@ -1936,9 +2120,14 @@ class EnergyAssistantPanel extends HTMLElement {
     return this._cfg.device_names?.[id] || this._hass?.states?.[id]?.attributes?.friendly_name || id;
   }
 
-  _devices() {
+  /** The sensors of the device list: the single ones plus the ones the name patterns find. */
+  _deviceIds() {
     const explicit = this._cfg.device_power || [];
-    const ids = [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
+    return [...new Set([...explicit, ...this._discoverDevices(this._cfg.device_patterns, this._cfg)])];
+  }
+
+  _devices() {
+    const ids = this._deviceIds();
     const sensors = ids
       .map((id) => ({
         id,
@@ -2660,6 +2849,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
     if (this._tab === "balance") this._maybeLoadBalance();
+    if (this._tab === "usage") this._maybeLoadUsage();
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
