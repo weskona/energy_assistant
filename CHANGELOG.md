@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-13
+
 ### Fixed
 
 - The bar of a device in *Biggest consumers* shows its share of the total energy of the selected period (day, week, month, year), no longer its share of the biggest device.
