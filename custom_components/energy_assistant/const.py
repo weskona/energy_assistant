@@ -15,6 +15,11 @@ CONF_BATTERY_GRID_CHARGE = "battery_grid_charge"  # part of the above from grid
 CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
 # Devices that count as standby (always on). When set, the Consumption tab lists exactly these.
 CONF_DEVICE_STANDBY = "device_standby"
+# Devices (power sensors) that get their own energy and cost sensors. Nothing is selected at first.
+CONF_DEVICE_IDS = "device_ids"
+MAX_DEVICE_IDS = 20  # a selection is cut to this many devices (eight sensors each)
+# Tariffy price sensor per such device ({entity_id: entity_id}).
+CONF_DEVICE_TARIFFS = "device_tariffs"
 # Name patterns like "*_leistung": every power sensor that matches is listed as a device.
 CONF_DEVICE_PATTERNS = "device_patterns"
 # Sensors that a pattern must not add to the device list.
@@ -64,6 +69,7 @@ LIST_KEYS = (
     CONF_BATTERY_SOC,
     CONF_DEVICE_POWER,
     CONF_DEVICE_STANDBY,
+    CONF_DEVICE_IDS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,
@@ -113,6 +119,7 @@ CONFIG_KEYS = (
     *DICT_KEYS,
     CONF_LABEL_TARIFFS,
     CONF_AREA_TARIFFS,
+    CONF_DEVICE_TARIFFS,
     *BOOL_KEYS,
     *NUMBER_KEYS,
 )

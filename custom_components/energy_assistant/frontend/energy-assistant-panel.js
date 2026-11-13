@@ -163,6 +163,9 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .mtoggle .chev.on{transform:rotate(90deg)}
 .mtoggle .go{margin-left:auto;color:var(--eb-green);font-weight:600;font-size:13px}
 .trow{display:flex;align-items:center;gap:12px;margin:6px 0}
+.msens{margin-left:auto;flex:none;align-self:center}
+.mrow .msens.on{border-color:var(--eb-green);color:var(--eb-green)}
+.trow.dsetup input[type=text]{flex:1 1 180px;min-width:0;max-width:300px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:7px 10px;font:14px var(--eb-font)}
 .trow .tn{font-size:14px;flex:0 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow select{flex:1 1 220px;min-width:0;max-width:420px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font:14px var(--eb-font)}
 .chip button{border:0;background:none;color:var(--eb-muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
@@ -244,6 +247,16 @@ const STRINGS = {
     uTopTitle: "Biggest consumers",
     uLabelsTitle: "Labels",
     costsPeriod: "Costs in the period",
+    f_device_ids: "Devices with their own sensors",
+    devSensorsBtn: "Sensors",
+    devSensorsTip: "Give this device its own energy and cost sensors (at most {n} devices)",
+    deviceLimit: "At most {n} devices can have their own sensors.",
+    deviceCounter: "{n} of {max} devices with their own sensors: {sensors} sensors (four for the energy, four for the cost with Tariffy per device). Untick a device to delete its sensors when you save.",
+    deviceCounterNone: "Nothing is selected at first, so no sensors are created: tick the devices you need in the list above with the Sensors button (at most {max}). Every device gets four energy sensors and, with Tariffy, four cost sensors.",
+    f_device_setup: "Name and tariff of these devices",
+    h_device_setup: "The name is the display name of the device and is part of the sensor names. Leave it empty for the name of the sensor without the word Leistung. A name changed later changes the name of the sensors, but not their entity id. A device whose source is gone or excluded keeps its sensors until you untick it.",
+    deviceNameLabel: "Name of the device",
+    deviceCostTitle: "Cost per device",
     uAreasTitle: "Areas",
     uAreasHint: "Energy of the sensors in the area in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per selected area for dashboards and automations, they count from the moment they were created.",
     areaCostTitle: "Cost per area",
@@ -542,6 +555,16 @@ const STRINGS = {
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
     costsPeriod: "Kosten im Zeitraum",
+    f_device_ids: "Geräte mit eigenen Sensoren",
+    devSensorsBtn: "Sensoren",
+    devSensorsTip: "Diesem Gerät eigene Verbrauchs- und Kostensensoren geben (höchstens {n} Geräte)",
+    deviceLimit: "Höchstens {n} Geräte können eigene Sensoren haben.",
+    deviceCounter: "{n} von {max} Geräten mit eigenen Sensoren: {sensors} Sensoren (je Gerät vier für den Verbrauch, mit Tariffy vier für die Kosten). Wählst du ein Gerät ab, werden seine Sensoren beim Speichern gelöscht.",
+    deviceCounterNone: "Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle die Geräte, die du brauchst, in der Liste oben mit dem Knopf Sensoren (höchstens {max}). Jedes Gerät bekommt vier Verbrauchssensoren und mit Tariffy vier Kostensensoren.",
+    f_device_setup: "Name und Tarif dieser Geräte",
+    h_device_setup: "Der Name ist der Anzeigename des Geräts und Teil der Sensornamen. Leer lassen für den Namen des Sensors ohne das Wort Leistung. Ein später geänderter Name ändert den Namen der Sensoren, aber nicht ihre Entity-ID. Ein Gerät, dessen Quelle fehlt oder ausgeschlossen wurde, behält seine Sensoren, bis du es abwählst.",
+    deviceNameLabel: "Name des Geräts",
+    deviceCostTitle: "Kosten pro Gerät",
     uAreasTitle: "Bereiche",
     uAreasHint: "Verbrauch der Sensoren im Bereich im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro ausgewähltem Bereich für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
     areaCostTitle: "Kosten pro Bereich",
@@ -836,11 +859,11 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_exclude", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -858,6 +881,9 @@ const FLOW_W = 20; // charging or discharging from this power on
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
 const MIN_ROWS = 5;
+const MAX_DEVICE_IDS = 20; // devices with their own sensors (eight sensors each); the backend cuts to the same number
+// A name without the word that only says it is the power sensor ("Backofen Leistung" -> "Backofen"), like the backend.
+const stripPower = (name) => String(name).replace(/[\s_-]*(wirkleistung|leistung|power)\s*$/i, "").trim() || String(name);
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
 const PATTERN_RE = /^[a-z0-9_.*?]+$/;
 
@@ -1057,7 +1083,7 @@ class EnergyAssistantPanel extends HTMLElement {
       case "usage": return this._renderConsumption();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
-      case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderGroupCosts("area"), this._renderGroupCosts("label"), this._renderContract());
+      case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderGroupCosts("device"), this._renderGroupCosts("area"), this._renderGroupCosts("label"), this._renderContract());
       case "amortix": return stack(this._renderAmortix());
       default: return this._renderHouse();
     }
@@ -1469,6 +1495,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** Display name of a label or an area. */
   _groupName(kind, id) {
+    if (kind === "device") return this._cfg.device_names?.[id] || stripPower(this._hass?.states?.[id]?.attributes?.friendly_name || id.split(".").pop().replace(/_/g, " "));
     if (kind === "area") return this._hass?.areas?.[id]?.name || id;
     return (this._labelData?.labels || []).find((l) => l.label_id === id)?.name || id;
   }
@@ -2210,7 +2237,7 @@ class EnergyAssistantPanel extends HTMLElement {
    */
   _renderGroupCosts(kind) {
     const periods = [["day", "bDay"], ["week", "bWeek"], ["month", "bMonth"], ["year", "bYear"]];
-    const sensors = kind === "area" ? this._areaEnergy : this._labelEnergy;
+    const sensors = { area: this._areaEnergy, device: this._deviceEnergy }[kind] || this._labelEnergy;
     const rows = (this._cfg[`${kind}_ids`] || [])
       .map((id) => {
         const cells = periods.map(([p]) => {
@@ -2226,7 +2253,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const body = rows
       .map((r) => `<div class="lc"><span class="nm" title="${esc(r.name)}">${esc(r.name)}</span>${r.cells.map((c) => `<span class="n">${esc(c)}</span>`).join("")}</div>`)
       .join("");
-    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t(kind === "area" ? "areaCostTitle" : "labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t({ area: "areaCostTitle", device: "deviceCostTitle" }[kind] || "labelCostTitle"))}</span></div>${head}${body}<div class="hint">${esc(this._t("labelCostHint"))}</div></div>`;
   }
 
   /** Contract figures of Tariffy: cost so far, balance so far and the forecast for the contract end. */
@@ -2289,9 +2316,10 @@ class EnergyAssistantPanel extends HTMLElement {
         return current || {};
       }
     };
-    [this._labelEnergy, this._areaEnergy] = await Promise.all([
+    [this._labelEnergy, this._areaEnergy, this._deviceEnergy] = await Promise.all([
       ask("energy_assistant/label_energy", this._labelEnergy),
       ask("energy_assistant/area_energy", this._areaEnergy),
+      ask("energy_assistant/device_energy", this._deviceEnergy),
     ]);
     this._render();
   }
@@ -2323,6 +2351,7 @@ class EnergyAssistantPanel extends HTMLElement {
     out.device_names = { ...(cfg.device_names || {}) };
     out.label_tariffs = { ...(cfg.label_tariffs || {}) };
     out.area_tariffs = { ...(cfg.area_tariffs || {}) };
+    out.device_tariffs = { ...(cfg.device_tariffs || {}) };
     return out;
   }
 
@@ -2491,6 +2520,16 @@ class EnergyAssistantPanel extends HTMLElement {
     } else if (e.target.closest("[data-pvapply]") && this._isAdmin && this._pv) {
       Object.assign(this._draft, this._pvTargets());
       this._edited();
+    } else if (e.target.closest("[data-devsel]")) {
+      // A device gets (or loses) its own energy and cost sensors; nothing happens before Save.
+      e.preventDefault();
+      if (this._isAdmin) {
+        const id = e.target.closest("[data-devsel]").dataset.devsel;
+        const list = this._draft.device_ids || [];
+        if (list.includes(id)) this._draft.device_ids = list.filter((x) => x !== id);
+        else if (list.length < MAX_DEVICE_IDS) this._draft.device_ids = [...list, id];
+        this._edited();
+      }
     } else if (e.target.closest("[data-open]")) {
       // Click on an area or label row: show or hide the sensors it sums up.
       const key = e.target.closest("[data-open]").dataset.open;
@@ -2540,6 +2579,20 @@ class EnergyAssistantPanel extends HTMLElement {
       const rest = this._draft.area_ids.filter((x) => x !== id);
       this._draft.area_ids = t.checked ? [...rest, id] : rest;
       this._edited();
+    } else if (t.dataset?.devname !== undefined) {
+      const id = t.dataset.devname;
+      const next = { ...(this._draft.device_names || {}) };
+      const text = t.value.trim();
+      if (text) next[id] = text.slice(0, 80);
+      else delete next[id];
+      this._draft.device_names = next;
+      this._edited();
+    } else if (t.dataset?.devtariff !== undefined) {
+      const next = { ...(this._draft.device_tariffs || {}) };
+      if (t.value) next[t.dataset.devtariff] = t.value;
+      else delete next[t.dataset.devtariff];
+      this._draft.device_tariffs = next;
+      this._edited();
     } else if (t.dataset?.labeltariff || t.dataset?.areatariff) {
       const kind = t.dataset.areatariff ? "area" : "label";
       const id = t.dataset[`${kind}tariff`];
@@ -2578,6 +2631,8 @@ class EnergyAssistantPanel extends HTMLElement {
         } else {
           this._fieldError = { [t.dataset.add]: this._t("invalidPattern") };
         }
+      } else if (t.dataset.add === "device_ids" && (this._draft.device_ids || []).length >= MAX_DEVICE_IDS && !this._draft.device_ids.includes(id)) {
+        this._fieldError = { device_ids: this._t("deviceLimit", { n: MAX_DEVICE_IDS }) };
       } else if (this._hass?.states?.[id]) {
         this._draftAdd(t.dataset.add, id, t.dataset.mode);
         this._fieldError = {};
@@ -2662,6 +2717,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const states = this._hass?.states || {};
     const excluded = new Set(this._draft.device_exclude);
     const byPattern = compilePatterns(this._draft.device_exclude_patterns || []);
+    const ids = this._draft.device_ids || [];
     if (!shown.length) return `<div class="hint" style="padding:10px">${esc(this._t("noMatches"))}</div>`;
     return shown
       .map((id) => {
@@ -2669,7 +2725,10 @@ class EnergyAssistantPanel extends HTMLElement {
         const off = excluded.has(id) || viaPattern;
         const name = states[id]?.attributes?.friendly_name || id;
         const title = viaPattern ? `${id} – ${this._t("excludedByPattern")}` : id;
-        return `<label class="mrow${off ? " ex" : ""}" title="${esc(title)}"><input type="checkbox" data-device="${esc(id)}" ${off ? "" : "checked"} ${ro || viaPattern ? "disabled" : ""}><span class="mt"><span class="mn">${esc(name)}</span><span class="mi">${esc(id)}</span></span></label>`;
+        const own = ids.includes(id);
+        const full = ids.length >= MAX_DEVICE_IDS && !own;
+        const sensors = off && !own ? "" : `<button type="button" class="seg msens${own ? " on" : ""}" data-devsel="${esc(id)}" ${ro || full ? "disabled" : ""} title="${esc(this._t(full ? "deviceLimit" : "devSensorsTip", { n: MAX_DEVICE_IDS }))}">${esc(this._t("devSensorsBtn"))}</button>`;
+        return `<label class="mrow${off ? " ex" : ""}" title="${esc(title)}"><input type="checkbox" data-device="${esc(id)}" ${off ? "" : "checked"} ${ro || viaPattern ? "disabled" : ""}><span class="mt"><span class="mn">${esc(name)}</span><span class="mi">${esc(id)}</span></span>${sensors}</label>`;
       })
       .join("");
   }
@@ -2782,6 +2841,40 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="fld span"><label>${esc(this._t(`f_${kind}_tariffs`))}</label>${rows}<div class="hint">${esc(this._t(`h_${kind}_tariffs`))}</div></div>`;
   }
 
+  /** "5 of 20 devices selected: 40 sensors" and what a selection does (nothing is selected at first). */
+  _deviceCounter() {
+    const n = (this._draft.device_ids || []).length;
+    const perDevice = this._int?.tariffy ? 8 : 4;
+    return this._t(n ? "deviceCounter" : "deviceCounterNone", { n, max: MAX_DEVICE_IDS, sensors: n * perDevice });
+  }
+
+  /**
+   * Name and tariff of every device with its own sensors. The name field is prefilled with the name the sensors
+   * would get (the display name, else the sensor name without "Leistung"); a name typed here is the display name
+   * of the device, so it is set before the sensors exist. The tariff is only offered with several contracts.
+   */
+  _renderDeviceSetup(ro) {
+    const ids = this._draft.device_ids || [];
+    if (!ids.length) return "";
+    const prices = this._int?.tariffy?.prices;
+    const withTariff = Array.isArray(prices) && prices.length >= 2;
+    const names = this._draft.device_names || {};
+    const chosen = this._draft.device_tariffs || {};
+    const rows = ids
+      .map((id) => {
+        const friendly = this._hass?.states?.[id]?.attributes?.friendly_name || id;
+        const select = withTariff
+          ? `<select data-devtariff="${esc(id)}" ${ro ? "disabled" : ""}>${[
+            `<option value="">${esc(this._t("tariffDefault", { name: prices[0].name }))}</option>`,
+            ...prices.map((p) => `<option value="${esc(p.entity)}"${chosen[id] === p.entity ? " selected" : ""}>${esc(p.name)}</option>`),
+          ].join("")}</select>`
+          : "";
+        return `<div class="trow dsetup"><span class="tn" title="${esc(id)}">${esc(friendly)}</span><input type="text" data-devname="${esc(id)}" value="${esc(names[id] || "")}" placeholder="${esc(stripPower(friendly))}" maxlength="80" autocomplete="off" ${ro ? "disabled" : ""} aria-label="${esc(this._t("deviceNameLabel"))}">${select}</div>`;
+      })
+      .join("");
+    return `<div class="fld span"><label>${esc(this._t("f_device_setup"))}</label>${rows}<div class="hint">${esc(this._t("h_device_setup"))}</div></div>`;
+  }
+
   _renderMatches(ro) {
     const { found, counts } = this._matchList();
     if (!found.length) return `<div class="hint">${esc(this._t("noMatches"))}</div>`;
@@ -2812,6 +2905,8 @@ class EnergyAssistantPanel extends HTMLElement {
       if (kind === "note") return `<div class="fld span note">${esc(this._t(key))}</div>`;
       if (kind === "labeltariffs") return this._renderGroupTariffs("label", ro);
       if (kind === "areatariffs") return this._renderGroupTariffs("area", ro);
+      if (kind === "devnote") return `<div class="fld span note">${esc(this._deviceCounter())}</div>`;
+      if (kind === "devsetup") return this._renderDeviceSetup(ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
         const v = this._draft[key];
@@ -2836,7 +2931,7 @@ class EnergyAssistantPanel extends HTMLElement {
         return `<div class="fld span">${head}${open ? this._renderMatches(ro) : ""}</div>`;
       }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
-      const long = key === "device_exclude"; // can be a long list: full width, scrolls when very long
+      const long = key === "device_exclude" || key === "device_ids"; // can be a long list: full width, scrolls when very long
       const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
       // The chips and the input share one box, so a list only grows as much as it has entries.
       return `<div class="fld${long ? " span" : ""}"><label>${esc(label)}</label>

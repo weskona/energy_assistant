@@ -3994,3 +3994,98 @@ test("settings: labels and areas say that nothing is selected at first and what 
   assert.match(html, /Nothing is selected at first, so no sensors are created: select only the labels you need/);
   assert.match(html, /Nothing is selected at first, so no sensors are created; with no selection the Areas card/);
 });
+
+// --- devices with their own energy and cost sensors -------------------------------------------------
+test("device sensors: the list has a Sensors button per device, nothing is selected at first", () => {
+  const p = matchPanel();
+  assert.deepEqual(p._draft.device_ids, []);
+  const html = p._renderMatchRows(false);
+  assert.equal((html.match(/data-devsel="/g) || []).length, 4); // one button per device
+  assert.doesNotMatch(html, /msens on/);
+  assert.match(html, /<button type="button" class="seg msens" data-devsel="sensor\.herd_leistung"/);
+});
+
+test("device sensors: a click selects and deselects a device, an excluded device has no button", () => {
+  const p = matchPanel();
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.deepEqual(p._draft.device_ids, ["sensor.herd_leistung"]);
+  assert.match(p._renderMatchRows(false), /msens on" data-devsel="sensor\.herd_leistung"/);
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.deepEqual(p._draft.device_ids, []); // deselected again
+  p._onChange(checkbox("sensor.ofen_leistung", false)); // excluded
+  assert.doesNotMatch(p._renderMatchRows(false), /data-devsel="sensor\.ofen_leistung"/);
+});
+
+test("device sensors: at most 20 devices, the other buttons are disabled and an input says why", () => {
+  const p = matchPanel();
+  p._draft.device_ids = Array.from({ length: 20 }, (_, k) => `sensor.d${k}_leistung`);
+  const html = p._renderMatchRows(false);
+  assert.match(html, /<button[^>]*data-devsel="sensor\.herd_leistung" disabled/);
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.equal(p._draft.device_ids.length, 20);
+  p._hass.states["sensor.extra_leistung"] = power("Extra");
+  p._onChange({ target: { dataset: { add: "device_ids", mode: "multi" }, value: "sensor.extra_leistung" } });
+  assert.equal(p._draft.device_ids.length, 20);
+  assert.match(p._fieldError.device_ids, /At most 20 devices/);
+  // a device that is already selected can still be unselected with the button
+  p._draft.device_ids = ["sensor.herd_leistung", ...Array.from({ length: 19 }, (_, k) => `sensor.d${k}_leistung`)];
+  const own = p._renderMatchRows(false);
+  assert.match(own, /msens on" data-devsel="sensor\.herd_leistung"\s+title=/); // enabled although the list is full
+  assert.match(own, /data-devsel="sensor\.ofen_leistung" disabled/); // the others are not
+});
+
+test("device sensors: the counter tells what the selection creates", () => {
+  const p = matchPanel();
+  assert.match(p._deviceCounter(), /Nothing is selected at first, so no sensors are created/);
+  p._draft.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
+  assert.match(p._deviceCounter(), /2 of 20 devices with their own sensors: 8 sensors/); // energy only
+  p._int = { tariffy: { price: "x" } };
+  assert.match(p._deviceCounter(), /16 sensors/); // with Tariffy the cost sensors too
+});
+
+test("device sensors: the name can be set before the sensors exist and the tariff per device", () => {
+  const p = matchPanel();
+  p._draft.device_ids = ["sensor.herd_leistung"];
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
+  let html = p._renderDeviceSetup(false);
+  assert.match(html, /placeholder="Herd"/); // the name the sensors would get (no "Leistung")
+  assert.match(html, /<option value="sensor\.wp">/);
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "  Herd Küche " } });
+  assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd Küche" });
+  p._onChange({ target: { dataset: { devtariff: "sensor.herd_leistung" }, value: "sensor.wp" } });
+  assert.deepEqual(p._draft.device_tariffs, { "sensor.herd_leistung": "sensor.wp" });
+  html = p._renderDeviceSetup(false);
+  assert.match(html, /value="Herd Küche"/);
+  assert.match(html, /<option value="sensor\.wp" selected>/);
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "" } }); // empty: back to the proposal
+  p._onChange({ target: { dataset: { devtariff: "sensor.herd_leistung" }, value: "" } });
+  assert.deepEqual(p._draft.device_names, {});
+  assert.deepEqual(p._draft.device_tariffs, {});
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }] } };
+  assert.doesNotMatch(p._renderDeviceSetup(false), /<select/); // one contract: no choice
+  p._draft.device_ids = [];
+  assert.equal(p._renderDeviceSetup(false), "");
+});
+
+test("device sensors: the names in the Costs tab are the display names, else the name without Leistung", () => {
+  const p = matchPanel();
+  p._cfg.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
+  p._cfg.device_names = { "sensor.ofen_leistung": "Backofen" };
+  assert.equal(p._groupName("device", "sensor.herd_leistung"), "Herd");
+  assert.equal(p._groupName("device", "sensor.ofen_leistung"), "Backofen");
+  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
+  p._deviceEnergy = { "sensor.ofen_leistung": { cost_day: "sensor.k_day" } };
+  const html = p._renderGroupCosts("device");
+  assert.match(html, /Cost per device/);
+  assert.match(html, /Backofen[\s\S]*0[.,]62[^<]*€/);
+  assert.doesNotMatch(html, /Herd/); // no cost sensor
+});
+
+test("device sensors: a name without the word Leistung stays, 'Leistung' alone is kept", () => {
+  const p = matchPanel();
+  p._hass.states["sensor.a"] = { state: "1", attributes: { friendly_name: "Wallbox 3EM Phase A Leistung" } };
+  p._hass.states["sensor.b"] = { state: "1", attributes: { friendly_name: "Oven power" } };
+  p._hass.states["sensor.c"] = { state: "1", attributes: { friendly_name: "Leistung" } };
+  p._hass.states["sensor.d"] = { state: "1", attributes: { friendly_name: "Leistungsmesser Keller" } };
+  assert.deepEqual(["a", "b", "c", "d"].map((k) => p._groupName("device", `sensor.${k}`)), ["Wallbox 3EM Phase A", "Oven", "Leistung", "Leistungsmesser Keller"]);
+});

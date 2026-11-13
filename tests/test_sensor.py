@@ -536,3 +536,168 @@ async def test_a_fresh_setup_creates_no_sensors_at_all(
     assert [
         e for e in er.async_get(hass).entities.values() if e.platform == DOMAIN
     ] == []
+
+
+def test_a_device_name_loses_the_word_leistung() -> None:
+    from custom_components.energy_assistant.sensor import strip_power
+
+    assert strip_power("Backofen Leistung") == "Backofen"
+    assert strip_power("Wallbox 3EM Phase A Leistung") == "Wallbox 3EM Phase A"
+    assert strip_power("Oven power") == "Oven"
+    assert strip_power("Kühlschrank_leistung") == "Kühlschrank"
+    assert strip_power("Leistung") == "Leistung"  # a name that is only the word stays
+    assert (
+        strip_power("Leistungsmesser Keller") == "Leistungsmesser Keller"
+    )  # only at the end
+
+
+async def test_the_name_of_a_device_is_the_own_name_else_the_short_friendly_name(
+    hass: HomeAssistant,
+) -> None:
+    from custom_components.energy_assistant.sensor import device_display_name
+
+    hass.states.async_set(
+        "sensor.oven_power", "5", {"friendly_name": "Backofen Leistung"}
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    assert device_display_name(hass, entry, "sensor.oven_power") == "Backofen"
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={}, options={"device_names": {"sensor.oven_power": "Ofen"}}
+    )
+    assert device_display_name(hass, entry, "sensor.oven_power") == "Ofen"
+    # without a state the id gives a readable name
+    assert device_display_name(hass, entry, "sensor.herd_leistung") == "herd"
+
+
+async def _setup_devices(
+    hass: HomeAssistant, device_ids: list[str], **options
+) -> MockConfigEntry:
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    for entity_id, name in (
+        ("sensor.oven_power", "Backofen Leistung"),
+        ("sensor.tv_power", "Fernseher Leistung"),
+    ):
+        hass.states.async_set(
+            entity_id,
+            "500",
+            {
+                "device_class": "power",
+                "unit_of_measurement": "W",
+                "friendly_name": name,
+            },
+        )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"grid_import": "sensor.import"},
+        options={"device_ids": device_ids, **options},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+def _device_ids(hass: HomeAssistant, entry: MockConfigEntry, device: str, prefix=""):
+    registry = er.async_get(hass)
+    return [
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, unique_id(entry.entry_id, device, prefix + p, "device")
+        )
+        for p in PERIODS
+    ]
+
+
+async def test_devices_get_sensors_only_when_selected_with_a_short_name(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    hass.config.language = "de"
+    entry = await _setup_devices(hass, ["sensor.oven_power"])
+    ids = _device_ids(hass, entry, "sensor.oven_power")
+    assert ids[0] == "sensor.energy_assistant_backofen_verbrauch_taglich"
+    assert all(ids)
+    assert not any(_device_ids(hass, entry, "sensor.tv_power"))  # not selected: nothing
+    state = hass.states.get(ids[0])
+    assert state.attributes["device_id"] == "sensor.oven_power"
+    assert state.attributes["sensors"] == ["sensor.oven_power"]
+    assert (
+        state.attributes["friendly_name"]
+        == "Energy Assistant Backofen Verbrauch täglich"
+    )
+
+
+async def test_the_name_of_the_sensors_follows_a_new_display_name_but_not_the_id(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    from homeassistant.util import dt as dt_util
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    hass.config.language = "de"
+    entry = await _setup_devices(hass, ["sensor.oven_power"])
+    entity_id = _device_ids(hass, entry, "sensor.oven_power")[0]
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "device_names": {"sensor.oven_power": "Ofen"}}
+    )
+    await hass.async_block_till_done()
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=2))
+    await hass.async_block_till_done()
+    assert _device_ids(hass, entry, "sensor.oven_power")[0] == entity_id  # the id stays
+    assert hass.states.get(entity_id).attributes["friendly_name"] == (
+        "Energy Assistant Ofen Verbrauch täglich"
+    )
+
+
+async def test_the_sensors_of_a_device_stay_when_its_source_goes_away(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    entry = await _setup_devices(hass, ["sensor.oven_power"])
+    hass.states.async_remove("sensor.oven_power")
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, "device_exclude": ["sensor.oven_power"]}
+    )
+    await hass.async_block_till_done()
+    assert all(
+        _device_ids(hass, entry, "sensor.oven_power")
+    )  # nothing is deleted on its own
+    # deselecting is what removes them
+    hass.config_entries.async_update_entry(entry, options={"device_ids": []})
+    await hass.async_block_till_done()
+    assert not any(_device_ids(hass, entry, "sensor.oven_power"))
+
+
+async def test_an_excluded_device_that_exists_still_counts(
+    hass: HomeAssistant,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={}, options={"device_exclude": ["sensor.oven_power"]}
+    )
+    hass.states.async_set(
+        "sensor.oven_power",
+        "500",
+        {"device_class": "power", "unit_of_measurement": "W"},
+    )
+    tracker = GroupEnergy(hass, entry, "sensor.oven_power", "device")
+    assert tracker._find_members() == {"sensor.oven_power"}
+    gone = GroupEnergy(hass, entry, "sensor.missing_power", "device")
+    assert gone._find_members() == set()
+
+
+async def test_a_device_uses_the_tariff_chosen_for_it(hass: HomeAssistant) -> None:
+    hass.states.async_set(
+        "sensor.haus_preis", "0.30", {"unit_of_measurement": "EUR/kWh"}
+    )
+    hass.states.async_set("sensor.wp_preis", "0.22", {"unit_of_measurement": "EUR/kWh"})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={"device_tariffs": {"sensor.wp_power": "sensor.wp_preis"}},
+    )
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.haus_preis"},
+    ):
+        heat = GroupEnergy(hass, entry, "sensor.wp_power", "device")
+        heat._refresh_price()
+        other = GroupEnergy(hass, entry, "sensor.tv_power", "device")
+        other._refresh_price()
+    assert heat.price == 0.22
+    assert other.price == 0.30

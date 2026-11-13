@@ -16,6 +16,7 @@ from .const import (
     BOOL_KEYS,
     CONF_AREA_TARIFFS,
     CONF_DEVICE_NAMES,
+    CONF_DEVICE_TARIFFS,
     CONF_HOUSE_POWER,
     CONF_LABEL_TARIFFS,
     DOMAIN,
@@ -65,6 +66,7 @@ _CONFIG_SCHEMA = vol.Schema(
         vol.Optional(CONF_AREA_TARIFFS): {
             vol.All(cv.string, vol.Match(ID_REGEX)): cv.entity_id
         },
+        vol.Optional(CONF_DEVICE_TARIFFS): {cv.entity_id: cv.entity_id},
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
     }
 )
@@ -81,6 +83,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_energy_suggestion)
     websocket_api.async_register_command(hass, ws_label_energy)
     websocket_api.async_register_command(hass, ws_area_energy)
+    websocket_api.async_register_command(hass, ws_device_energy)
 
 
 def _entry(hass: HomeAssistant):
@@ -178,6 +181,17 @@ def ws_area_energy(
 ) -> None:
     """Return the energy and cost sensors of the selected areas (like the ones of the labels)."""
     connection.send_result(msg["id"], _group_energy(hass, "area"))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "energy_assistant/device_energy"}
+)
+@callback
+def ws_device_energy(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the energy and cost sensors of the devices that have their own (like the ones of the labels)."""
+    connection.send_result(msg["id"], _group_energy(hass, "device"))
 
 
 @websocket_api.websocket_command(

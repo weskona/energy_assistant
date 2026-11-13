@@ -184,6 +184,30 @@
       },
       "area_cost_year": {
         "name": "{area} cost this year"
+      },
+      "device_energy_day": {
+        "name": "{device} energy today"
+      },
+      "device_cost_day": {
+        "name": "{device} cost today"
+      },
+      "device_energy_week": {
+        "name": "{device} energy this week"
+      },
+      "device_cost_week": {
+        "name": "{device} cost this week"
+      },
+      "device_energy_month": {
+        "name": "{device} energy this month"
+      },
+      "device_cost_month": {
+        "name": "{device} cost this month"
+      },
+      "device_energy_year": {
+        "name": "{device} energy this year"
+      },
+      "device_cost_year": {
+        "name": "{device} cost this year"
       }
     }
   }

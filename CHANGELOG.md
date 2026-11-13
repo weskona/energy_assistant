@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An error in the log when the integration was unloaded or reloaded (the stop of the sensors per label and area returned a list instead of nothing).
 - The list of matching sensors in the device settings now opens and closes with a click on its header (the page was not redrawn after the click).
 
 ### Removed

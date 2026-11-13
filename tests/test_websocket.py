@@ -547,3 +547,40 @@ async def test_update_config_stores_the_tariff_per_area(
     assert msg["success"]
     assert msg["result"]["area_tariffs"] == {"keller": "sensor.wp_preis"}
     assert entry.options["area_tariffs"] == {"keller": "sensor.wp_preis"}
+
+
+async def test_device_energy_and_the_tariff_per_device(
+    hass, hass_ws_client, entry
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.energy_assistant.sensor import PERIODS, unique_id
+
+    hass.config_entries.async_update_entry(
+        entry, options={"device_ids": ["sensor.wp_power"]}
+    )
+    registry = er.async_get(hass)
+    for period in PERIODS[:2]:
+        registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            unique_id(entry.entry_id, "sensor.wp_power", period, "device"),
+        )
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "energy_assistant/device_energy"})
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert set(msg["result"]["sensor.wp_power"]) == {"day", "week"}
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {
+                "device_tariffs": {"sensor.wp_power": "sensor.wp_preis"},
+                "device_ids": [f"sensor.d{k}_power" for k in range(25)],
+            },
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["device_tariffs"] == {"sensor.wp_power": "sensor.wp_preis"}
+    assert len(msg["result"]["device_ids"]) == 20  # cut to the limit

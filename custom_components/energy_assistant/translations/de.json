@@ -184,6 +184,30 @@
       },
       "area_cost_year": {
         "name": "{area} Kosten jährlich"
+      },
+      "device_energy_day": {
+        "name": "{device} Verbrauch täglich"
+      },
+      "device_cost_day": {
+        "name": "{device} Kosten täglich"
+      },
+      "device_energy_week": {
+        "name": "{device} Verbrauch wöchentlich"
+      },
+      "device_cost_week": {
+        "name": "{device} Kosten wöchentlich"
+      },
+      "device_energy_month": {
+        "name": "{device} Verbrauch monatlich"
+      },
+      "device_cost_month": {
+        "name": "{device} Kosten monatlich"
+      },
+      "device_energy_year": {
+        "name": "{device} Verbrauch jährlich"
+      },
+      "device_cost_year": {
+        "name": "{device} Kosten jährlich"
       }
     }
   }

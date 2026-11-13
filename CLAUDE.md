@@ -18,4 +18,8 @@ These apply to every sensor that adds values up over time, such as the label ene
 6. **Create and remove with the selection** (no reload), derive unique ids from entry id, label and period, and keep an entity registry cleanup when something is deselected.
 7. **Test every rule** in `tests/test_sensor.py` (bad readings, pause, backwards time, price change, bad restore, bad price) and document the protection in the README.
 
+8. **Names follow renames, ids do not.** Home Assistant caches an entity's name; to rename a running sensor set the new `_attr_translation_placeholders`, drop the cached name (`self.__dict__.pop("name", None)`, like HA's own `_attr_` setters) and reset `_cached_friendly_name`, then write the state.
+9. **Unload callbacks return nothing.** Anything passed to `entry.async_on_unload` must return `None` (a lambda that returns a list makes the unload fail).
+10. **Selections are opt-in and capped.** Nothing is preselected so a new installation creates no sensors; a selection that creates sensors per item has a hard limit (`MAX_DEVICE_IDS`) in the backend and a hint in the settings. A source that disappears never deletes sensors on its own; only deselecting does.
+
 Limits live as constants at the top of `sensor.py`; reuse them or add new ones there.
