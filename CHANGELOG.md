@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tab bar on a phone:** with many tabs the bar was wider than the screen and pushed the whole page sideways. On screens up to 900 px it now stays within the screen, is a little more compact and scrolls sideways; the active tab is brought to the middle when you change the tab.
+
 ## [0.29.1] - 2026-11-14
 
 ### Fixed

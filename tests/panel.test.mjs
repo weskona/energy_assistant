@@ -4457,3 +4457,24 @@ test("devices tab: the chart is drawn at the real width of its box, so the text 
   p._wireDevChart({ querySelector: () => null }); // another tab: nothing to measure
   assert.equal(renders, 1);
 });
+
+test("tab bar: on a narrow screen the active tab is brought to the middle, once per change of the tab", () => {
+  const p = new Panel();
+  const bar = { scrollWidth: 700, clientWidth: 300, scrollLeft: 0, querySelector: () => ({ offsetLeft: 500, offsetWidth: 80 }) };
+  p._tab = "costs";
+  p._centerActiveTab(bar);
+  assert.equal(bar.scrollLeft, 500 - (300 - 80) / 2); // 390: the tab sits in the middle
+  bar.scrollLeft = 12; // the user scrolls by hand
+  p._centerActiveTab(bar);
+  assert.equal(bar.scrollLeft, 12); // not pulled back while the tab stays the same
+  p._tab = "house";
+  bar.querySelector = () => ({ offsetLeft: 4, offsetWidth: 70 });
+  p._centerActiveTab(bar);
+  assert.equal(bar.scrollLeft, 0); // never negative
+  const wide = { scrollWidth: 300, clientWidth: 600, scrollLeft: 0, querySelector: () => ({ offsetLeft: 200, offsetWidth: 80 }) };
+  p._tab = "pv";
+  p._centerActiveTab(wide);
+  assert.equal(wide.scrollLeft, 0); // everything fits: nothing to scroll
+  p._tab = "ev";
+  p._centerActiveTab({ scrollWidth: 700, clientWidth: 300, scrollLeft: 0, querySelector: () => null }); // no active tab yet
+});
