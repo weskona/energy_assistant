@@ -654,7 +654,7 @@ test("areas: card lists areas strongest first, with the sensor count, share and 
   assert.match(html, /2 power sensors/);
   assert.match(html, /1 power sensor</);
   assert.match(html, /Wohnzimmer[\s\S]*?<small class="pct">6 %<\/small>/);
-  assert.match(html, /title="6 % of house · Media 124 W"/);
+  assert.match(html, /title="6 % of house\nMedia 124 W"/); // one line per fact in the tooltip
 });
 
 test("areas: idle areas are only counted", () => {
@@ -846,7 +846,7 @@ test("labels: card with sums, shares, sensor counts, colors and tooltips", () =>
   assert.match(html, /Licht[\s\S]*?1 power sensor</);
   assert.ok(html.indexOf("Klima") < html.indexOf("Licht")); // strongest first
   assert.match(html, /var\(--blue-color/);
-  assert.match(html, /title="81 % of house · Klimaanlage 900 W/);
+  assert.match(html, /title="81 % of house\nKlimaanlage 900 W/);
 });
 
 test("labels: the card folds like the others and has its own toggle", () => {
@@ -2198,101 +2198,6 @@ test("ev rows: no row without live data, an idle wallbox shows as idle, the row 
   assert.equal(gone._renderDevices(10000), "");
 });
 
-// --- cards can be folded -------------------------------------------------------------------------
-function foldCard(title, { glow = false, noRow = false } = {}) {
-  const classes = new Set(glow ? ["eb-card", "eb-card--glow"] : ["eb-card"]);
-  const attrs = {};
-  const card = {
-    classes,
-    classList: {
-      contains: (c) => classes.has(c),
-      toggle: (c, on) => {
-        const next = on === undefined ? !classes.has(c) : on;
-        if (next) classes.add(c);
-        else classes.delete(c);
-      },
-    },
-    querySelector: (sel) => (sel === ":scope > .row" && !noRow ? row : null),
-  };
-  const row = {
-    attrs,
-    setAttribute: (k, v) => { attrs[k] = v; },
-    querySelector: (sel) => (sel === ".eb-title" ? { textContent: `  ${title}  ` } : null),
-    closest: () => card,
-  };
-  return { card, row };
-}
-
-function withStorage(initial, fn) {
-  const store = { ...initial };
-  const old = globalThis.localStorage;
-  globalThis.localStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
-  try { return fn(store); } finally { globalThis.localStorage = old; }
-}
-
-test("fold: every card with a title row can be folded, the house card stays open", () => {
-  withStorage({}, () => {
-    const p = new Panel();
-    const house = foldCard("Haus", { glow: true });
-    const devices = foldCard("Devices");
-    const plain = foldCard("x", { noRow: true });
-    p._applyCollapse({ querySelectorAll: () => [house.card, devices.card, plain.card] });
-    assert.equal(devices.row.attrs["data-collapse-toggle"], "");
-    assert.equal(devices.row.attrs["aria-expanded"], "true");
-    assert.equal(devices.row.attrs.role, "button");
-    assert.equal(house.row.attrs["data-collapse-toggle"], undefined);
-    assert.equal(devices.card.classes.has("collapsed"), false);
-  });
-});
-
-test("fold: a click folds the card and the choice is remembered, also after a redraw", () => {
-  withStorage({}, (store) => {
-    const p = new Panel();
-    const devices = foldCard("Devices");
-    p._toggleCollapse(devices.row);
-    assert.equal(devices.card.classes.has("collapsed"), true);
-    assert.equal(devices.row.attrs["aria-expanded"], "false");
-    assert.deepEqual(JSON.parse(store["energy_assistant.collapsed"]), ["Devices"]);
-    // a redraw delivers new markup: the state is applied again
-    const fresh = foldCard("Devices");
-    p._applyCollapse({ querySelectorAll: () => [fresh.card] });
-    assert.equal(fresh.card.classes.has("collapsed"), true);
-    // a second click unfolds again
-    p._toggleCollapse(fresh.row);
-    assert.equal(fresh.card.classes.has("collapsed"), false);
-    assert.deepEqual(JSON.parse(store["energy_assistant.collapsed"]), []);
-  });
-});
-
-test("fold: the remembered state is read from the browser storage", () => {
-  withStorage({ "energy_assistant.collapsed": JSON.stringify(["Areas", 5, null]) }, () => {
-    const p = new Panel();
-    const areas = foldCard("Areas");
-    const labels = foldCard("Labels");
-    p._applyCollapse({ querySelectorAll: () => [areas.card, labels.card] });
-    assert.equal(areas.card.classes.has("collapsed"), true);
-    assert.equal(labels.card.classes.has("collapsed"), false);
-  });
-});
-
-test("fold: without usable storage everything still works for the session", () => {
-  const old = globalThis.localStorage;
-  globalThis.localStorage = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
-  try {
-    const p = new Panel();
-    const devices = foldCard("Devices");
-    p._applyCollapse({ querySelectorAll: () => [devices.card] });
-    p._toggleCollapse(devices.row);
-    assert.equal(devices.card.classes.has("collapsed"), true);
-  } finally {
-    globalThis.localStorage = old;
-  }
-  const none = new Panel(); // no storage at all
-  const card = foldCard("Devices");
-  none._toggleCollapse(card.row);
-  assert.equal(card.card.classes.has("collapsed"), true);
-});
-
 // --- the history chart (in the style of the power chart of PV Assistant, from our own sensors) -----
 const T0 = Date.UTC(2026, 10, 12, 0, 0, 0);
 function historyPoints({ storage = true, gridOut = true } = {}) {
@@ -2580,9 +2485,9 @@ test("balance: tiles with totals, the change to the period before and the shares
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Balance<\/span>/);
   assert.match(html, /Production<\/div><div class="eb-value">30\.0<small>kWh/);
-  assert.match(html, /▲ 200 % vs\. previous period/); // 30 kWh against 10
+  assert.match(html, /▲ 200 % vs\. last week/); // 30 kWh against 10
   assert.match(html, /Grid import<\/div><div class="eb-value">6\.0<small>kWh/);
-  assert.match(html, /▼ 25 % vs\. previous period/); // 6 against 8
+  assert.match(html, /▼ 25 % vs\. last week/); // 6 against 8
   assert.match(html, /Feed-in<\/div><div class="eb-value">7\.0<small>kWh/);
   assert.match(html, /To storage<\/div><div class="eb-value">3\.0/);
   assert.match(html, /From storage<\/div><div class="eb-value">1\.0/);
@@ -2592,13 +2497,16 @@ test("balance: tiles with totals, the change to the period before and the shares
   assert.doesNotMatch(html, /Grid cost/); // without Tariffy no money
 });
 
-test("balance: with Tariffy the grid cost, the feed-in revenue and the balance are shown", () => {
+test("costs: the grid cost, the feed-in revenue and the balance of the shown period are in the Costs tab", () => {
   const p = loadedBalance({
     "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: 0.99 } },
     "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } },
   });
   p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
-  const html = p._renderBalance();
+  assert.doesNotMatch(p._renderBalance(), /Grid cost|Feed-in revenue/); // the money moved to the Costs tab
+  const html = p._renderPeriodCosts();
+  assert.match(html, /<span class="eb-title">Costs in the period<\/span>/);
+  assert.match(html, /data-urange="week"/); // the same period picker
   assert.match(html, /Grid cost<\/div><div class="eb-value">1\.80<small>[^<]*</); // 6 kWh x 0.30 (contract price, not the live price)
   assert.match(html, /Feed-in revenue<\/div><div class="eb-value">0\.56/); // 7 x 0.08
   assert.match(html, /Balance<\/div><div class="eb-value">-1\.24/);
@@ -2623,11 +2531,17 @@ test("balance: the picker marks the range, 'next' is off for the current period 
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
 });
 
-test("balance: the bar chart has a bar per bucket and series, a title tooltip and the table with the sum", () => {
+test("balance: the bar chart has a bar per bucket and series, a styled tooltip and the table with the sum", () => {
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Energy per period<\/span>/);
   assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // two days with production
-  assert.match(html, /<title>[^<]*Production: 10[.,]00 kWh&#10;/);
+  // the tooltip is drawn by the panel from the data of the slot: a title and one row per series
+  const slot = html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/);
+  assert.ok(slot);
+  const tip = JSON.parse(slot[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.ok(tip.t.length > 0);
+  assert.ok(tip.r.some(([color, value, name]) => color === "--ea-prod" && /^\d+[.,]\d{2} kWh$|^–$/.test(value) && name === "Production"));
+  assert.doesNotMatch(html, /<title>/); // no plain browser tooltip any more
   assert.match(html, /<summary>Show as table<\/summary>/);
   assert.match(html, /<th>Sum<\/th><td>30[.,]00<\/td>/);
   assert.equal((html.match(/<tr><th>/g) || []).length, 1 + 7 + 1); // the header, seven days and the sum row
@@ -2927,15 +2841,15 @@ function labelEnergyPanel(range = "day", off = 0) {
 }
 
 function withLabelUsage(p, rows, range = "day", off = 0) {
-  p._labelUsage = { key: p._labelUsageKey(range, off), at: Date.now(), rows };
+  p._groupUsage = { key: p._groupUsageKey(range, off), at: Date.now(), rows };
   return p;
 }
 
 test("usage: the labels card shows the kWh of every selected label for the shown period, biggest first", () => {
   const p = withLabelUsage(labelEnergyPanel(), {
-    klima: { kwh: 1.25, covered: 1, total: 2 },
-    licht: { kwh: 4.5, covered: 3, total: 3 },
-    kaputt: { kwh: 0, covered: 0, total: 2 },
+    "label:klima": { kwh: 1.25, covered: 1, total: 2 },
+    "label:licht": { kwh: 4.5, covered: 3, total: 3 },
+    "label:kaputt": { kwh: 0, covered: 0, total: 2 },
   });
   const html = p._renderUsage();
   const card = html.slice(html.indexOf('<span class="eb-title">Labels</span>'));
@@ -2949,7 +2863,7 @@ test("usage: the labels card shows the kWh of every selected label for the shown
 });
 
 test("usage: the labels card waits for the data of the shown period", () => {
-  const p = withLabelUsage(labelEnergyPanel(), { licht: { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
+  const p = withLabelUsage(labelEnergyPanel(), { "label:licht": { kwh: 4.5, covered: 1, total: 1 } }, "day", 0);
   p._usRange = "week"; // another period than the data
   p._usageView = { range: "week", off: 0, devices: p._usage.devices, houseBase: 150 };
   const html = p._renderUsage();
@@ -2981,13 +2895,13 @@ test("label usage: today is the finished hours plus the running hour from the 5-
     },
     "5minute": { "sensor.klimaanlage_leistung": [minRow("2026-11-13T14:00:00Z", 1200), minRow("2026-11-13T14:05:00Z", 1200)] }, // 0.2 kWh
   });
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["hour", "5minute"]);
   assert.equal(calls[0].from, "2026-11-12T23:00:00.000Z"); // midnight of Berlin
   assert.equal(calls[0].to, "2026-11-13T14:00:00.000Z"); // up to the running hour
   assert.equal(calls[1].from, "2026-11-13T14:00:00.000Z");
   assert.equal(calls[1].to, "2026-11-13T14:20:00.000Z");
-  const klima = p._labelUsage.rows.klima;
+  const klima = p._groupUsage.rows["label:klima"];
   assert.ok(Math.abs(klima.kwh - (1.5 + 0.1 + 0.2)) < 1e-9);
   assert.equal(klima.covered, 2); // two of the three sensors of the label have statistics
   assert.equal(klima.total, 3);
@@ -2999,30 +2913,30 @@ test("label usage: a month uses daily statistics, today's hours and the running 
     day: { "sensor.klimaanlage_leistung": [{ start: Date.parse("2026-10-31T23:00:00Z"), end: Date.parse("2026-11-01T23:00:00Z"), mean: 240 }] }, // 5.76 kWh
   });
   p._usRange = "month";
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["day", "hour", "5minute"]);
   assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z"); // the day statistics end at the start of today
   assert.equal(calls[1].from, "2026-11-12T23:00:00.000Z"); // today by the hour
-  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 5.76) < 1e-9);
+  assert.ok(Math.abs(p._groupUsage.rows["label:klima"].kwh - 5.76) < 1e-9);
 });
 
 test("label usage: a past period needs the finished statistics only", async () => {
   const calls = [];
   const p = statsPanel(calls, { hour: { "sensor.klimaanlage_leistung": [hourRow("2026-11-12T10:00:00Z", 2000)] } });
   p._usOff = -1;
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
   assert.deepEqual(calls.map((c) => c.period), ["hour"]);
   assert.equal(calls[0].from, "2026-11-11T23:00:00.000Z");
   assert.equal(calls[0].to, "2026-11-12T23:00:00.000Z");
-  assert.ok(Math.abs(p._labelUsage.rows.klima.kwh - 2) < 1e-9);
+  assert.ok(Math.abs(p._groupUsage.rows["label:klima"].kwh - 2) < 1e-9);
 });
 
 test("label usage: a failed request says so instead of showing zeros", async () => {
   const p = statsPanel([], {});
   p._hass.callWS = async () => { throw new Error("no recorder"); };
-  await atTime("2026-11-13T14:20:00Z", () => p._loadLabelUsage());
-  assert.equal(p._labelUsage.failed, true);
-  assert.match(p._renderLabelEnergy({ range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
+  assert.equal(p._groupUsage.failed, true);
+  assert.match(p._renderGroupEnergy("label", { range: "day", off: 0, num: (v) => String(v) }), /long-term statistics/);
 });
 
 test("usage: the labels card shows kWh only, the cost belongs to the Costs tab", () => {
@@ -3049,7 +2963,7 @@ function labelCostPanel() {
 }
 
 test("costs: every selected label with its cost sensors shows today, week, month and year", () => {
-  const html = labelCostPanel()._renderLabelCosts();
+  const html = labelCostPanel()._renderGroupCosts("label");
   assert.match(html, /Cost per label/);
   assert.match(html, /Day<\/span><span class="n">Week<\/span><span class="n">Month<\/span><span class="n">Year/);
   assert.match(html, /Klima[\s\S]*0[.,]40[^<]*€[\s\S]*2[.,]10[^<]*€[\s\S]*8[.,]00[^<]*€[\s\S]*95[.,]50[^<]*€/);
@@ -3059,9 +2973,9 @@ test("costs: every selected label with its cost sensors shows today, week, month
 
 test("costs: no card without cost sensors", () => {
   const p = labelCostPanel();
-  assert.match(p._renderLabelCosts(), /Cost per label/);
+  assert.match(p._renderGroupCosts("label"), /Cost per label/);
   p._labelEnergy = {};
-  assert.equal(p._renderLabelCosts(), "");
+  assert.equal(p._renderGroupCosts("label"), "");
 });
 
 test("usage: without selected labels there is no labels card", () => {
@@ -3816,7 +3730,7 @@ function tariffPanel(extra = {}) {
 
 test("settings: a tariff can be chosen per selected label when Tariffy has several contracts", () => {
   const p = tariffPanel({ label_tariffs: { wp: "sensor.wp" } });
-  const html = p._renderLabelTariffs(false);
+  const html = p._renderGroupTariffs("label", false);
   assert.match(html, /Tariff per label/);
   assert.match(html, /Wärmepumpe[\s\S]*<option value="sensor\.wp" selected>/);
   assert.match(html, /Default \(Haushalt\)/);
@@ -3826,10 +3740,10 @@ test("settings: a tariff can be chosen per selected label when Tariffy has sever
 test("settings: no tariff choice with a single contract or without selected labels", () => {
   const p = tariffPanel();
   p._int.tariffy.prices = [{ entity: "sensor.haus", name: "Haushalt" }];
-  assert.equal(p._renderLabelTariffs(false), "");
+  assert.equal(p._renderGroupTariffs("label", false), "");
   const q = tariffPanel();
   q._draft.label_ids = [];
-  assert.equal(q._renderLabelTariffs(false), "");
+  assert.equal(q._renderGroupTariffs("label", false), "");
 });
 
 test("settings: choosing a tariff changes the draft and the default removes it again", () => {
@@ -3862,4 +3776,378 @@ test("settings: a sensor list keeps its chips and its input in one box", () => {
   p._draft.device_standby = ["sensor.herd_leistung"];
   const html = p._renderSettings();
   assert.match(html, /<div class="tags"><span class="chip"[^>]*>[^<]*<button data-remove="device_standby"[\s\S]*?<input type="text" data-add="device_standby"/);
+});
+
+test("costs: the period costs compare with the period before and wait for the data", () => {
+  const p = loadedBalance({
+    "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } },
+    "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } },
+  });
+  p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } };
+  p._bal.before = { imp: 8, exp: 5 };
+  const html = p._renderPeriodCosts();
+  assert.match(html, /Grid cost[\s\S]*▼ 25 % vs\. last week/); // 1.80 against 2.40
+  p._usOff = -1; // another period than the data: loading
+  assert.match(p._renderPeriodCosts(), /Loading/);
+  const none = loadedBalance();
+  assert.equal(none._renderPeriodCosts(), ""); // without Tariffy
+  const noCounters = usagePanel();
+  noCounters._int = { tariffy: { price: "x" } };
+  assert.equal(noCounters._renderPeriodCosts(), ""); // without energy counters
+});
+
+test("comparison: the text names the chosen period, and the one before when looking back", () => {
+  const p = new Panel();
+  p._hass = { language: "en" };
+  assert.equal(p._vsText("▲", 30, "day", 0), "▲ 30 % vs. yesterday");
+  assert.equal(p._vsText("▼", 5, "week", 0), "▼ 5 % vs. last week");
+  assert.equal(p._vsText("▲", 1, "month", 0), "▲ 1 % vs. last month");
+  assert.equal(p._vsText("▲", 2, "year", 0), "▲ 2 % vs. last year");
+  assert.equal(p._vsText("▲", 3, "day", -2), "▲ 3 % vs. the day before");
+  assert.equal(p._vsText("▲", 3, "week", -1), "▲ 3 % vs. the week before");
+  assert.equal(p._vsText("▲", 3, "year", -1), "▲ 3 % vs. the year before");
+  p._hass.language = "de";
+  assert.equal(p._vsText("▲", 30, "day", 0), "▲ 30 % ggü. gestern");
+  assert.equal(p._vsText("▲", 30, "week", 0), "▲ 30 % ggü. letzter Woche");
+  assert.equal(p._vsText("▲", 30, "month", -1), "▲ 30 % ggü. Vormonat");
+  assert.equal(p._vsText("▲", 30, "day", -1), "▲ 30 % ggü. Vortag");
+});
+
+// --- the one tooltip of the panel -------------------------------------------------------------------
+function tipDom() {
+  const make = () => {
+    const el = { children: [], hidden: true, style: {}, className: "", textContent: "", dataset: {}, attrs: {}, offsetWidth: 120, offsetHeight: 40 };
+    el.append = (...kids) => { el.children.push(...kids); };
+    el.replaceChildren = () => { el.children = []; };
+    el.hasAttribute = (n) => n in el.attrs;
+    el.getAttribute = (n) => el.attrs[n];
+    el.removeAttribute = (n) => { delete el.attrs[n]; };
+    return el;
+  };
+  return make;
+}
+
+function tipPanel() {
+  const make = tipDom();
+  const tip = make();
+  const listeners = {};
+  const realDoc = globalThis.document;
+  globalThis.document = { createElement: () => make() };
+  const p = new Panel();
+  p.shadowRoot = { querySelector: () => tip, addEventListener: (type, fn) => { listeners[type] = fn; } };
+  p._wireTips();
+  return { p, tip, listeners, restore: () => { globalThis.document = realDoc; } };
+}
+
+test("tooltip: an element with a title gets the styled tooltip and loses the native one", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const el = { dataset: {}, attrs: { title: "6 % of house\nMedia 124 W" }, hasAttribute(n) { return n in this.attrs; }, getAttribute(n) { return this.attrs[n]; }, removeAttribute(n) { delete this.attrs[n]; } };
+    el.closest = () => el;
+    listeners.pointermove({ target: el, clientX: 100, clientY: 50, pointerType: "mouse" });
+    assert.equal(tip.hidden, false);
+    assert.equal("title" in el.attrs, false); // no second, native tooltip
+    assert.deepEqual(tip.children.map((c) => c.textContent), ["6 % of house", "Media 124 W"]);
+    listeners.pointerleave();
+    assert.equal(tip.hidden, true);
+  } finally { restore(); }
+});
+
+test("tooltip: structured data gives a title and rows with a color, a value and a name", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const el = { dataset: { tipj: JSON.stringify({ t: "13.11., 12:00", r: [["--ea-prod", "4,10 kWh", "Production"]] }) }, attrs: {}, hasAttribute: () => false };
+    el.closest = () => el;
+    listeners.pointermove({ target: el, clientX: 10, clientY: 10, pointerType: "mouse" });
+    assert.equal(tip.children[0].className, "tt");
+    assert.equal(tip.children[0].textContent, "13.11., 12:00");
+    const row = tip.children[1];
+    assert.equal(row.className, "tr");
+    assert.deepEqual(row.children.map((c) => c.textContent || c.style.background), ["var(--ea-prod)", "4,10 kWh", "Production"]);
+  } finally { restore(); }
+});
+
+test("tooltip: nothing under the pointer hides it, a broken structure and touch do nothing", () => {
+  const { tip, listeners, restore } = tipPanel();
+  try {
+    const none = { closest: () => null };
+    tip.hidden = false;
+    listeners.pointermove({ target: none, clientX: 1, clientY: 1, pointerType: "mouse" });
+    assert.equal(tip.hidden, true);
+    const broken = { dataset: { tipj: "{not json" }, attrs: {}, hasAttribute: () => false, closest() { return this; } };
+    listeners.pointermove({ target: broken, clientX: 1, clientY: 1, pointerType: "mouse" });
+    assert.equal(tip.hidden, true);
+    const text = { dataset: { tip: "x" }, attrs: {}, hasAttribute: () => false, closest() { return this; } };
+    listeners.pointermove({ target: text, clientX: 1, clientY: 1, pointerType: "touch" });
+    assert.equal(tip.hidden, true); // touch devices have no hover
+  } finally { restore(); }
+});
+
+test("settings: a click on the header of the matches opens the list and redraws the settings page", () => {
+  const p = matchPanel();
+  p._tab = "settings";
+  p._render = () => {};
+  p._settingsDirty = false;
+  const header = { dataset: { open: "settings:matches" } };
+  const click = () => p._onClick({ target: { closest: (sel) => (sel === "[data-open]" ? header : null) } });
+  click();
+  assert.equal(p._open.has("settings:matches"), true);
+  assert.equal(p._settingsDirty, true); // without this the page keeps its old markup
+  assert.match(p._renderSettings(), /data-device="sensor\.herd_leistung"/);
+  p._settingsDirty = false;
+  click(); // a second click closes it again
+  assert.equal(p._open.has("settings:matches"), false);
+  assert.equal(p._settingsDirty, true);
+  assert.doesNotMatch(p._renderSettings(), /data-device="sensor\.herd_leistung"/);
+});
+
+// --- consumption and cost per area (like per label) ---------------------------------------------------
+function areaGroupPanel(config = {}) {
+  const p = areaPanel({ device_patterns: ["*_leistung"], area_ids: ["kueche", "wohnzimmer"], label_ids: ["klima"], ...config });
+  p._hass.language = "en";
+  p._hass.config = { time_zone: "Europe/Berlin" };
+  p._ready = true;
+  p._render = () => {};
+  p._labelData = { labels: [{ label_id: "klima", name: "Klima" }], entities: { "sensor.media_leistung": ["klima"] } };
+  return p;
+}
+
+test("area usage: labels and areas share one request, the sensors of an area come from the registry", () => {
+  const p = areaGroupPanel();
+  const map = p._groupMemberMap();
+  assert.deepEqual(Object.keys(map).sort(), ["area:kueche", "area:wohnzimmer", "label:klima"]);
+  assert.deepEqual(map["area:kueche"], ["sensor.herd_leistung", "sensor.kuehl_leistung"]);
+  assert.deepEqual(map["area:wohnzimmer"], ["sensor.media_leistung"]);
+  assert.deepEqual(map["label:klima"], ["sensor.media_leistung"]); // one sensor can be in a label and an area
+});
+
+test("area usage: the energy of an area is summed up from the statistics of its sensors", async () => {
+  const calls = [];
+  const p = areaGroupPanel();
+  p._hass.callWS = async (m) => {
+    calls.push(m);
+    return m.period === "hour"
+      ? { "sensor.herd_leistung": [hourRow("2026-11-13T00:00:00Z", 1000)], "sensor.kuehl_leistung": [hourRow("2026-11-13T00:00:00Z", 500)], "sensor.media_leistung": [hourRow("2026-11-13T00:00:00Z", 100)] }
+      : {};
+  };
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
+  assert.equal(calls.filter((c) => c.period === "hour").length, 1); // the same sensors are asked for once
+  assert.equal(new Set(calls[0].statistic_ids).size, 3);
+  const rows = p._groupUsage.rows;
+  assert.ok(Math.abs(rows["area:kueche"].kwh - 1.5) < 1e-9);
+  assert.ok(Math.abs(rows["area:wohnzimmer"].kwh - 0.1) < 1e-9);
+  assert.ok(Math.abs(rows["label:klima"].kwh - 0.1) < 1e-9);
+});
+
+test("area usage: the Areas card names the areas and sits next to the Labels card", () => {
+  const p = areaGroupPanel();
+  p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: {
+    "area:kueche": { kwh: 1.5, covered: 2, total: 2 },
+    "area:wohnzimmer": { kwh: 0.1, covered: 1, total: 1 },
+    "label:klima": { kwh: 0.1, covered: 1, total: 1 },
+  } };
+  const num = (v) => v.toFixed(2);
+  const html = p._renderGroupEnergy("area", { range: "day", off: 0, num });
+  assert.match(html, /<span class="eb-title">Areas<\/span>/);
+  assert.ok(html.indexOf("Küche") < html.indexOf("Wohnzimmer")); // biggest first
+  assert.match(html, /Küche[\s\S]*1\.50<small>kWh/);
+  assert.match(html, /selected area|selected area for dashboards|per selected area/);
+  assert.equal(p._renderGroupEnergy("area", { range: "day", off: 0, num }).includes("Klima"), false);
+  const none = areaGroupPanel({ area_ids: [] }); // no selection: no card and nothing to load
+  assert.equal(none._renderGroupEnergy("area", { range: "day", off: 0, num }), "");
+});
+
+test("area cost: the Costs tab lists the cost sensors of the selected areas", () => {
+  const p = areaGroupPanel();
+  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.k_week"] = { state: "3.40", attributes: { unit_of_measurement: "EUR" } };
+  p._areaEnergy = { kueche: { cost_day: "sensor.k_day", cost_week: "sensor.k_week" } };
+  const html = p._renderGroupCosts("area");
+  assert.match(html, /Cost per area/);
+  assert.match(html, /Küche[\s\S]*0[.,]62[^<]*€[\s\S]*3[.,]40[^<]*€/);
+  assert.doesNotMatch(html, /Wohnzimmer/); // no cost sensor
+  assert.equal(p._renderGroupCosts("label"), ""); // labels have their own table and sensors
+});
+
+test("area tariff: a contract can be chosen per selected area, also in the draft", () => {
+  const p = areaGroupPanel();
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
+  p._draft = p._normalize({ house_power: "h", area_ids: ["kueche"], area_tariffs: { kueche: "sensor.wp" } });
+  const html = p._renderGroupTariffs("area", false);
+  assert.match(html, /Tariff per area/);
+  assert.match(html, /Küche[\s\S]*<option value="sensor\.wp" selected>/);
+  assert.equal((html.match(/data-areatariff=/g) || []).length, 1);
+  p._hass.user = { is_admin: true };
+  p._edited = () => {};
+  p._onChange({ target: { dataset: { areatariff: "kueche" }, value: "sensor.haus" } });
+  assert.deepEqual(p._draft.area_tariffs, { kueche: "sensor.haus" });
+  assert.deepEqual(p._draft.label_tariffs, {}); // the labels are not touched
+  p._onChange({ target: { dataset: { areatariff: "kueche" }, value: "" } });
+  assert.deepEqual(p._draft.area_tariffs, {});
+});
+
+test("settings: labels and areas say that nothing is selected at first and what a selection creates", () => {
+  const p = areaGroupPanel();
+  p._draft = p._normalize({ house_power: "h" });
+  p._labelData = { labels: [], entities: {} };
+  const html = p._renderSettings();
+  assert.match(html, /Nothing is selected at first, so no sensors are created: select only the labels you need/);
+  assert.match(html, /Nothing is selected at first, so no sensors are created; with no selection the Areas card/);
+});
+
+// --- devices with their own energy and cost sensors -------------------------------------------------
+test("device sensors: the list has a Sensors button per device, nothing is selected at first", () => {
+  const p = matchPanel();
+  assert.deepEqual(p._draft.device_ids, []);
+  const html = p._renderMatchRows(false);
+  assert.equal((html.match(/data-devsel="/g) || []).length, 4); // one button per device
+  assert.doesNotMatch(html, /msens on/);
+  assert.match(html, /<button type="button" class="seg msens" data-devsel="sensor\.herd_leistung"/);
+});
+
+test("device sensors: a click selects and deselects a device, an excluded device has no button", () => {
+  const p = matchPanel();
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.deepEqual(p._draft.device_ids, ["sensor.herd_leistung"]);
+  assert.match(p._renderMatchRows(false), /msens on" data-devsel="sensor\.herd_leistung"/);
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.deepEqual(p._draft.device_ids, []); // deselected again
+  p._onChange(checkbox("sensor.ofen_leistung", false)); // excluded
+  assert.doesNotMatch(p._renderMatchRows(false), /data-devsel="sensor\.ofen_leistung"/);
+});
+
+test("device sensors: at most 20 devices, the other buttons are disabled and an input says why", () => {
+  const p = matchPanel();
+  p._draft.device_ids = Array.from({ length: 20 }, (_, k) => `sensor.d${k}_leistung`);
+  const html = p._renderMatchRows(false);
+  assert.match(html, /<button[^>]*data-devsel="sensor\.herd_leistung" disabled/);
+  p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
+  assert.equal(p._draft.device_ids.length, 20);
+  p._hass.states["sensor.extra_leistung"] = power("Extra");
+  p._onChange({ target: { dataset: { add: "device_ids", mode: "multi" }, value: "sensor.extra_leistung" } });
+  assert.equal(p._draft.device_ids.length, 20);
+  assert.match(p._fieldError.device_ids, /At most 20 devices/);
+  // a device that is already selected can still be unselected with the button
+  p._draft.device_ids = ["sensor.herd_leistung", ...Array.from({ length: 19 }, (_, k) => `sensor.d${k}_leistung`)];
+  const own = p._renderMatchRows(false);
+  assert.match(own, /msens on" data-devsel="sensor\.herd_leistung"\s+title=/); // enabled although the list is full
+  assert.match(own, /data-devsel="sensor\.ofen_leistung" disabled/); // the others are not
+});
+
+test("device sensors: the counter tells what the selection creates", () => {
+  const p = matchPanel();
+  assert.match(p._deviceCounter(), /Nothing is selected at first, so no sensors are created/);
+  p._draft.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
+  assert.match(p._deviceCounter(), /2 of 20 devices with their own sensors: 8 sensors/); // energy only
+  p._int = { tariffy: { price: "x" } };
+  assert.match(p._deviceCounter(), /16 sensors/); // with Tariffy the cost sensors too
+});
+
+test("device sensors: the name can be set before the sensors exist and the tariff per device", () => {
+  const p = matchPanel();
+  p._draft.device_ids = ["sensor.herd_leistung"];
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
+  let html = p._renderDeviceSetup(false);
+  assert.match(html, /placeholder="Herd"/); // the name the sensors would get (no "Leistung")
+  assert.match(html, /<option value="sensor\.wp">/);
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "  Herd Küche " } });
+  assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd Küche" });
+  p._onChange({ target: { dataset: { devtariff: "sensor.herd_leistung" }, value: "sensor.wp" } });
+  assert.deepEqual(p._draft.device_tariffs, { "sensor.herd_leistung": "sensor.wp" });
+  html = p._renderDeviceSetup(false);
+  assert.match(html, /value="Herd Küche"/);
+  assert.match(html, /<option value="sensor\.wp" selected>/);
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "" } }); // empty: back to the proposal
+  p._onChange({ target: { dataset: { devtariff: "sensor.herd_leistung" }, value: "" } });
+  assert.deepEqual(p._draft.device_names, {});
+  assert.deepEqual(p._draft.device_tariffs, {});
+  p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }] } };
+  assert.doesNotMatch(p._renderDeviceSetup(false), /<select/); // one contract: no choice
+  p._draft.device_ids = [];
+  assert.equal(p._renderDeviceSetup(false), "");
+});
+
+test("device sensors: the names in the Costs tab are the display names, else the name without Leistung", () => {
+  const p = matchPanel();
+  p._cfg.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
+  p._cfg.device_names = { "sensor.ofen_leistung": "Backofen" };
+  assert.equal(p._groupName("device", "sensor.herd_leistung"), "Herd");
+  assert.equal(p._groupName("device", "sensor.ofen_leistung"), "Backofen");
+  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
+  p._deviceEnergy = { "sensor.ofen_leistung": { cost_day: "sensor.k_day" } };
+  const html = p._renderGroupCosts("device");
+  assert.match(html, /Cost per device/);
+  assert.match(html, /Backofen[\s\S]*0[.,]62[^<]*€/);
+  assert.doesNotMatch(html, /Herd/); // no cost sensor
+});
+
+test("device sensors: a name without the word Leistung stays, 'Leistung' alone is kept", () => {
+  const p = matchPanel();
+  p._hass.states["sensor.a"] = { state: "1", attributes: { friendly_name: "Wallbox 3EM Phase A Leistung" } };
+  p._hass.states["sensor.b"] = { state: "1", attributes: { friendly_name: "Oven power" } };
+  p._hass.states["sensor.c"] = { state: "1", attributes: { friendly_name: "Leistung" } };
+  p._hass.states["sensor.d"] = { state: "1", attributes: { friendly_name: "Leistungsmesser Keller" } };
+  assert.deepEqual(["a", "b", "c", "d"].map((k) => p._groupName("device", `sensor.${k}`)), ["Wallbox 3EM Phase A", "Oven", "Leistung", "Leistungsmesser Keller"]);
+});
+
+// --- standby loads that are meant to run all the time ------------------------------------------------------
+test("standby: every standby load has a Normal button, nothing is marked at first", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  const html = p._renderUsage();
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.equal((card.match(/data-standbynormal="/g) || []).length, 2); // Kühlschrank and Router
+  assert.doesNotMatch(card, /snorm on/);
+  assert.match(card, /Avoidable: 52 W · 456 kWh per year/); // 40 + 12 W, all of it avoidable at first
+  assert.match(html, /Avoidable standby<\/div><div class="eb-value">52<small>W/);
+});
+
+test("standby: a load marked as normal is muted and no longer counts as avoidable", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  p._cfg.standby_normal = ["sensor.a"]; // the fridge
+  const html = p._renderUsage();
+  const card = html.slice(html.indexOf("Always on (standby)"));
+  assert.match(card, /snorm on" data-standbynormal="sensor\.a" aria-pressed="true"/);
+  assert.match(card, /aria-pressed="false"[^>]*>Normal<\/button>/); // the router is not marked
+  assert.equal((card.match(/class="fill other"/g) || []).length, 1); // only the normal one has the grey bar
+  assert.match(card, /Avoidable: 12 W · 105 kWh per year/); // only the router
+  assert.match(html, /Avoidable standby<\/div><div class="eb-value">12<small>W/);
+});
+
+test("standby: with the price the avoidable standby shows its cost and with everything normal nothing is avoidable", () => {
+  const p = loadedUsage({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } } });
+  p._int = { tariffy: { price: "sensor.t_preis" } };
+  p._cfg.standby_normal = ["sensor.a"];
+  assert.match(p._renderUsage(), /Avoidable: 12 W · 105 kWh · 31[.,]54[^<]* per year/); // 105.12 kWh x 0.30
+  p._cfg.standby_normal = ["sensor.a", "sensor.b"];
+  const html = p._renderUsage();
+  assert.doesNotMatch(html, /Avoidable/);
+});
+
+test("standby: the buttons of non-admins are disabled", () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: false };
+  const card = p._renderUsage();
+  assert.match(card.slice(card.indexOf("Always on (standby)")), /data-standbynormal="sensor\.a" aria-pressed="false" disabled/);
+});
+
+test("standby: a click marks the load at once and saves it, a failing save takes it back", async () => {
+  const p = loadedUsage();
+  p._hass.user = { is_admin: true };
+  p._render = () => {};
+  const calls = [];
+  p._hass.callWS = async (m) => { calls.push(m); return { ...p._cfg, standby_normal: m.config.standby_normal }; };
+  p._onClick({ preventDefault() {}, ...click("[data-standbynormal]", { standbynormal: "sensor.a" }) });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls[0], { type: "energy_assistant/update_config", config: { standby_normal: ["sensor.a"] } });
+  assert.deepEqual(p._cfg.standby_normal, ["sensor.a"]);
+  await p._toggleStandbyNormal("sensor.a"); // a second click unmarks it
+  assert.deepEqual(p._cfg.standby_normal, []);
+  p._hass.callWS = async () => { throw new Error("denied"); };
+  await p._toggleStandbyNormal("sensor.b");
+  assert.deepEqual(p._cfg.standby_normal, []); // taken back
+  p._hass.user = { is_admin: false };
+  p._hass.callWS = async () => { throw new Error("must not be called"); };
+  await p._toggleStandbyNormal("sensor.b"); // only admins change settings
 });

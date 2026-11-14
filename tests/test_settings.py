@@ -185,3 +185,31 @@ def test_label_tariffs_keep_only_valid_entries() -> None:
         "label_tariffs"
     ] == {"waermepumpe": "sensor.wp_preis"}
     assert "label_tariffs" not in to_storage({"label_tariffs": {}})
+
+
+def test_devices_with_their_own_sensors_are_cut_to_the_limit() -> None:
+    from custom_components.energy_assistant.const import MAX_DEVICE_IDS
+
+    many = [f"sensor.d{k}_power" for k in range(MAX_DEVICE_IDS + 7)]
+    assert normalize({"device_ids": many})["device_ids"] == many[:MAX_DEVICE_IDS]
+    assert to_storage({"device_ids": many})["device_ids"] == many[:MAX_DEVICE_IDS]
+    assert normalize({})["device_ids"] == []  # nothing is selected at first
+    assert normalize({"device_ids": "sensor.a_power"})["device_ids"] == [
+        "sensor.a_power"
+    ]
+
+
+def test_device_tariffs_keep_only_valid_entries() -> None:
+    from custom_components.energy_assistant.settings import clean_device_tariffs
+
+    result = clean_device_tariffs(
+        {
+            "sensor.wp_power": "sensor.wp_preis",
+            "light.x": "sensor.p",  # not a sensor
+            "sensor.y": "Preis",  # not an entity id
+            "sensor.z": 5,
+        }
+    )
+    assert result == {"sensor.wp_power": "sensor.wp_preis"}
+    assert normalize({})["device_tariffs"] == {}
+    assert "device_tariffs" not in to_storage({"device_tariffs": {}})

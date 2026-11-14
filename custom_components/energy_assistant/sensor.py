@@ -1,8 +1,8 @@
-"""Energy and cost sensors per selected label: today, this week, this month and this year.
+"""Energy and cost sensors per selected label and area: today, this week, this month and this year.
 
-The sensors are created for the labels that are selected in the settings (one set of four per label)
-and removed when a label is deselected, without reloading the entry. The energy is the power of the
-sensors that carry the label (like the Labels card of the panel), integrated over time. The cost is
+The sensors are created for the labels and areas that are selected in the settings (one set of four
+per label or area) and removed when one is deselected, without reloading the entry. The energy is the
+power of the sensors that carry the label or sit in the area (like the cards of the panel), integrated over time. The cost is
 added up step by step with the price of Tariffy that is valid at that moment, so a change of the unit
 price never changes what was already counted. The periods follow the time zone of Home Assistant.
 """
@@ -10,6 +10,7 @@ price never changes what was already counted. The periods follow the time zone o
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable
 from datetime import datetime, time, timedelta
 from fnmatch import fnmatchcase
@@ -23,6 +24,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfEnergy
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import label_registry as lr
@@ -42,7 +44,13 @@ from .const import (
     SYSTEM_KEYS,
 )
 from .providers import tariffy
-from .settings import as_list, clean_ids, clean_label_tariffs
+from .settings import (
+    as_list,
+    clean_device_tariffs,
+    clean_ids,
+    clean_label_tariffs,
+    clean_names,
+)
 
 PERIODS = ("day", "week", "month", "year")
 COST = "cost_"  # prefix of the period in the unique id of a cost sensor
@@ -78,19 +86,43 @@ def period_start(now: datetime, period: str) -> datetime:
     return datetime.combine(day, time.min, tzinfo=now.tzinfo)
 
 
-def unique_id(entry_id: str, label_id: str, period: str) -> str:
-    """Unique id of the sensor of a label and period."""
-    return f"{entry_id}_label_{label_id}_{period}"
+KINDS = ("label", "area", "device")
 
 
-def _selected(entry: ConfigEntry) -> list[str]:
-    return clean_ids({**entry.data, **entry.options}.get("label_ids"))
+def unique_id(entry_id: str, group_id: str, period: str, kind: str = "label") -> str:
+    """Unique id of the sensor of a label (or area) and period."""
+    return f"{entry_id}_{kind}_{group_id}_{period}"
 
 
-def _chosen_tariff(entry: ConfigEntry, label_id: str) -> str | None:
-    """The Tariffy price sensor the user chose for the label, if any."""
+def _selected(entry: ConfigEntry, kind: str = "label") -> list[str]:
+    return clean_ids({**entry.data, **entry.options}.get(f"{kind}_ids"))
+
+
+def _chosen_tariff(
+    entry: ConfigEntry, group_id: str, kind: str = "label"
+) -> str | None:
+    """The Tariffy price sensor the user chose for the label (or area), if any."""
     config = {**entry.data, **entry.options}
-    return clean_label_tariffs(config.get("label_tariffs")).get(label_id)
+    clean = clean_device_tariffs if kind == "device" else clean_label_tariffs
+    return clean(config.get(f"{kind}_tariffs")).get(group_id)
+
+
+def strip_power(name: str) -> str:
+    """A device name without the word that only says it is the power sensor ("Backofen Leistung" -> "Backofen")."""
+    short = re.sub(
+        r"[\s_-]*(wirkleistung|leistung|power)\s*$", "", name, flags=re.IGNORECASE
+    ).strip()
+    return short or name
+
+
+def device_display_name(hass: HomeAssistant, entry: ConfigEntry, entity_id: str) -> str:
+    """The name of a device with its own sensors: the display name the user gave it, else its name without "Leistung"."""
+    config = {**entry.data, **entry.options}
+    if own := clean_names(config.get("device_names")).get(entity_id):
+        return own
+    state = hass.states.get(entity_id)
+    friendly = state.attributes.get("friendly_name") if state else None
+    return strip_power(str(friendly or entity_id.split(".", 1)[-1].replace("_", " ")))
 
 
 def _excluded(entry: ConfigEntry) -> Callable[[str], bool]:
@@ -109,13 +141,20 @@ def _excluded(entry: ConfigEntry) -> Callable[[str], bool]:
     return excluded
 
 
-class LabelEnergy:
-    """Integrates the power of the sensors of one label into four period counters."""
+class GroupEnergy:
+    """Integrates the power of the sensors of one label or area into four period counters."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, label_id: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        group_id: str,
+        kind: str = "label",
+    ) -> None:
         self.hass = hass
         self.entry = entry
-        self.label_id = label_id
+        self.kind = kind
+        self.group_id = group_id
         self.members: set[str] = set()
         self.powers: dict[str, float] = {}  # kW per member
         self.last = dt_util.now()
@@ -138,7 +177,7 @@ class LabelEnergy:
         A chosen contract is never replaced by another one: a heat pump tariff must not be costed
         with the household tariff.
         """
-        if chosen := _chosen_tariff(self.entry, self.label_id):
+        if chosen := _chosen_tariff(self.entry, self.group_id, self.kind):
             return chosen
         offer = tariffy(self.hass)
         return offer["price"] if offer else None
@@ -175,24 +214,38 @@ class LabelEnergy:
             self.price, self.currency = found
         elif (
             entity_id
-            and _chosen_tariff(self.entry, self.label_id)
+            and _chosen_tariff(self.entry, self.group_id, self.kind)
             and (self.hass.states.get(entity_id) is None)
         ):
             self.price = None  # the chosen contract is gone: no cost rather than the wrong tariff
 
     def _find_members(self) -> set[str]:
-        """Power sensors (W or kW) of the entity registry that carry the label."""
+        """Power sensors (W or kW) of the entity registry that carry the label or sit in the area."""
+        if self.kind == "device":
+            # one chosen sensor; it counts while it exists and is a power sensor, whatever the exclude
+            # list says (that list only decides what the device list shows)
+            state = self.hass.states.get(self.group_id)
+            if state is not None and state.attributes.get("device_class") == "power":
+                return {self.group_id}
+            return set()
         excluded = _excluded(self.entry)
         devices = dr.async_get(self.hass)
         found: set[str] = set()
         for reg in er.async_get(self.hass).entities.values():
             if reg.domain != "sensor" or reg.disabled:
                 continue
-            labels = set(reg.labels)
-            if reg.device_id and (device := devices.async_get(reg.device_id)):
-                labels |= set(device.labels)
-            if self.label_id not in labels:
-                continue
+            device = devices.async_get(reg.device_id) if reg.device_id else None
+            if self.kind == "area":
+                # like the panel: the area of the entity, else the one of its device
+                area = reg.area_id or (device.area_id if device else None)
+                if area != self.group_id:
+                    continue
+            else:
+                labels = set(reg.labels)
+                if device:
+                    labels |= set(device.labels)
+                if self.group_id not in labels:
+                    continue
             state = self.hass.states.get(reg.entity_id)
             if (
                 state is not None
@@ -291,6 +344,7 @@ class LabelEnergy:
         self._refresh_members()
         self._refresh_price()
         for sensor in self._sensors:
+            sensor.refresh_name()
             sensor.async_write_ha_state()
 
     # -- lifetime ----------------------------------------------------------------
@@ -306,6 +360,16 @@ class LabelEnergy:
         ):
             target = self.costs if cost else self.values
             target[period] = max(target[period], value)
+
+    def display_name(self) -> str:
+        """The current name of the label, area or device (it follows renames)."""
+        if self.kind == "device":
+            return device_display_name(self.hass, self.entry, self.group_id)
+        if self.kind == "area":
+            area = ar.async_get(self.hass).async_get_area(self.group_id)
+            return area.name if area else self.group_id
+        label = lr.async_get(self.hass).async_get_label(self.group_id)
+        return label.name if label else self.group_id
 
     def add_sensor(self, sensor: LabelEnergySensor) -> None:
         self._sensors.append(sensor)
@@ -342,23 +406,36 @@ class LabelEnergySensor(SensorEntity, RestoreEntity):
     _cost = False
 
     def __init__(
-        self, entry: ConfigEntry, tracker: LabelEnergy, label_name: str, period: str
+        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str, period: str
     ) -> None:
         self._tracker = tracker
         self._period = period
         prefix = COST if self._cost else ""
         self._attr_unique_id = unique_id(
-            entry.entry_id, tracker.label_id, prefix + period
+            entry.entry_id, tracker.group_id, prefix + period, tracker.kind
         )
-        kind = "cost" if self._cost else "energy"
-        self._attr_translation_key = f"label_{kind}_{period}"
-        self._attr_translation_placeholders = {"label": label_name}
+        what = "cost" if self._cost else "energy"
+        self._attr_translation_key = f"{tracker.kind}_{what}_{period}"
+        self._attr_translation_placeholders = self._placeholders(group_name)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name="Energy Assistant",
             entry_type=dr.DeviceEntryType.SERVICE,
         )
         tracker.add_sensor(self)
+
+    @staticmethod
+    def _placeholders(name: str) -> dict[str, str]:
+        return {"label": name, "area": name, "device": name}
+
+    def refresh_name(self) -> None:
+        """Take over a new name of the label, area or device (the entity id stays as it was created)."""
+        self._attr_translation_placeholders = self._placeholders(
+            self._tracker.display_name()
+        )
+        # Home Assistant caches the name; drop it (as its own _attr_ setters do) so it is built again
+        self.__dict__.pop("name", None)
+        self._cached_friendly_name = None
 
     @property
     def native_value(self) -> float:
@@ -371,7 +448,7 @@ class LabelEnergySensor(SensorEntity, RestoreEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
-            "label_id": self._tracker.label_id,
+            f"{self._tracker.kind}_id": self._tracker.group_id,
             "period_start": self._tracker.starts[self._period].isoformat(),
             "sensors": sorted(self._tracker.members),
         }
@@ -397,9 +474,9 @@ class LabelCostSensor(LabelEnergySensor):
     _cost = True
 
     def __init__(
-        self, entry: ConfigEntry, tracker: LabelEnergy, label_name: str, period: str
+        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str, period: str
     ) -> None:
-        super().__init__(entry, tracker, label_name, period)
+        super().__init__(entry, tracker, group_name, period)
         self._attr_native_unit_of_measurement = (
             tracker.currency or tracker.hass.config.currency
         )
@@ -411,7 +488,7 @@ class LabelCostSensor(LabelEnergySensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
-            "label_id": self._tracker.label_id,
+            f"{self._tracker.kind}_id": self._tracker.group_id,
             "period_start": self._tracker.starts[self._period].isoformat(),
             "price": self._tracker.price,  # the unit price per kWh that is used now
         }
@@ -420,49 +497,61 @@ class LabelCostSensor(LabelEnergySensor):
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Create the sensors of the selected labels and keep them in line with the selection."""
-    trackers: dict[str, LabelEnergy] = {}
-    with_cost: set[str] = set()  # labels that already have their cost sensors
+    """Create the sensors of the selected labels and areas and keep them in line with the selection."""
+    trackers: dict[tuple[str, str], GroupEnergy] = {}
+    with_cost: set[tuple[str, str]] = (
+        set()
+    )  # groups that already have their cost sensors
 
-    def label_name(label_id: str) -> str:
-        label = lr.async_get(hass).async_get_label(label_id)
-        return label.name if label else label_id
+    def exists(kind: str, group_id: str) -> bool:
+        if kind == "device":
+            # a device whose source is gone keeps its sensors until it is deselected
+            return True
+        if kind == "area":
+            return ar.async_get(hass).async_get_area(group_id) is not None
+        return lr.async_get(hass).async_get_label(group_id) is not None
 
     @callback
     def sync(*_: Any) -> None:
-        wanted = _selected(entry)
-        # Only labels that exist; a deleted label would give a sensor without a name.
-        wanted = [i for i in wanted if lr.async_get(hass).async_get_label(i)]
+        # Only labels and areas that exist; a deleted one would give a sensor without a name.
+        wanted = [
+            (kind, group_id)
+            for kind in KINDS
+            for group_id in _selected(entry, kind)
+            if exists(kind, group_id)
+        ]
         for tracker in trackers.values():
             tracker.options_changed()
         entities: list[LabelEnergySensor] = []
-        for label_id in wanted:
-            if label_id not in trackers:
-                tracker = LabelEnergy(hass, entry, label_id)
-                trackers[label_id] = tracker
-                name = label_name(label_id)
+        for key in wanted:
+            kind, group_id = key
+            if key not in trackers:
+                tracker = GroupEnergy(hass, entry, group_id, kind)
+                trackers[key] = tracker
+                name = tracker.display_name()
                 entities += [
                     LabelEnergySensor(entry, tracker, name, period)
                     for period in PERIODS
                 ]
                 tracker.start()
-            tracker = trackers[label_id]
+            tracker = trackers[key]
             # Cost sensors need a price, so they appear once Tariffy offers one.
-            if label_id not in with_cost and tracker.price is not None:
-                with_cost.add(label_id)
-                name = label_name(label_id)
+            if key not in with_cost and tracker.price is not None:
+                with_cost.add(key)
+                name = tracker.display_name()
                 entities += [
                     LabelCostSensor(entry, tracker, name, period) for period in PERIODS
                 ]
         if entities:
             async_add_entities(entities)
         registry = er.async_get(hass)
-        for label_id in [i for i in trackers if i not in wanted]:
-            trackers.pop(label_id).stop()
-            with_cost.discard(label_id)
+        for key in [k for k in trackers if k not in wanted]:
+            kind, group_id = key
+            trackers.pop(key).stop()
+            with_cost.discard(key)
             for period in PERIODS:
                 for prefix in ("", COST):
-                    uid = unique_id(entry.entry_id, label_id, prefix + period)
+                    uid = unique_id(entry.entry_id, group_id, prefix + period, kind)
                     if entity_id := registry.async_get_entity_id("sensor", DOMAIN, uid):
                         registry.async_remove(entity_id)
 
@@ -473,4 +562,10 @@ async def async_setup_entry(
     entry.async_on_unload(entry.add_update_listener(_updated))
     # A price source (Tariffy) may be set up later: look again now and then.
     entry.async_on_unload(async_track_time_interval(hass, sync, timedelta(minutes=5)))
-    entry.async_on_unload(lambda: [t.stop() for t in trackers.values()])
+
+    @callback
+    def stop_all() -> None:
+        for tracker in trackers.values():
+            tracker.stop()
+
+    entry.async_on_unload(stop_all)

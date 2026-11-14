@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-14
+
+### Fixed
+
+- An error in the log when the integration was unloaded or reloaded (the stop of the sensors per label and area returned a list instead of nothing).
+- The list of matching sensors in the device settings now opens and closes with a click on its header (the page was not redrawn after the click).
+
+### Removed
+
+- **Folding of cards:** the cards can no longer be folded with a click on their title (arrow in front of the title); the cards are always open. The lists still unfold with *Show all*.
+
+### Changed
+
+- **One tooltip style everywhere:** the bars of the energy chart (balance) and every other element with a hint (device, area and label rows, filter buttons, chips, names) now show the tooltip of the history chart instead of the plain browser tooltip: a title, rows with a colored dot, the value in bold and the name. The bar under the pointer is highlighted.
+
+### Added
+
+- **Consumption and cost sensors per area:** every selected area gets four energy sensors (day, week, month, year) and, with a Tariffy price, four cost sensors, built like the ones of the labels (same protection against bad values, priced step by step, created and removed with the selection, German names *Verbrauch / Kosten täglich, wöchentlich, monatlich, jährlich*). The sensors of an area are the power sensors in the area (the entity's own area, else its device's). The Consumption tab has an *Areas* card (from the statistics, every period) next to the *Labels* card, the Costs tab a *Cost per area* table, and a tariff can be chosen per area.
+- **Consumption and cost sensors per device:** a *Sensors* button in the device list of the settings gives a device four energy sensors and, with a Tariffy price, four cost sensors, like labels and areas. Nothing is selected at first, at most 20 devices (a counter shows what a selection creates), and switching a device off deletes its sensors when saving. The name is prefilled (display name, else the sensor name without *Leistung*) and can be changed before the sensors exist; a name changed later renames the sensors (not their entity id). A device whose source is gone or excluded keeps its sensors until it is switched off. A tariff can be chosen per device; the Costs tab has a *Cost per device* table.
+- **Nothing is selected at first:** a new installation creates no label, area or device sensors; the settings say what a selection creates. An empty area selection (all areas on the Areas card of the Power tab) creates no sensors either.
+- **Normal and avoidable standby:** a *Normal* button per row of the standby card marks a load that is meant to run all the time (server, fridge); it gets a grey bar and no longer counts as avoidable. The card title and a new tile *Avoidable standby* show the rest in W, kWh per year and, with Tariffy, cost per year. The marking is saved at once (administrators), nothing is marked at first.
+- **Period picker in the Costs tab:** a new card *Costs in the period* shows the grid cost, the feed-in revenue and the balance of the chosen day, week, month or year with the change to the period before. It uses the same period as the Consumption tab. The three money tiles moved there from the balance of the Consumption tab. The *Cost per label* table keeps showing the running day, week, month and year.
+- **The comparison names the period:** instead of *vs. previous period* the tiles say *vs. yesterday*, *vs. last week*, *vs. last month* or *vs. last year* (German: *ggü. gestern*, *letzter Woche*, *letztem Monat*, *letztem Jahr*); when you look back they say *the day before*, *the week before* and so on (*Vortag*, *Vorwoche*, *Vormonat*, *Vorjahr*). It applies to the balance and to the period costs.
+
 ## [0.26.0] - 2026-11-13
 
 ### Changed

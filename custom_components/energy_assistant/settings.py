@@ -8,6 +8,9 @@ from typing import Any
 
 from .const import (
     BOOL_KEYS,
+    CONF_AREA_TARIFFS,
+    CONF_DEVICE_IDS,
+    CONF_DEVICE_TARIFFS,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
     CONF_HOUSE_POWER,
@@ -16,6 +19,7 @@ from .const import (
     DICT_KEYS,
     ID_KEYS,
     LIST_KEYS,
+    MAX_DEVICE_IDS,
     NUMBER_KEYS,
     PATTERN_REGEX,
     SINGLE_KEYS,
@@ -76,6 +80,20 @@ def clean_label_tariffs(value: Any) -> dict[str, str]:
     }
 
 
+def clean_device_tariffs(value: Any) -> dict[str, str]:
+    """Tariffy price sensor per device: keep only entries of two sensor entity ids."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        device: price
+        for device, price in value.items()
+        if isinstance(device, str)
+        and isinstance(price, str)
+        and re.fullmatch(r"sensor\.[a-z0-9_]+", device)
+        and re.fullmatch(r"sensor\.[a-z0-9_]+", price)
+    }
+
+
 def clean_number(value: Any) -> float | None:
     """A number or None: texts with a decimal comma work, anything unusable (and negative values) means not set."""
     if isinstance(value, bool) or value is None:
@@ -104,7 +122,11 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         key: clean_patterns(data.get(key))
         if key in TEXT_KEYS
         else clean_label_tariffs(data.get(key))
-        if key == CONF_LABEL_TARIFFS
+        if key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS)
+        else clean_device_tariffs(data.get(key))
+        if key == CONF_DEVICE_TARIFFS
+        else as_list(data.get(key))[:MAX_DEVICE_IDS]
+        if key == CONF_DEVICE_IDS
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
@@ -138,7 +160,12 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
             items = as_list(value)
             if items:
                 stored[key] = items[0]
-        elif key == CONF_LABEL_TARIFFS:
+        elif key == CONF_DEVICE_TARIFFS:
+            if device_tariffs := clean_device_tariffs(value):
+                stored[key] = device_tariffs
+        elif key == CONF_DEVICE_IDS:
+            stored[key] = as_list(value)[:MAX_DEVICE_IDS]
+        elif key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS):
             if tariffs := clean_label_tariffs(value):
                 stored[key] = tariffs
         elif key in DICT_KEYS:
