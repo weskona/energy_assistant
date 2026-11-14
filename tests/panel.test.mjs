@@ -4432,3 +4432,28 @@ test("group cards: a card with few rows has no button and the hint stays below",
   const area = html.slice(html.indexOf(">Areas<"));
   assert.ok(area.indexOf('class="dev"') < area.indexOf('class="hint"'));
 });
+
+test("devices tab: the chart is drawn at the real width of its box, so the text stays readable on a phone", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = { key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5 }) };
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 900 170"/); // the default
+  p._devW = 340;
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 340 170"/);
+  p._devW = 100;
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 280 170"/); // never narrower than 280
+  // a measured width that differs redraws once, a similar one does not
+  let renders = 0;
+  p._render = () => { renders++; };
+  const content = (w) => ({ querySelector: (sel) => (sel === ".dchart" ? { clientWidth: w } : null) });
+  p._devW = 340;
+  p._wireDevChart(content(350));
+  assert.equal(renders, 0);
+  p._wireDevChart(content(500));
+  assert.equal(renders, 1);
+  assert.equal(p._devW, 500);
+  p._wireDevChart({ querySelector: () => null }); // another tab: nothing to measure
+  assert.equal(renders, 1);
+});

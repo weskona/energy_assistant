@@ -229,6 +229,22 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .msg.err{color:var(--eb-red)}
 .note{font-size:12.5px;color:var(--eb-muted)}
 .warn{color:var(--eb-orange)}
+@media (max-width:640px){
+.row{flex-wrap:wrap;row-gap:2px}
+.dev .line{gap:8px}
+.dev .name{flex:1 1 0;flex-wrap:wrap;row-gap:0;align-items:baseline}
+.nt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.dev .cnt{flex-basis:100%;margin:1px 0 0;white-space:normal}
+.dev .val{flex:none}
+.dev .val .spk:not(.big){width:52px;height:20px;margin-right:6px}
+.dev .val small.pct{margin-left:6px;min-width:30px}
+.snorm{padding:2px 8px;font-size:11px;margin-right:6px}
+.lc{grid-template-columns:minmax(0,1fr) repeat(4,auto);gap:6px;font-size:13px}
+.lc .nm{white-space:normal}
+.dtop{gap:14px}
+.dring{width:104px}
+.dlegend{gap:6px 14px}
+}
 `;
 
 // English is the base language, German is the only translation.
@@ -2237,7 +2253,8 @@ class EnergyAssistantPanel extends HTMLElement {
     if (m.unBuckets && m.unassigned > 0.005) layers.push({ name: this._t("devUnassigned"), color: "var(--eb-dim)", values: m.unBuckets });
     const totals = Array.from({ length: n }, (_, k) => layers.reduce((a, l) => a + l.values[k], 0));
     const max = Math.max(...totals, 0.1);
-    const W = 900, H = 170, M = { l: 6, r: 6, t: 8, b: 20 };
+    // The drawing has the real width of its box (see _wireDevChart), so the text stays readable on a phone.
+    const W = Math.max(280, Math.round(this._devW || 900)), H = 170, M = { l: 6, r: 6, t: 8, b: 20 };
     const pw = W - M.l - M.r, ph = H - M.t - M.b;
     const slot = pw / n, barW = Math.max(2, slot * 0.64);
     const f1 = (v) => v.toFixed(1);
@@ -2261,6 +2278,18 @@ class EnergyAssistantPanel extends HTMLElement {
       svg += `<rect class="bslot" x="${f1(M.l + k * slot)}" y="${M.t}" width="${f1(slot)}" height="${ph}" data-tipj="${esc(JSON.stringify(tip))}"/>`;
     }
     return `<div class="dchart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(this._t("devTitle"))}">${svg}</svg></div>`;
+  }
+
+  /** After a redraw of the Devices tab: one redraw at the real width of the chart (like the chart of the balance). */
+  _wireDevChart(content) {
+    const wrap = content.querySelector?.(".dchart");
+    if (!wrap) return;
+    const box = Math.max(280, Math.round(wrap.clientWidth || 0));
+    if (wrap.clientWidth && Math.abs(box - (this._devW || 900)) > 24) {
+      this._devW = box;
+      this._html = null;
+      this._render();
+    }
   }
 
   /** One category: its energy and share of the house, a ring of its devices and the devices with their kWh. */
@@ -4245,6 +4274,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._swapMarkup(content, html);
       this._wireChart(content);
       this._wireBalance(content);
+      this._wireDevChart(content);
     }
   }
 
