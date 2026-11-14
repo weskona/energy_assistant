@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-14
+
+### Added
+
+- **Devices card in the Consumption tab:** the devices that have their own sensors get a card *Devices with sensors* (energy per device for the shown period, from the long-term statistics) next to the *Areas* and *Labels* cards. The three cards share a grid of up to three columns.
+
 ## [0.27.1] - 2026-11-14
 
 ### Changed
