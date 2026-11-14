@@ -1545,7 +1545,8 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))} ${esc(this._t("uNormalHint"))}</div></div>`; // the hint sits below the list so both lists start at the same height
     // 4) energy per selected area and label, from the long-term statistics of their sensors
     // Areas, labels and devices with their own sensors stand side by side (up to three columns).
-    const groupCards = ["area", "label", "device"].map((kind) => this._renderGroupEnergy(kind, { range, off, num })).filter(Boolean);
+    const groupLimit = this._groupLimit();
+    const groupCards = ["area", "label", "device"].map((kind) => this._renderGroupEnergy(kind, { range, off, num, limit: groupLimit })).filter(Boolean);
     const groups = groupCards.length > 1 ? `<div class="cards">${groupCards.join("")}</div>` : groupCards.join("");
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${groups}${note}`);
@@ -1555,19 +1556,44 @@ class EnergyAssistantPanel extends HTMLElement {
    * Card with the energy (kWh) of every selected label or area for the shown period, from the long-term
    * statistics of its sensors (see _loadGroupUsage). Empty without a selection.
    */
-  _renderGroupEnergy(kind, { range, off, num }) {
+  /**
+   * The rows of the card of a label, area or device group for the shown period (strongest first, only the ones with
+   * statistics); null while the data of the period is not loaded or nothing is selected.
+   */
+  _groupRows(kind) {
+    const selected = this._cfg[`${kind}_ids`] || [];
+    const u = this._groupUsage;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    if (!selected.length || !u || u.key !== this._groupUsageKey(range, off)) return null;
+    return selected
+      .map((id) => ({ id, name: this._groupName(kind, id), ...(u.rows?.[`${kind}:${id}`] || { kwh: 0, covered: 0, total: 0 }) }))
+      .filter((r) => r.covered > 0)
+      .sort((a, b) => b.kwh - a.kwh);
+  }
+
+  /**
+   * The cards of the groups show as many rows as the shortest of them has (at least MIN_ROWS, at most MAX_ROWS), like
+   * the lists of the biggest consumers and the standby loads; the rest unfolds per card and then scrolls.
+   */
+  _groupLimit() {
+    const lens = ["area", "label", "device"].map((k) => this._groupRows(k)?.length).filter((n) => n > 0);
+    return lens.length ? Math.max(MIN_ROWS, Math.min(MAX_ROWS, Math.min(...lens))) : MAX_ROWS;
+  }
+
+  _renderGroupEnergy(kind, { range, off, num, limit = MAX_ROWS }) {
     const selected = this._cfg[`${kind}_ids`] || [];
     if (!selected.length) return "";
-    const nameOf = (id) => this._groupName(kind, id);
     const title = `<div class="row"><span class="eb-title">${esc(this._t({ area: "uAreasTitle", device: "uDevicesTitle" }[kind] || "uLabelsTitle"))}</span>${this._groupUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
     const u = this._groupUsage;
     if (!u || u.key !== this._groupUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
-    const rows = selected
-      .map((id) => ({ id, name: nameOf(id), ...(u.rows?.[`${kind}:${id}`] || { kwh: 0, covered: 0, total: 0 }) }))
-      .filter((r) => r.covered > 0)
-      .sort((a, b) => b.kwh - a.kwh);
+    const rows = this._groupRows(kind) || [];
     const max = Math.max(0, ...rows.map((r) => r.kwh));
-    const html = rows
+    const key = `grp:${kind}`;
+    const open = this._open?.has(key);
+    const folded = rows.length > limit;
+    const shown = folded && !open ? rows.slice(0, limit) : rows;
+    const button = folded ? `<button type="button" class="linkbtn" data-open="${key}">${esc(open ? this._t("showLess") : this._t("showAll", { n: rows.length }))}</button>` : "";
+    const html = shown
       .map((r) => {
         const cover = r.covered < r.total ? ` <small class="cnt" title="${esc(this._t("uLabelsCoverageTip"))}">${esc(this._t("uLabelsCoverage", { n: r.covered, m: r.total }))}</small>` : "";
         return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span>${cover}</span>
@@ -1575,7 +1601,7 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t({ area: "uAreasHint", device: "uDevicesHint" }[kind] || "uLabelsHint"))}</div></div>`;
+    return `<div class="eb-card">${title}<div class="devgrid${open && folded ? " devlist" : ""}">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div>${button}<div class="hint">${esc(this._t({ area: "uAreasHint", device: "uDevicesHint" }[kind] || "uLabelsHint"))}</div></div>`;
   }
 
   /** Display name of a label or an area. */

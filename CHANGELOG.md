@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Same height and rows for the group cards:** *Areas*, *Labels* and *Devices with sensors* in the Consumption tab now show as many rows as the shortest of them has (at least 5, at most 8), like *Biggest consumers* and *Always on*; *Show all* unfolds the rest of a card, which then scrolls inside it, and the cards of a row keep the same height.
+
 ## [0.29.0] - 2026-11-14
 
 ### Added
