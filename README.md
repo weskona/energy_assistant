@@ -19,6 +19,8 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 **Tooltips:** all tooltips of the panel look the same, in the style of the history chart: the bars of the energy chart (title with the time, one row per series with a colored dot, the value in bold and the name), the rows of the device, area and label lists (share, sensors, original name), the filter buttons and the chips of the settings. The plain browser tooltip is not used any more; touch screens have no hover and so no tooltips.
 
+**Device names:** every device has one name that is used everywhere (device list, consumers, standby, tooltips of areas and labels, the settings, the names of its sensors): the display name you gave it with the pencil (or in the name field of the settings), else the name of its sensor without the word *Leistung* or *Power* at the end (*Staubsauger* instead of *Staubsauger Leistung*). Rename a device once and it changes everywhere (the entity id of existing sensors stays).
+
 **Layout:** the first row shows the house card and the history. Below it **Devices**, **Areas** and **Labels** sit side by
 side in one row, in this order and with the same height (missing cards leave more room to the others). On narrow screens
 they stack. Areas and labels show their Home Assistant icon in front of the name (labels tinted with their color).

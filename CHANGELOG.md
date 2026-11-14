@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-11-14
+
+### Changed
+
+- **One name for every device, everywhere:** a device is called the same in the device list, the consumers and standby lists, the area and label tooltips, the settings (list, chips, name field) and the names of its sensors: the display name if you gave one (pencil), else the name of its sensor without the word *Leistung* or *Power* (*Staubsauger* instead of *Staubsauger Leistung*). The name field of a device with its own sensors shows that name as real text, edits are stored as the display name, and the column of the field is wider; only a name that differs from the automatic one is stored, so an untouched name keeps following the sensor.
+
 ## [0.28.0] - 2026-11-14
 
 ### Added
