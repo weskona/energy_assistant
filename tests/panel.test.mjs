@@ -4147,3 +4147,54 @@ test("standby: a click marks the load at once and saves it, a failing save takes
   p._hass.callWS = async () => { throw new Error("must not be called"); };
   await p._toggleStandbyNormal("sensor.b"); // only admins change settings
 });
+
+// --- devices with their own sensors in the consumption tab ---------------------------------------------------
+test("device usage: a device with its own sensors is one sensor in the member map", () => {
+  const p = areaGroupPanel({ device_ids: ["sensor.herd_leistung", "sensor.weg_leistung"] });
+  const map = p._groupMemberMap();
+  assert.deepEqual(map["device:sensor.herd_leistung"], ["sensor.herd_leistung"]);
+  assert.deepEqual(map["device:sensor.weg_leistung"], []); // its sensor is gone: nothing to count, the sensors stay anyway
+});
+
+test("device usage: the energy of the selected devices comes from the same request as labels and areas", async () => {
+  const calls = [];
+  const p = areaGroupPanel({ device_ids: ["sensor.herd_leistung"] });
+  p._hass.callWS = async (m) => {
+    calls.push(m);
+    return m.period === "hour" ? { "sensor.herd_leistung": [hourRow("2026-11-13T00:00:00Z", 1000)], "sensor.kuehl_leistung": [hourRow("2026-11-13T00:00:00Z", 500)] } : {};
+  };
+  await atTime("2026-11-13T14:20:00Z", () => p._loadGroupUsage());
+  assert.equal(calls.filter((c) => c.period === "hour").length, 1);
+  assert.ok(calls[0].statistic_ids.includes("sensor.herd_leistung"));
+  assert.ok(Math.abs(p._groupUsage.rows["device:sensor.herd_leistung"].kwh - 1) < 1e-9);
+  assert.ok(Math.abs(p._groupUsage.rows["area:kueche"].kwh - 1.5) < 1e-9); // the same sensor is also in its area
+});
+
+test("device usage: the card names the devices without Leistung and the three cards share a grid", () => {
+  const p = loadedUsage();
+  p._cfg.area_ids = ["kueche"];
+  p._cfg.label_ids = ["klima"];
+  p._cfg.device_ids = ["sensor.a", "sensor.b"];
+  p._cfg.device_names = { "sensor.b": "Router Keller" };
+  p._hass.areas = { kueche: { name: "Küche" } };
+  p._labelData = { labels: [{ label_id: "klima", name: "Klima" }], entities: {} };
+  p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: {
+    "area:kueche": { kwh: 2, covered: 1, total: 1 },
+    "label:klima": { kwh: 1, covered: 1, total: 1 },
+    "device:sensor.a": { kwh: 0.4, covered: 1, total: 1 },
+    "device:sensor.b": { kwh: 0.9, covered: 1, total: 1 },
+  } };
+  const html = p._renderUsage();
+  const cards = html.slice(html.indexOf('<div class="cards">'));
+  assert.match(html, /<div class="cards">/);
+  assert.ok(cards.indexOf(">Areas<") < cards.indexOf(">Labels<")); // areas, labels, then the devices
+  assert.ok(cards.indexOf(">Labels<") < cards.indexOf(">Devices with sensors<"));
+  const devices = cards.slice(cards.indexOf(">Devices with sensors<"));
+  assert.ok(devices.indexOf("Router Keller") < devices.indexOf("Kühlschrank")); // strongest first, own display name
+  assert.match(devices, /Router Keller[\s\S]*0[.,]90<small>kWh/);
+  // a single group needs no grid
+  p._cfg.area_ids = [];
+  p._cfg.label_ids = [];
+  p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: { "device:sensor.a": { kwh: 0.4, covered: 1, total: 1 } } };
+  assert.doesNotMatch(p._renderUsage(), /<div class="cards">/);
+});

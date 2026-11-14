@@ -56,6 +56,7 @@ const STYLE = `
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
 .stack{display:grid;gap:var(--eb-gap)}
+.cards{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
 .pair{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:800px){.pair{grid-template-columns:minmax(0,1fr)}}
 .amo-bar{height:6px;border-radius:3px;background:var(--eb-line);margin-top:8px;overflow:hidden}
@@ -266,6 +267,8 @@ const STRINGS = {
     uAvoidableKwh: "Avoidable: {w} · {kwh} kWh per year",
     uAvoidableTip: "The standby loads that are not marked as normal, extrapolated to a year.",
     uAvoidableTile: "Avoidable standby",
+    uDevicesTitle: "Devices with sensors",
+    uDevicesHint: "Energy of the devices that have their own sensors (Sensors button in the settings) in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). The sensors themselves count from the moment they were created.",
     uAreasTitle: "Areas",
     uAreasHint: "Energy of the sensors in the area in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per selected area for dashboards and automations, they count from the moment they were created.",
     areaCostTitle: "Cost per area",
@@ -581,6 +584,8 @@ const STRINGS = {
     uAvoidableKwh: "Vermeidbar: {w} · {kwh} kWh pro Jahr",
     uAvoidableTip: "Die Dauerlasten, die nicht als normal markiert sind, auf ein Jahr hochgerechnet.",
     uAvoidableTile: "Vermeidbare Dauerlast",
+    uDevicesTitle: "Geräte mit Sensoren",
+    uDevicesHint: "Verbrauch der Geräte, die eigene Sensoren haben (Knopf Sensoren in den Einstellungen), im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Die Sensoren selbst zählen ab dem Anlegen.",
     uAreasTitle: "Bereiche",
     uAreasHint: "Verbrauch der Sensoren im Bereich im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro ausgewähltem Bereich für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
     areaCostTitle: "Kosten pro Bereich",
@@ -1493,9 +1498,9 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="devgrid${alwaysFold.cls}">${alwaysRows || `<div class="empty">${this._t("uNone")}</div>`}</div>${alwaysFold.button}
       <div class="hint">${esc(this._t(defined.size ? "uAlwaysDefined" : today ? "uAlwaysHint" : "uAlwaysHintStat"))} ${esc(this._t("uNormalHint"))}</div></div>`; // the hint sits below the list so both lists start at the same height
     // 4) energy per selected area and label, from the long-term statistics of their sensors
-    const areasCard = this._renderGroupEnergy("area", { range, off, num });
-    const labelsCard = this._renderGroupEnergy("label", { range, off, num });
-    const groups = areasCard && labelsCard ? `<div class="pair">${areasCard}${labelsCard}</div>` : areasCard || labelsCard;
+    // Areas, labels and devices with their own sensors stand side by side (up to three columns).
+    const groupCards = ["area", "label", "device"].map((kind) => this._renderGroupEnergy(kind, { range, off, num })).filter(Boolean);
+    const groups = groupCards.length > 1 ? `<div class="cards">${groupCards.join("")}</div>` : groupCards.join("");
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${groups}${note}`);
   }
@@ -1508,7 +1513,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const selected = this._cfg[`${kind}_ids`] || [];
     if (!selected.length) return "";
     const nameOf = (id) => this._groupName(kind, id);
-    const title = `<div class="row"><span class="eb-title">${esc(this._t(kind === "area" ? "uAreasTitle" : "uLabelsTitle"))}</span>${this._groupUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
+    const title = `<div class="row"><span class="eb-title">${esc(this._t({ area: "uAreasTitle", device: "uDevicesTitle" }[kind] || "uLabelsTitle"))}</span>${this._groupUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
     const u = this._groupUsage;
     if (!u || u.key !== this._groupUsageKey(range, off)) return `<div class="eb-card">${title}<div class="empty">${this._t("loading")}</div></div>`;
     const rows = selected
@@ -1524,7 +1529,7 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
-    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t(kind === "area" ? "uAreasHint" : "uLabelsHint"))}</div></div>`;
+    return `<div class="eb-card">${title}<div class="devgrid">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div><div class="hint">${esc(this._t({ area: "uAreasHint", device: "uDevicesHint" }[kind] || "uLabelsHint"))}</div></div>`;
   }
 
   /** Display name of a label or an area. */
@@ -1539,6 +1544,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const out = {};
     for (const id of this._cfg.label_ids || []) out[`label:${id}`] = this._labelMembers(id);
     for (const id of this._cfg.area_ids || []) out[`area:${id}`] = this._areaMembers(id);
+    // A device with its own sensors is one sensor; it counts while it exists (like the sensors of the backend).
+    for (const id of this._cfg.device_ids || []) out[`device:${id}`] = this._hass?.states?.[id] ? [id] : [];
     return out;
   }
 
@@ -1547,8 +1554,8 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _maybeLoadGroupUsage() {
-    const labels = (this._cfg.label_ids || []).length, areas = (this._cfg.area_ids || []).length;
-    if (!this._ready || this._groupUsageLoading || (!labels && !areas) || (labels && !this._labelData)) return;
+    const labels = (this._cfg.label_ids || []).length, areas = (this._cfg.area_ids || []).length, devices = (this._cfg.device_ids || []).length;
+    if (!this._ready || this._groupUsageLoading || (!labels && !areas && !devices) || (labels && !this._labelData)) return;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const v = this._groupUsage;
     if (!v || v.key !== this._groupUsageKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadGroupUsage();
