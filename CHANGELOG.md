@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-11-14
+
 ### Fixed
 
 - **Phone layout:** on narrow screens (up to 640 px) the rows of the lists show the complete device name (it wraps instead of being cut off), with the cost or year figure below it and a small line, value and share on the right; the *Normal* button of the standby card no longer covers the name; headers of cards wrap instead of squeezing; the table of costs per label fits; and the chart of the Devices tab is drawn at the real width of its box, so its labels stay readable.
