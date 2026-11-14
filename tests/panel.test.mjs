@@ -1083,16 +1083,16 @@ function renamePanel({ admin = true, names = {}, fail = false } = {}) {
 test("names: an own name wins over the friendly name, which wins over the entity id", () => {
   const p = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } });
   assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox");
-  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
-  assert.equal(p._deviceName("sensor.unknown"), "sensor.unknown");
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd"); // the name of the sensor without the word Leistung
+  assert.equal(p._deviceName("sensor.unknown"), "unknown"); // no state: the readable part of the id
 });
 
 test("names: the device list shows own names, sorting stays by power, the original is kept", () => {
   const p = renamePanel({ names: { "sensor.herd_leistung": "AAA first in the alphabet" } });
   const [first, second] = p._devices();
-  assert.equal(first.name, "Wallbox 3EM Leistung"); // strongest first
+  assert.equal(first.name, "Wallbox 3EM"); // strongest first
   assert.equal(second.name, "AAA first in the alphabet");
-  assert.equal(second.original, "Herd Leistung");
+  assert.equal(second.original, "Herd");
 });
 
 test("names: admins get a pencil on every device row but not on the unmeasured rest", () => {
@@ -1110,7 +1110,7 @@ test("names: no pencil and no editing for non-admins", async () => {
   assert.doesNotMatch(p._renderDevices(2500), /data-rename|rename/);
   await p._commitRename("sensor.wallbox_leistung", "Hacked");
   assert.deepEqual(p._hass.calls, []);
-  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox 3EM Leistung");
+  assert.equal(p._deviceName("sensor.wallbox_leistung"), "Wallbox 3EM");
 });
 
 test("names: the row in edit mode is a text field with the own name as value and the original as placeholder", () => {
@@ -1119,7 +1119,7 @@ test("names: the row in edit mode is a text field with the own name as value and
   const input = html.match(/<input class="rename"[^>]*>/)[0];
   assert.match(input, /data-rename-input="sensor.wallbox_leistung"/);
   assert.match(input, /value="Wallbox"/);
-  assert.match(input, /placeholder="Wallbox 3EM Leistung"/);
+  assert.match(input, /placeholder="Wallbox 3EM"/);
   assert.match(input, /maxlength="80"/);
   assert.match(html, /data-rename="sensor.herd_leistung"/); // the other row stays a normal row
   const plain = renamePanel();
@@ -1128,7 +1128,7 @@ test("names: the row in edit mode is a text field with the own name as value and
 
 test("names: the tooltip names the original when a row was renamed", () => {
   const html = renamePanel({ names: { "sensor.wallbox_leistung": "Wallbox" } })._renderDevices(2500);
-  assert.match(html, /title="[^"]*Original: Wallbox 3EM Leistung"/);
+  assert.match(html, /title="[^"]*Original: Wallbox 3EM"/);
 });
 
 test("names: names and placeholders are HTML-escaped", () => {
@@ -1155,9 +1155,9 @@ test("names: an empty name or the original name resets the own name", async () =
   await p._commitRename("sensor.wallbox_leistung", "   ");
   assert.deepEqual(p._hass.calls[0].config.device_names, { "sensor.herd_leistung": "Herd" });
   p._editName = "sensor.herd_leistung";
-  await p._commitRename("sensor.herd_leistung", "Herd Leistung"); // typed the original again
+  await p._commitRename("sensor.herd_leistung", "Herd"); // typed the automatic name again
   assert.deepEqual(p._hass.calls[1].config.device_names, {});
-  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd Leistung");
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd");
 });
 
 test("names: nothing is sent when the name did not change, or when editing already ended", async () => {
@@ -4209,4 +4209,24 @@ test("device sensors: a name given in the device list is what the name field sho
   const html = p._renderDeviceSetup(false);
   assert.match(html, /data-devname="sensor\.herd_leistung" value="Herd"/); // not renamed: the name without Leistung
   assert.match(html, /data-devname="sensor\.ofen_leistung" value="Backofen"/); // renamed: that name
+});
+
+test("device names: one short name everywhere devices are listed", () => {
+  const p = matchPanel();
+  p._hass.states["sensor.herd_leistung"].attributes.friendly_name = "Herd Leistung";
+  p._cfg.device_names = { "sensor.ofen_leistung": "Backofen" };
+  p._draft.device_names = { ...p._cfg.device_names };
+  p._draft.device_ids = ["sensor.herd_leistung"];
+  p._cfg.device_ids = ["sensor.herd_leistung"];
+  // the device list, the settings list, the chips and the tables all call it the same
+  assert.equal(p._deviceName("sensor.herd_leistung"), "Herd");
+  assert.equal(p._groupName("device", "sensor.herd_leistung"), "Herd");
+  assert.equal(p._settingsName("sensor.ofen_leistung"), "Backofen");
+  const rows = p._renderMatchRows(false);
+  assert.match(rows, /class="mn">Herd<\/span>/);
+  assert.match(rows, /class="mn">Backofen<\/span>/);
+  assert.doesNotMatch(rows, /Herd Leistung/);
+  const settings = p._renderSettings();
+  assert.doesNotMatch(settings.replace(/data-id="[^"]*"/g, ""), /Herd Leistung<button/); // the chips
+  assert.match(p._renderDeviceSetup(false), /data-devname="sensor\.herd_leistung" value="Herd"/);
 });

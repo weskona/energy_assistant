@@ -116,7 +116,7 @@ def strip_power(name: str) -> str:
 
 
 def device_display_name(hass: HomeAssistant, entry: ConfigEntry, entity_id: str) -> str:
-    """The name of a device with its own sensors: the display name the user gave it, else its name without "Leistung"."""
+    """The one name of a device (panel and sensors): the display name, else the sensor's name without "Leistung"."""
     config = {**entry.data, **entry.options}
     if own := clean_names(config.get("device_names")).get(entity_id):
         return own

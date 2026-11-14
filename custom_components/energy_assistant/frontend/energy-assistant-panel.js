@@ -169,7 +169,7 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .msens{margin-left:auto;flex:none;align-self:center}
 .mrow .msens.on{border-color:var(--eb-green);color:var(--eb-green)}
 .trow.dsetup input[type=text]{flex:1 1 180px;min-width:0;max-width:300px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:7px 10px;font:14px var(--eb-font)}
-.trow.dsetup .tn{flex:0 1 300px}
+.trow.dsetup .tn{flex:0 1 300px;color:var(--eb-dim);font-size:12.5px}
 .trow .tn{font-size:14px;flex:0 1 220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow select{flex:1 1 220px;min-width:0;max-width:420px;background:var(--eb-tile);color:var(--eb-text);border:1px solid var(--eb-tile-border);border-radius:10px;padding:8px 10px;font:14px var(--eb-font)}
 .chip button{border:0;background:none;color:var(--eb-muted);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}
@@ -257,7 +257,7 @@ const STRINGS = {
     deviceCounter: "{n} devices with their own sensors: {sensors} sensors (four for the energy, four for the cost with Tariffy per device). Untick a device to delete its sensors when you save.",
     deviceCounterNone: "Nothing is selected at first, so no sensors are created: tick the devices you need in the list above with the Sensors button. Every device gets four energy sensors and, with Tariffy, four cost sensors.",
     f_device_setup: "Name and tariff of these devices",
-    h_device_setup: "The name is the display name of the device and is part of the sensor names. The field shows the name the sensors get: the display name from the device list, else the name of the sensor without the word Leistung; change it as you like. A name changed later changes the name of the sensors, but not their entity id. A device whose source is gone or excluded keeps its sensors until you untick it.",
+    h_device_setup: "The name is the display name of the device and is part of the sensor names. The field shows the name of the device (the display name, else the name of the sensor without the word Leistung) and the sensors get exactly this name; change it as you like and it changes everywhere. A name changed later changes the name of the sensors, but not their entity id. A device whose source is gone or excluded keeps its sensors until you untick it.",
     deviceNameLabel: "Name of the device",
     deviceCostTitle: "Cost per device",
     uNormal: "Normal",
@@ -574,7 +574,7 @@ const STRINGS = {
     deviceCounter: "{n} Geräte mit eigenen Sensoren: {sensors} Sensoren (je Gerät vier für den Verbrauch, mit Tariffy vier für die Kosten). Wählst du ein Gerät ab, werden seine Sensoren beim Speichern gelöscht.",
     deviceCounterNone: "Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle die Geräte, die du brauchst, in der Liste oben mit dem Knopf Sensoren. Jedes Gerät bekommt vier Verbrauchssensoren und mit Tariffy vier Kostensensoren.",
     f_device_setup: "Name und Tarif dieser Geräte",
-    h_device_setup: "Der Name ist der Anzeigename des Geräts und Teil der Sensornamen. Das Feld zeigt den Namen, den die Sensoren bekommen: der Anzeigename aus der Geräteliste, sonst der Name des Sensors ohne das Wort Leistung; ändere ihn nach Wunsch. Ein später geänderter Name ändert den Namen der Sensoren, aber nicht ihre Entity-ID. Ein Gerät, dessen Quelle fehlt oder ausgeschlossen wurde, behält seine Sensoren, bis du es abwählst.",
+    h_device_setup: "Der Name ist der Anzeigename des Geräts und Teil der Sensornamen. Das Feld zeigt den Namen des Geräts (der Anzeigename, sonst der Name des Sensors ohne das Wort Leistung), und die Sensoren bekommen genau diesen Namen; ändere ihn nach Wunsch, dann ändert er sich überall. Ein später geänderter Name ändert den Namen der Sensoren, aber nicht ihre Entity-ID. Ein Gerät, dessen Quelle fehlt oder ausgeschlossen wurde, behält seine Sensoren, bis du es abwählst.",
     deviceNameLabel: "Name des Geräts",
     deviceCostTitle: "Kosten pro Gerät",
     uNormal: "Normal",
@@ -1535,7 +1535,7 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** Display name of a label or an area. */
   _groupName(kind, id) {
-    if (kind === "device") return this._cfg.device_names?.[id] || stripPower(this._hass?.states?.[id]?.attributes?.friendly_name || id.split(".").pop().replace(/_/g, " "));
+    if (kind === "device") return this._deviceName(id); // the name of the device list, everywhere
     if (kind === "area") return this._hass?.areas?.[id]?.name || id;
     return (this._labelData?.labels || []).find((l) => l.label_id === id)?.name || id;
   }
@@ -2444,7 +2444,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const states = this._hass?.states || {};
     return Object.entries(states)
       .filter(([id, st]) => id.startsWith("sensor.") && st.attributes?.device_class === "power")
-      .map(([id, st]) => ({ id, name: st.attributes.friendly_name || id }))
+      .map(([id]) => ({ id, name: this._settingsName(id) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -2516,7 +2516,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._editName !== id) return; // already saved or cancelled (blur after Enter or Escape)
     const before = { ...(this._cfg.device_names || {}) };
     const names = { ...before };
-    const original = this._hass?.states?.[id]?.attributes?.friendly_name || id;
+    const original = this._autoName(id);
     const name = String(value).trim().slice(0, 80);
     if (!name || name === original) delete names[id];
     else names[id] = name;
@@ -2653,7 +2653,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const text = t.value.trim();
       // The field shows the name the sensors get anyway (the display name, else the name without "Leistung").
       // Only a different name is stored, so an untouched name keeps following the sensor.
-      const automatic = stripPower(this._hass?.states?.[id]?.attributes?.friendly_name || id);
+      const automatic = this._autoName(id);
       if (text && text !== automatic) next[id] = text.slice(0, 80);
       else delete next[id];
       this._draft.device_names = next;
@@ -2776,7 +2776,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (fState === "idle" && i.active) return false;
       if (fSel === "included" && i.excluded) return false;
       if (fSel === "excluded" && !i.excluded) return false;
-      return !q || `${states[id]?.attributes?.friendly_name || ""} ${id}`.toLowerCase().includes(q);
+      return !q || `${states[id]?.attributes?.friendly_name || ""} ${this._settingsName(id)} ${id}`.toLowerCase().includes(q);
     });
     return { found, shown, counts };
   }
@@ -2792,7 +2792,7 @@ class EnergyAssistantPanel extends HTMLElement {
       .map((id) => {
         const viaPattern = byPattern(id);
         const off = excluded.has(id) || viaPattern;
-        const name = states[id]?.attributes?.friendly_name || id;
+        const name = this._settingsName(id);
         const title = viaPattern ? `${id} – ${this._t("excludedByPattern")}` : id;
         const own = ids.includes(id);
         const sensors = off && !own ? "" : `<button type="button" class="seg msens${own ? " on" : ""}" data-devsel="${esc(id)}" ${ro ? "disabled" : ""} title="${esc(this._t("devSensorsTip"))}">${esc(this._t("devSensorsBtn"))}</button>`;
@@ -2930,14 +2930,15 @@ class EnergyAssistantPanel extends HTMLElement {
     const chosen = this._draft.device_tariffs || {};
     const rows = ids
       .map((id) => {
-        const friendly = this._hass?.states?.[id]?.attributes?.friendly_name || id;
+        const friendly = this._autoName(id);
         const select = withTariff
           ? `<select data-devtariff="${esc(id)}" ${ro ? "disabled" : ""}>${[
             `<option value="">${esc(this._t("tariffDefault", { name: prices[0].name }))}</option>`,
             ...prices.map((p) => `<option value="${esc(p.entity)}"${chosen[id] === p.entity ? " selected" : ""}>${esc(p.name)}</option>`),
           ].join("")}</select>`
           : "";
-        return `<div class="trow dsetup"><span class="tn" title="${esc(id)}">${esc(friendly)}</span><input type="text" data-devname="${esc(id)}" value="${esc(names[id] || stripPower(friendly))}" placeholder="${esc(stripPower(friendly))}" maxlength="80" autocomplete="off" ${ro ? "disabled" : ""} aria-label="${esc(this._t("deviceNameLabel"))}">${select}</div>`;
+        // the name of the device list (the display name, else the name of the sensor), editable; the sensor id below it
+        return `<div class="trow dsetup"><input type="text" data-devname="${esc(id)}" value="${esc(names[id] || friendly)}" placeholder="${esc(friendly)}" maxlength="80" autocomplete="off" ${ro ? "disabled" : ""} aria-label="${esc(this._t("deviceNameLabel"))}"><span class="tn mi" title="${esc(id)}">${esc(id)}</span>${select}</div>`;
       })
       .join("");
     return `<div class="fld span"><label>${esc(this._t("f_device_setup"))}</label>${rows}<div class="hint">${esc(this._t("h_device_setup"))}</div></div>`;
@@ -2964,7 +2965,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const ro = !this._isAdmin;
     const states = this._hass?.states || {};
-    const nameOf = (id) => states[id]?.attributes?.friendly_name || id;
+    const nameOf = (id) => this._settingsName(id);
     const options = this._candidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const energyOptions = this._energyCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
     const socOptions = this._socCandidates().map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
@@ -3157,8 +3158,22 @@ class EnergyAssistantPanel extends HTMLElement {
   }
   /** Individual devices with their current power in W, highest first. */
   /** Display name of a sensor in the lists: the own name if one is set, else the friendly name. */
-  _deviceName(id) {
-    return this._cfg.device_names?.[id] || this._hass?.states?.[id]?.attributes?.friendly_name || id;
+  _deviceName(id, names = this._cfg.device_names) {
+    return names?.[id] || this._autoName(id);
+  }
+
+  /**
+   * The name of a device when nobody named it: the name of its sensor without the word Leistung. It is the one
+   * name used everywhere (lists, cards, tables, the names of the sensors a device gets) unless a display name is set.
+   */
+  _autoName(id) {
+    const friendly = this._hass?.states?.[id]?.attributes?.friendly_name;
+    return stripPower(friendly || id.split(".").pop().replace(/_/g, " "));
+  }
+
+  /** The same name while the settings are edited: the unsaved display names of the draft count. */
+  _settingsName(id) {
+    return this._deviceName(id, this._draft?.device_names);
   }
 
   /** The sensors of the device list: the single ones plus the ones the name patterns find. */
@@ -3173,7 +3188,7 @@ class EnergyAssistantPanel extends HTMLElement {
       .map((id) => ({
         id,
         name: this._deviceName(id),
-        original: this._hass?.states?.[id]?.attributes?.friendly_name || id,
+        original: this._autoName(id),
         w: this._watts(id),
       }))
       .filter((d) => d.w != null);
