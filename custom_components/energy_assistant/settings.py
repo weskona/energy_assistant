@@ -9,7 +9,6 @@ from typing import Any
 from .const import (
     BOOL_KEYS,
     CONF_AREA_TARIFFS,
-    CONF_DEVICE_IDS,
     CONF_DEVICE_TARIFFS,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
@@ -19,7 +18,6 @@ from .const import (
     DICT_KEYS,
     ID_KEYS,
     LIST_KEYS,
-    MAX_DEVICE_IDS,
     NUMBER_KEYS,
     PATTERN_REGEX,
     SINGLE_KEYS,
@@ -125,8 +123,6 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         if key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS)
         else clean_device_tariffs(data.get(key))
         if key == CONF_DEVICE_TARIFFS
-        else as_list(data.get(key))[:MAX_DEVICE_IDS]
-        if key == CONF_DEVICE_IDS
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
@@ -163,8 +159,6 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
         elif key == CONF_DEVICE_TARIFFS:
             if device_tariffs := clean_device_tariffs(value):
                 stored[key] = device_tariffs
-        elif key == CONF_DEVICE_IDS:
-            stored[key] = as_list(value)[:MAX_DEVICE_IDS]
         elif key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS):
             if tariffs := clean_label_tariffs(value):
                 stored[key] = tariffs

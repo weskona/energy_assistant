@@ -701,3 +701,35 @@ async def test_a_device_uses_the_tariff_chosen_for_it(hass: HomeAssistant) -> No
         other._refresh_price()
     assert heat.price == 0.22
     assert other.price == 0.30
+
+
+async def test_saving_the_same_selection_again_never_creates_a_second_set(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    """The unique id of a sensor is fixed by entry, device and period, so a repeated save finds the old ones."""
+    entry = await _setup_devices(hass, ["sensor.oven_power"])
+
+    def ours() -> list[str]:
+        return sorted(
+            e.entity_id
+            for e in er.async_get(hass).entities.values()
+            if e.platform == DOMAIN
+        )
+
+    first = ours()
+    assert len(first) == 4  # four energy sensors, no price source: no cost sensors
+    for _ in range(3):
+        hass.config_entries.async_update_entry(
+            entry, options={"device_ids": ["sensor.oven_power"], "standby_normal": []}
+        )
+        await hass.async_block_till_done()
+    assert ours() == first
+    # unticking and ticking again gives the same ids again (nothing is left behind in between)
+    hass.config_entries.async_update_entry(entry, options={"device_ids": []})
+    await hass.async_block_till_done()
+    assert ours() == []
+    hass.config_entries.async_update_entry(
+        entry, options={"device_ids": ["sensor.oven_power"]}
+    )
+    await hass.async_block_till_done()
+    assert ours() == first
