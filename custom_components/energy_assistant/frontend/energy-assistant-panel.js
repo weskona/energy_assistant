@@ -245,6 +245,14 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .dring{width:104px}
 .dlegend{gap:6px 14px}
 }
+@media (max-width:900px){
+.top{grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
+.top .left:empty{display:none}
+.tabs{min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:8px 12px;font-size:13px}
+.top .tabs{justify-self:stretch}
+}
 `;
 
 // English is the base language, German is the only translation.
@@ -1150,6 +1158,15 @@ class EnergyAssistantPanel extends HTMLElement {
     if (found.tariffy) tabs.push("costs");
     if (found.amortix?.entries?.length) tabs.push("amortix");
     return tabs;
+  }
+
+  /** On a narrow screen the tab bar scrolls sideways: bring the active tab to the middle when the tab changed. */
+  _centerActiveTab(bar) {
+    if (this._centeredTab === this._tab) return;
+    const tab = bar.querySelector?.(".tab.active");
+    if (!tab) return;
+    this._centeredTab = this._tab;
+    if (bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, tab.offsetLeft - (bar.clientWidth - tab.offsetWidth) / 2);
   }
 
   _tabLabel(tab) {
@@ -4241,6 +4258,7 @@ class EnergyAssistantPanel extends HTMLElement {
     for (const tab of bar.querySelectorAll(".tab")) {
       tab.classList.toggle("active", tab.dataset.tab === this._tab);
     }
+    this._centerActiveTab(bar);
     const gear = this.shadowRoot.querySelector(".gear");
     gear.setAttribute("aria-label", this._t("settings"));
     gear.setAttribute("title", this._t("settings"));
