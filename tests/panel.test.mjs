@@ -4367,3 +4367,93 @@ test("devices tab: a category shows five devices and unfolds the rest", () => {
   assert.ok(rowsOf(html) > before);
   assert.match(html, /Show less/);
 });
+
+// --- the cards of areas, labels and devices fold like the biggest consumers and the standby loads -------------
+function groupCardsPanel(counts) {
+  const p = loadedUsage();
+  const rows = {};
+  p._cfg.area_ids = []; p._cfg.label_ids = []; p._cfg.device_ids = [];
+  p._labelData = { labels: [], entities: {} };
+  p._hass.areas = {};
+  for (const [kind, n] of Object.entries(counts)) {
+    for (let k = 0; k < n; k++) {
+      const id = kind === "device" ? `sensor.g${k}` : `${kind}${k}`;
+      p._cfg[`${kind}_ids`].push(id);
+      if (kind === "area") p._hass.areas[id] = { name: `Bereich ${k}` };
+      if (kind === "label") p._labelData.labels.push({ label_id: id, name: `Label ${k}` });
+      if (kind === "device") p._hass.states[id] = { state: "1", attributes: { friendly_name: `Gerät ${k} Leistung` } };
+      rows[`${kind}:${id}`] = { kwh: 10 - k * 0.1, covered: 1, total: 1 };
+    }
+  }
+  p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows };
+  return p;
+}
+const cardRows = (html, title) => {
+  const card = html.slice(html.indexOf(`<span class="eb-title">${title}</span>`));
+  const next = card.indexOf('<div class="eb-card', 10);
+  return ((next > 0 ? card.slice(0, next) : card).match(/class="dev"/g) || []).length;
+};
+
+test("group cards: all three show as many rows as the shortest one has, within 5 and 8", () => {
+  let p = groupCardsPanel({ area: 7, label: 6, device: 12 });
+  assert.equal(p._groupLimit(), 6);
+  let html = p._renderUsage();
+  assert.equal(cardRows(html, "Areas"), 6);
+  assert.equal(cardRows(html, "Labels"), 6);
+  assert.equal(cardRows(html, "Devices with sensors"), 6);
+  assert.match(html, /Show all 7/);
+  assert.match(html, /Show all 12/);
+  assert.doesNotMatch(html.slice(html.indexOf(">Labels<"), html.indexOf(">Devices with sensors<")), /Show all/); // Labels has exactly 6
+  p = groupCardsPanel({ area: 2, label: 3, device: 12 });
+  assert.equal(p._groupLimit(), 5); // never fewer than five rows
+  p = groupCardsPanel({ area: 20, label: 15, device: 30 });
+  assert.equal(p._groupLimit(), 8); // never more than eight
+  assert.equal(groupCardsPanel({ area: 3 })._groupLimit(), 5);
+  assert.equal(groupCardsPanel({})._groupLimit(), 8); // nothing selected
+});
+
+test("group cards: the rest unfolds per card and then scrolls like the other lists", () => {
+  const p = groupCardsPanel({ area: 12, label: 12 });
+  let html = p._renderUsage();
+  assert.equal(cardRows(html, "Areas"), 8);
+  assert.doesNotMatch(html, /devgrid devlist/);
+  p._open = new Set(["grp:area"]); // only the Areas card is unfolded
+  html = p._renderUsage();
+  assert.equal(cardRows(html, "Areas"), 12);
+  assert.equal(cardRows(html, "Labels"), 8);
+  assert.match(html.slice(html.indexOf(">Areas<"), html.indexOf(">Labels<")), /devgrid devlist[\s\S]*Show less/);
+  assert.match(html, /data-open="grp:label"/);
+});
+
+test("group cards: a card with few rows has no button and the hint stays below", () => {
+  const p = groupCardsPanel({ area: 3, label: 3 });
+  const html = p._renderUsage();
+  assert.doesNotMatch(html, /Show all/);
+  const area = html.slice(html.indexOf(">Areas<"));
+  assert.ok(area.indexOf('class="dev"') < area.indexOf('class="hint"'));
+});
+
+test("devices tab: the chart is drawn at the real width of its box, so the text stays readable on a phone", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = { key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5 }) };
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 900 170"/); // the default
+  p._devW = 340;
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 340 170"/);
+  p._devW = 100;
+  assert.match(p._renderDevicesTab(), /<svg viewBox="0 0 280 170"/); // never narrower than 280
+  // a measured width that differs redraws once, a similar one does not
+  let renders = 0;
+  p._render = () => { renders++; };
+  const content = (w) => ({ querySelector: (sel) => (sel === ".dchart" ? { clientWidth: w } : null) });
+  p._devW = 340;
+  p._wireDevChart(content(350));
+  assert.equal(renders, 0);
+  p._wireDevChart(content(500));
+  assert.equal(renders, 1);
+  assert.equal(p._devW, 500);
+  p._wireDevChart({ querySelector: () => null }); // another tab: nothing to measure
+  assert.equal(renders, 1);
+});
