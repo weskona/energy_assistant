@@ -583,7 +583,7 @@ async def test_device_energy_and_the_tariff_per_device(
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"]["device_tariffs"] == {"sensor.wp_power": "sensor.wp_preis"}
-    assert len(msg["result"]["device_ids"]) == 20  # cut to the limit
+    assert len(msg["result"]["device_ids"]) == 25  # no limit: all of them are kept
 
 
 async def test_update_config_stores_the_standby_loads_marked_as_normal(

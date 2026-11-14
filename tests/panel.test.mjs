@@ -4016,29 +4016,25 @@ test("device sensors: a click selects and deselects a device, an excluded device
   assert.doesNotMatch(p._renderMatchRows(false), /data-devsel="sensor\.ofen_leistung"/);
 });
 
-test("device sensors: at most 20 devices, the other buttons are disabled and an input says why", () => {
+test("device sensors: as many devices as you like, no button is ever disabled by a limit", () => {
   const p = matchPanel();
-  p._draft.device_ids = Array.from({ length: 20 }, (_, k) => `sensor.d${k}_leistung`);
+  p._draft.device_ids = Array.from({ length: 60 }, (_, k) => `sensor.d${k}_leistung`);
   const html = p._renderMatchRows(false);
-  assert.match(html, /<button[^>]*data-devsel="sensor\.herd_leistung" disabled/);
+  assert.doesNotMatch(html, /data-devsel="[^"]*" disabled/);
   p._onClick({ preventDefault() {}, ...click("[data-devsel]", { devsel: "sensor.herd_leistung" }) });
-  assert.equal(p._draft.device_ids.length, 20);
+  assert.equal(p._draft.device_ids.length, 61);
+  assert.ok(p._draft.device_ids.includes("sensor.herd_leistung"));
   p._hass.states["sensor.extra_leistung"] = power("Extra");
   p._onChange({ target: { dataset: { add: "device_ids", mode: "multi" }, value: "sensor.extra_leistung" } });
-  assert.equal(p._draft.device_ids.length, 20);
-  assert.match(p._fieldError.device_ids, /At most 20 devices/);
-  // a device that is already selected can still be unselected with the button
-  p._draft.device_ids = ["sensor.herd_leistung", ...Array.from({ length: 19 }, (_, k) => `sensor.d${k}_leistung`)];
-  const own = p._renderMatchRows(false);
-  assert.match(own, /msens on" data-devsel="sensor\.herd_leistung"\s+title=/); // enabled although the list is full
-  assert.match(own, /data-devsel="sensor\.ofen_leistung" disabled/); // the others are not
+  assert.equal(p._draft.device_ids.length, 62); // also by hand in the box
+  assert.equal(p._fieldError?.device_ids, undefined);
 });
 
 test("device sensors: the counter tells what the selection creates", () => {
   const p = matchPanel();
   assert.match(p._deviceCounter(), /Nothing is selected at first, so no sensors are created/);
   p._draft.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
-  assert.match(p._deviceCounter(), /2 of 20 devices with their own sensors: 8 sensors/); // energy only
+  assert.match(p._deviceCounter(), /2 devices with their own sensors: 8 sensors/); // energy only
   p._int = { tariffy: { price: "x" } };
   assert.match(p._deviceCounter(), /16 sensors/); // with Tariffy the cost sensors too
 });

@@ -19,7 +19,6 @@ CONF_DEVICE_STANDBY = "device_standby"
 CONF_STANDBY_NORMAL = "standby_normal"
 # Devices (power sensors) that get their own energy and cost sensors. Nothing is selected at first.
 CONF_DEVICE_IDS = "device_ids"
-MAX_DEVICE_IDS = 20  # a selection is cut to this many devices (eight sensors each)
 # Tariffy price sensor per such device ({entity_id: entity_id}).
 CONF_DEVICE_TARIFFS = "device_tariffs"
 # Name patterns like "*_leistung": every power sensor that matches is listed as a device.
