@@ -56,6 +56,31 @@ const STYLE = `
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
 .stack{display:grid;gap:var(--eb-gap)}
+.dtop{display:flex;gap:24px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.dring{flex:none;width:130px}
+.donut{display:block;width:100%;height:auto}
+.donut .dv{font:700 15px var(--eb-font);fill:var(--eb-text)}
+.donut .du{font:500 7px var(--eb-font);fill:var(--eb-muted)}
+.dside{flex:1 1 320px;min-width:0}
+.sbar{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden}
+.sbar i{display:block;min-width:2px}
+.dlegend{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:14px}
+.dl{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.dl .ln{color:var(--eb-text)}
+.dl small{color:var(--eb-dim)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.eb-label.davg{margin-top:14px;text-transform:none;letter-spacing:0}
+.eb-title .ico,.dl .ico{--mdc-icon-size:18px;margin-right:6px;vertical-align:middle}
+.dchart{margin-top:6px}
+.dchart svg{display:block;width:100%;height:auto}
+.cats2{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
+.cat .cbody{display:flex;gap:16px;align-items:center;margin-top:12px}
+.cat .dring{width:92px}
+.clist{flex:1;min-width:0}
+.cr{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13.5px}
+.cr .cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr small{color:var(--eb-muted)}
+.cr .cp{min-width:34px;text-align:right}
 .cards{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
 .pair{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:800px){.pair{grid-template-columns:minmax(0,1fr)}}
@@ -268,6 +293,13 @@ const STRINGS = {
     uAvoidableKwh: "Avoidable: {w} · {kwh} kWh per year",
     uAvoidableTip: "The standby loads that are not marked as normal, extrapolated to a year.",
     uAvoidableTile: "Avoidable standby",
+    tabDevices: "Devices",
+    devTitle: "Devices",
+    devUnassigned: "not assigned",
+    devOfHouse: "{pct} % of the house",
+    devPerDay: "{v} kWh per day",
+    devNoLabels: "The Devices tab groups the devices by label: select the labels you need in the settings (Labels).",
+    devNoData: "No energy of the devices of these labels in this period (the power sensors need the state class measurement).",
     uDevicesTitle: "Devices with sensors",
     uDevicesHint: "Energy of the devices that have their own sensors (Sensors button in the settings) in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). The sensors themselves count from the moment they were created.",
     uAreasTitle: "Areas",
@@ -585,6 +617,13 @@ const STRINGS = {
     uAvoidableKwh: "Vermeidbar: {w} · {kwh} kWh pro Jahr",
     uAvoidableTip: "Die Dauerlasten, die nicht als normal markiert sind, auf ein Jahr hochgerechnet.",
     uAvoidableTile: "Vermeidbare Dauerlast",
+    tabDevices: "Geräte",
+    devTitle: "Geräte",
+    devUnassigned: "nicht zugeordnet",
+    devOfHouse: "{pct} % vom Haus",
+    devPerDay: "{v} kWh pro Tag",
+    devNoLabels: "Der Tab Geräte gruppiert die Geräte nach Labels: wähle in den Einstellungen (Labels) die Labels, die du brauchst.",
+    devNoData: "Kein Verbrauch der Geräte dieser Labels in diesem Zeitraum (die Leistungssensoren brauchen die Zustandsklasse measurement).",
     uDevicesTitle: "Geräte mit Sensoren",
     uDevicesHint: "Verbrauch der Geräte, die eigene Sensoren haben (Knopf Sensoren in den Einstellungen), im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Die Sensoren selbst zählen ab dem Anlegen.",
     uAreasTitle: "Bereiche",
@@ -903,6 +942,9 @@ const FLOW_W = 20; // charging or discharging from this power on
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
 const MIN_ROWS = 5;
+// Colors of the categories and devices in the Devices tab (a label's own color wins for its category).
+const DEV_COLORS = ["#4c8bf5", "#34d399", "#ff9f43", "#7dc4ff", "#ef4444", "#22d3ee", "#a78bfa", "#fbbf24", "#f472b6", "#84cc16"];
+const DEV_ROWS = 5; // devices a category card shows before *Show all*
 // A name without the word that only says it is the power sensor ("Backofen Leistung" -> "Backofen"), like the backend.
 const stripPower = (name) => String(name).replace(/[\s_-]*(wirkleistung|leistung|power)\s*$/i, "").trim() || String(name);
 const SYSTEM_KEYS = ["house_power", "grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge"];
@@ -1085,6 +1127,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const tabs = ["house"];
     // Balance (energy counters) and consumption (devices) are one tab with one period picker.
     if (this._usageEnabled() || this._balEnabled()) tabs.push("usage");
+    // The Devices tab groups the devices by the selected labels.
+    if ((this._cfg.label_ids || []).length) tabs.push("devices");
     if (found.pv_assistant || (this._pv?.plants || []).length >= 2) tabs.push("pv");
     if (found.ev_assistant?.vehicles?.length) tabs.push("ev");
     if (found.tariffy) tabs.push("costs");
@@ -1093,7 +1137,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   _tabLabel(tab) {
-    return this._t({ house: "tabPower", usage: "tabUsage", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
+    return this._t({ house: "tabPower", usage: "tabUsage", devices: "tabDevices", pv: "tabPv", ev: "tabEv", costs: "tabCosts", amortix: "tabAmortix" }[tab] || tab);
   }
 
   /** Markup of the page of the current tab (not the settings). */
@@ -1102,6 +1146,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const stack = (...cards) => `<div class="stack">${cards.filter(Boolean).join("") || `<div class="eb-card"><div class="empty">–</div></div>`}</div>`;
     switch (this._tab) {
       case "usage": return this._renderConsumption();
+      case "devices": return this._renderDevicesTab();
       case "pv": return stack(this._renderPvDay(), this._renderPvPlants());
       case "ev": return stack(this._renderEv());
       case "costs": return stack(this._renderCosts(this._current()), this._renderPeriodCosts(), this._renderGroupCosts("device"), this._renderGroupCosts("area"), this._renderGroupCosts("label"), this._renderContract());
@@ -1593,8 +1638,8 @@ class EnergyAssistantPanel extends HTMLElement {
    * running day is taken from the hourly and the running hour from the 5-minute statistics. A Map of the sensors
    * that have statistics; null when a request fails.
    */
-  async _statsKwh(ids, win, range) {
-    if (!ids.length) return new Map();
+  /** The statistics to ask for to cover a window up to now: [from, to, period] (day, hour and 5-minute parts). */
+  _statsParts(win, range) {
     const now = Date.now(), tz = this._tz();
     const to = Math.min(win.end, now);
     const live = win.end > now;
@@ -1607,6 +1652,57 @@ class EnergyAssistantPanel extends HTMLElement {
       if (live) parts.push([Math.max(win.start, todayStart), hourStart, "hour"]);
     } else parts.push([win.start, hourStart, "hour"]);
     if (live && to > hourStart) parts.push([Math.max(hourStart, win.start), to, "5minute"]);
+    return parts;
+  }
+
+  /** Energy in kWh of one statistics row: its mean power times its duration. */
+  _rowKwh(row, period) {
+    if (row.mean == null || Number.isNaN(row.mean)) return 0;
+    const hours = row.end != null && row.start != null ? (Number(row.end) - Number(row.start)) / 3600000 : period === "day" ? 24 : period === "5minute" ? 1 / 12 : 1;
+    return (Math.max(0, row.mean) * hours) / 1000;
+  }
+
+  /**
+   * Energy in kWh per sensor and bucket of the window (the buckets of the balance: hours, days or months), from the
+   * same statistics as _statsKwh. A Map of sensor -> array with one value per bucket; null when a request fails.
+   */
+  async _statsSeries(ids, win, range) {
+    if (!ids.length) return new Map();
+    const parts = this._statsParts(win, range);
+    const results = await Promise.all(parts.map(([from, end, period]) => this._usStats(ids, from, end, period)));
+    if (results.some((r) => r == null)) return null;
+    const n = win.edges.length - 1;
+    const bucketOf = (t) => {
+      if (!(t >= win.edges[0] && t < win.edges[n])) return -1;
+      let lo = 0, hi = n - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (win.edges[mid] <= t) lo = mid;
+        else hi = mid - 1;
+      }
+      return lo;
+    };
+    const series = new Map();
+    results.forEach((res, i) => {
+      const period = parts[i][2];
+      for (const id of ids) {
+        const rows = res?.[id];
+        if (!rows || !rows.length) continue;
+        const arr = series.get(id) || new Array(n).fill(0);
+        for (const row of rows) {
+          const start = Number(row.start);
+          const idx = bucketOf(Number.isNaN(start) ? Date.parse(row.start) : start);
+          if (idx >= 0) arr[idx] += this._rowKwh(row, period);
+        }
+        series.set(id, arr);
+      }
+    });
+    return series;
+  }
+
+  async _statsKwh(ids, win, range) {
+    if (!ids.length) return new Map();
+    const parts = this._statsParts(win, range);
     const results = await Promise.all(parts.map(([from, end, period]) => this._usStats(ids, from, end, period)));
     if (results.some((r) => r == null)) return null;
     const kwh = new Map();
@@ -1967,6 +2063,197 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="nav"><button type="button" class="seg" data-${kind}nav="-1" aria-label="${esc(this._t("bPrev"))}">‹</button>
         <span class="lab">${esc(this._balLabel(win))}</span>
         <button type="button" class="seg" data-${kind}nav="1" aria-label="${esc(this._t("bNext"))}" ${off >= 0 ? "disabled" : ""}>›</button></div></div>`;
+  }
+
+  // ---- the Devices tab: the energy of the devices, grouped by label ------------------------------------------
+
+  /**
+   * The categories of the Devices tab: the selected labels in their order, each with the power sensors that carry it.
+   * A device that carries several labels belongs to the first one only, so nothing is counted twice.
+   */
+  _devCats() {
+    const seen = new Set();
+    return (this._cfg.label_ids || []).map((id) => {
+      const label = (this._labelData?.labels || []).find((l) => l.label_id === id);
+      const members = this._labelMembers(id).filter((m) => !seen.has(m));
+      members.forEach((m) => seen.add(m));
+      return { id, name: label?.name || id, icon: label?.icon || null, color: label?.color || null, members };
+    });
+  }
+
+  _devKey(range, off) {
+    return `${range}:${off}:${this._devCats().map((c) => `${c.id}=${c.members.join(",")}`).join(";")}`;
+  }
+
+  _maybeLoadDevices() {
+    if (!this._ready || this._devLoading || !this._labelData || !(this._cfg.label_ids || []).length) return;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const v = this._devTab;
+    if (!v || v.key !== this._devKey(range, off) || Date.now() - v.at > 5 * 60 * 1000) this._loadDevices();
+  }
+
+  /** The energy per bucket of every device of the categories for the shown period (one request per kind of statistics). */
+  async _loadDevices() {
+    if (!this._hass || this._devLoading) return;
+    this._devLoading = true;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const key = this._devKey(range, off);
+    try {
+      const cats = this._devCats();
+      const win = this._balWindow(range, off);
+      const series = await this._statsSeries([...new Set(cats.flatMap((c) => c.members))], win, range);
+      this._devTab = series == null
+        ? { key, range, off, failed: true, at: Date.now() }
+        : { key, range, off, win, cats, series, n: win.edges.length - 1, at: Date.now() };
+    } finally {
+      this._devLoading = false;
+      this._render();
+    }
+  }
+
+  /**
+   * What the Devices tab shows, computed from the loaded statistics: per category its devices (strongest first), its
+   * total and its energy per bucket, the assigned total and, with energy counters, the part of the house that no
+   * category explains ("not assigned"). Null while nothing is loaded for the shown period.
+   */
+  _devModel() {
+    const d = this._devTab;
+    if (!d || d.failed) return null;
+    const n = d.n;
+    const sum = (arr) => arr.reduce((a, v) => a + v, 0);
+    const cats = d.cats
+      .map((c, i) => {
+        const devices = c.members
+          .map((id) => ({ id, name: this._deviceName(id), buckets: d.series.get(id) }))
+          .filter((x) => x.buckets)
+          .map((x) => ({ ...x, kwh: sum(x.buckets) }))
+          .filter((x) => x.kwh > 0.0005)
+          .sort((a, b) => b.kwh - a.kwh);
+        const buckets = Array.from({ length: n }, (_, k) => devices.reduce((a, x) => a + x.buckets[k], 0));
+        const own = c.color && /^[a-z-]+$/.test(c.color) ? `var(--${c.color}-color, ${DEV_COLORS[i % DEV_COLORS.length]})` : DEV_COLORS[i % DEV_COLORS.length];
+        return { id: c.id, name: c.name, icon: c.icon, tint: c.color, color: own, devices, buckets, total: sum(buckets) };
+      })
+      .filter((c) => c.devices.length);
+    const assignedBuckets = Array.from({ length: n }, (_, k) => cats.reduce((a, c) => a + c.buckets[k], 0));
+    const b = this._bal;
+    const fresh = b && b.range === d.range && b.off === d.off && !b.failed && b.rows?.length === n && b.rows.every((r) => r.cons != null);
+    const houseBuckets = fresh ? b.rows.map((r) => r.cons) : null;
+    const unBuckets = houseBuckets ? houseBuckets.map((h, k) => Math.max(0, h - assignedBuckets[k])) : null;
+    const assigned = sum(assignedBuckets);
+    const unassigned = unBuckets ? sum(unBuckets) : 0;
+    return { win: d.win, n, cats, assignedBuckets, unBuckets, assigned, unassigned, total: assigned + unassigned, house: houseBuckets ? sum(houseBuckets) : null };
+  }
+
+  /** The icon of a label as a real icon only (the plain dot that _iconHtml falls back to is drawn by the caller). */
+  _iconOnly(icon, color) {
+    const html = this._iconHtml(icon, color);
+    return html.startsWith("<ha-icon") ? html : "";
+  }
+
+  /** A ring of the given shares with a text in the middle. */
+  _donut(items, center, unit) {
+    const R = 42, C = 2 * Math.PI * R;
+    const total = items.reduce((a, i) => a + i.value, 0);
+    if (!(total > 0)) return "";
+    let acc = 0;
+    const arcs = items
+      .filter((i) => i.value > 0)
+      .map((i) => {
+        const len = (i.value / total) * C;
+        const gap = items.length > 1 ? Math.min(1.6, len * 0.2) : 0;
+        const arc = `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${i.color}" stroke-width="11" stroke-dasharray="${Math.max(0.1, len - gap).toFixed(2)} ${(C - len + gap).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}"/>`;
+        acc += len;
+        return arc;
+      })
+      .join("");
+    return `<svg class="donut" viewBox="0 0 100 100" role="img" aria-hidden="true"><g transform="rotate(-90 50 50)">${arcs}</g><text class="dv" x="50" y="52" text-anchor="middle">${esc(center)}</text><text class="du" x="50" y="64" text-anchor="middle">${esc(unit)}</text></svg>`;
+  }
+
+  /** The Devices tab: a ring and a stacked bar of the categories, the energy per bucket and one card per category. */
+  _renderDevicesTab() {
+    if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
+    const lang = this._hass?.language || "en";
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    const win = this._balWindow(range, off);
+    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, win)}</div>`;
+    const stack = (...cards) => `<div class="stack">${[picker, ...cards].join("")}</div>`;
+    const note = (key) => `<div class="eb-card"><div class="empty">${esc(this._t(key))}</div></div>`;
+    if (!(this._cfg.label_ids || []).length) return stack(note("devNoLabels"));
+    const d = this._devTab;
+    if (!d || d.key !== this._devKey(range, off)) return stack(note("loading"));
+    if (d.failed) return stack(note("uNeedStats"));
+    const m = this._devModel();
+    if (!m.cats.length) return stack(note("devNoData"));
+    const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: v < 100 ? 1 : 0, maximumFractionDigits: v < 100 ? 1 : 0 });
+    const pct = (v, of) => (of > 0 ? Math.round((v / of) * 100) : 0);
+    const items = [...m.cats.map((c) => ({ name: c.name, value: c.total, color: c.color, icon: c.icon, tint: c.tint }))];
+    if (m.unassigned > 0.005) items.push({ name: this._t("devUnassigned"), value: m.unassigned, color: "var(--eb-dim)", icon: null });
+    const bar = items.map((i) => `<i style="flex:${i.value} 1 0;background:${i.color}" title="${esc(`${i.name}: ${kwh(i.value)} kWh`)}"></i>`).join("");
+    const legend = items
+      .map((i) => `<span class="dl"><i class="dot" style="background:${i.color}"></i>${this._iconOnly(i.icon, i.tint)}<span class="ln">${esc(i.name)}</span><b>${kwh(i.value)}</b><small>${pct(i.value, m.total)} %</small></span>`)
+      .join("");
+    const elapsed = Math.max(1, (Math.min(Date.now(), win.end) - win.start) / 86400000);
+    const perDay = range === "day" ? "" : `<div class="eb-label davg">${esc(this._t("devPerDay", { v: kwh(m.total / elapsed) }))}</div>`;
+    const top = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("devTitle"))}</span><span class="eb-label">${kwh(m.total)} kWh · ${esc(this._balLabel(win))}</span></div>
+      <div class="dtop"><div class="dring">${this._donut(items, kwh(m.total), "kWh")}</div>
+        <div class="dside"><div class="sbar">${bar}</div><div class="dlegend">${legend}</div></div></div>
+      ${perDay}${this._devChart(m, items)}</div>`;
+    const denom = m.house ?? m.total;
+    const cards = m.cats.map((c) => this._devCategoryCard(c, denom, kwh, pct)).join("");
+    return stack(top, `<div class="cats2">${cards}</div>`);
+  }
+
+  /** Stacked bars per bucket: every category on top of the other, "not assigned" last. */
+  _devChart(m, items) {
+    const lang = this._hass?.language || "en";
+    const win = m.win, n = m.n;
+    const layers = [...m.cats.map((c) => ({ name: c.name, color: c.color, values: c.buckets }))];
+    if (m.unBuckets && m.unassigned > 0.005) layers.push({ name: this._t("devUnassigned"), color: "var(--eb-dim)", values: m.unBuckets });
+    const totals = Array.from({ length: n }, (_, k) => layers.reduce((a, l) => a + l.values[k], 0));
+    const max = Math.max(...totals, 0.1);
+    const W = 900, H = 170, M = { l: 6, r: 6, t: 8, b: 20 };
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const slot = pw / n, barW = Math.max(2, slot * 0.64);
+    const f1 = (v) => v.toFixed(1);
+    const num = (v) => v.toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+    let svg = `<line x1="${M.l}" x2="${M.l + pw}" y1="${H - M.b}" y2="${H - M.b}" class="haxis"/>`;
+    for (let k = 0; k < n; k++) {
+      const x0 = M.l + k * slot + (slot - barW) / 2;
+      let y = H - M.b;
+      for (const l of layers) {
+        const v = l.values[k];
+        if (!(v > 0)) continue;
+        const h = (v / max) * ph;
+        y -= h;
+        svg += `<rect x="${f1(x0)}" y="${f1(y)}" width="${f1(barW)}" height="${f1(Math.max(0.5, h))}" fill="${l.color}"/>`;
+      }
+      const label = this._balTick(win, k);
+      if (label && k % every === 0) svg += `<text class="htick" x="${f1(M.l + k * slot + slot / 2)}" y="${H - 5}" text-anchor="middle">${esc(label)}</text>`;
+      const rows = layers.filter((l) => l.values[k] > 0.0005).map((l) => [l.color, `${num(l.values[k])} kWh`, l.name]);
+      const tip = { t: `${this._balRowLabel(win, k)} · ${num(totals[k])} kWh`, r: rows };
+      svg += `<rect class="bslot" x="${f1(M.l + k * slot)}" y="${M.t}" width="${f1(slot)}" height="${ph}" data-tipj="${esc(JSON.stringify(tip))}"/>`;
+    }
+    return `<div class="dchart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(this._t("devTitle"))}">${svg}</svg></div>`;
+  }
+
+  /** One category: its energy and share of the house, a ring of its devices and the devices with their kWh. */
+  _devCategoryCard(c, denom, kwh, pct) {
+    const colors = c.devices.map((_, i) => DEV_COLORS[(i + 1) % DEV_COLORS.length]);
+    const open = this._open?.has(`devtab:${c.id}`);
+    const shown = open ? c.devices : c.devices.slice(0, DEV_ROWS);
+    const rows = shown
+      .map((x) => {
+        const i = c.devices.indexOf(x);
+        return `<div class="cr"><i class="dot" style="background:${colors[i]}"></i><span class="cn" title="${esc(x.name)}">${esc(x.name)}</span><b>${kwh(x.kwh)}</b><small>kWh</small><small class="cp">${pct(x.kwh, c.total)} %</small></div>`;
+      })
+      .join("");
+    const more = c.devices.length > DEV_ROWS
+      ? `<button type="button" class="linkbtn" data-open="devtab:${esc(c.id)}">${esc(open ? this._t("showLess") : this._t("showAll", { n: c.devices.length }))}</button>`
+      : "";
+    const ring = this._donut(c.devices.map((x, i) => ({ value: x.kwh, color: colors[i] })), kwh(c.total), "kWh");
+    return `<div class="eb-card cat"><div class="row"><span class="eb-title">${this._iconOnly(c.icon, c.tint) || `<i class="dot" style="background:${c.color};margin-right:8px"></i>`}${esc(c.name)}</span><span class="eb-label">${kwh(c.total)} kWh · ${esc(this._t("devOfHouse", { pct: pct(c.total, denom) }))}</span></div>
+      <div class="cbody"><div class="dring">${ring}</div><div class="clist">${rows}${more}</div></div></div>`;
   }
 
   /**
@@ -3921,6 +4208,10 @@ class EnergyAssistantPanel extends HTMLElement {
     if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadGroupUsage();
+    if (this._tab === "devices") {
+      this._maybeLoadDevices();
+      if (this._balEnabled()) this._maybeLoadBalance();
+    }
     if (this._tab === "house") this._maybeLoadBaseRef();
     const html = this._renderPage();
     if (html !== this._html) {

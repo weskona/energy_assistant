@@ -4230,3 +4230,140 @@ test("device names: one short name everywhere devices are listed", () => {
   assert.doesNotMatch(settings.replace(/data-id="[^"]*"/g, ""), /Herd Leistung<button/); // the chips
   assert.match(p._renderDeviceSetup(false), /data-devname="sensor\.herd_leistung" value="Herd"/);
 });
+
+// --- the Devices tab: devices grouped by label -------------------------------------------------------------
+function devicesTabPanel(extra = {}) {
+  const p = labelPanel({ label_ids: ["klima", "licht"], device_patterns: ["*_leistung"], ...extra });
+  p._hass.language = "en";
+  p._hass.config = { time_zone: "Europe/Berlin" };
+  p._ready = true;
+  p._render = () => {};
+  p._usRange = "day";
+  p._usOff = 0;
+  return p;
+}
+const bucketsOf = (p, byId) => {
+  const n = p._balWindow("day", 0).edges.length - 1;
+  return new Map(Object.entries(byId).map(([id, f]) => [id, Array.from({ length: n }, (_, k) => f(k))]));
+};
+
+test("devices tab: the tab exists with selected labels and comes after the consumption tab", () => {
+  const p = devicesTabPanel();
+  assert.ok(p._tabs().includes("devices"));
+  assert.equal(p._tabLabel("devices"), "Devices");
+  p._hass.language = "de";
+  assert.equal(p._tabLabel("devices"), "Geräte");
+  const none = devicesTabPanel({ label_ids: [] });
+  assert.ok(!none._tabs().includes("devices"));
+  p._cfg.device_power = ["sensor.klimaanlage_leistung"];
+  const tabs = p._tabs();
+  assert.ok(tabs.indexOf("devices") > tabs.indexOf("usage"));
+});
+
+test("devices tab: a device with several labels belongs to the first one only", () => {
+  const p = devicesTabPanel({ label_ids: ["licht", "klima"] });
+  p._labelData.entities["sensor.licht_flur_leistung"] = ["licht", "klima"]; // carries both
+  const cats = p._devCats();
+  assert.deepEqual(cats.map((c) => c.id), ["licht", "klima"]);
+  assert.deepEqual(cats[0].members, ["sensor.licht_flur_leistung"]);
+  assert.ok(!cats[1].members.includes("sensor.licht_flur_leistung")); // not counted twice
+});
+
+test("devices tab: the statistics are sorted into the buckets of the period", async () => {
+  const p = devicesTabPanel();
+  p._hass.callWS = async (m) => (m.period === "hour"
+    ? { "sensor.klimaanlage_leistung": [hourRow("2026-11-12T23:00:00Z", 1000), hourRow("2026-11-13T05:00:00Z", 2000)] }
+    : m.period === "5minute" ? { "sensor.klimaanlage_leistung": [minRow("2026-11-13T14:00:00Z", 1200)] } : {});
+  const series = await atTime("2026-11-13T14:20:00Z", () => p._statsSeries(["sensor.klimaanlage_leistung"], p._balWindow("day", 0), "day"));
+  const arr = series.get("sensor.klimaanlage_leistung");
+  assert.equal(arr.length, 24);
+  assert.ok(Math.abs(arr[0] - 1) < 1e-9); // 23:00Z is midnight in Berlin: 1 kW for an hour
+  assert.ok(Math.abs(arr[6] - 2) < 1e-9); // 05:00Z is 06:00
+  assert.ok(Math.abs(arr[15] - 0.1) < 1e-9); // the running hour from the 5-minute statistics: 1.2 kW x 5 min
+  assert.equal((await p._statsSeries([], p._balWindow("day", 0), "day")).size, 0);
+  p._hass.callWS = async () => { throw new Error("no recorder"); };
+  assert.equal(await atTime("2026-11-13T14:20:00Z", () => p._statsSeries(["sensor.x"], p._balWindow("day", 0), "day")), null);
+});
+
+test("devices tab: categories, devices, shares and the part of the house that nobody explains", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  const flur = "sensor.licht_flur_leistung";
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, [flur]: (k) => (k < 12 ? 0.1 : 0) }),
+  };
+  let m = p._devModel();
+  assert.deepEqual(m.cats.map((c) => c.id), ["klima", "licht"]);
+  const k = m.cats[0];
+  assert.ok(Math.abs(k.total - 24 * 0.75) < 1e-9);
+  assert.ok(k.devices[0].kwh >= k.devices[1].kwh); // strongest first
+  assert.ok(Math.abs(m.assigned - (24 * 0.75 + 1.2)) < 1e-9);
+  assert.equal(m.house, null); // without the counters of the house there is no "not assigned"
+  assert.equal(m.unassigned, 0);
+  // with the consumption of the house from the balance
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: 1 })), totals: {} };
+  m = p._devModel();
+  assert.equal(m.house, 24);
+  assert.ok(Math.abs(m.unassigned - (24 - m.assigned)) < 1e-9 || m.unassigned >= 0); // never negative
+  assert.ok(m.unBuckets.every((v) => v >= 0));
+  assert.ok(Math.abs(m.total - (m.assigned + m.unassigned)) < 1e-9);
+});
+
+test("devices tab: it asks for the labels first, shows loading and the failure", () => {
+  const none = devicesTabPanel({ label_ids: [] });
+  assert.match(none._renderDevicesTab(), /select the labels you need in the settings/);
+  const p = devicesTabPanel();
+  assert.match(p._renderDevicesTab(), /Loading/);
+  p._devTab = { key: p._devKey("day", 0), range: "day", off: 0, failed: true, at: Date.now() };
+  assert.match(p._renderDevicesTab(), /state class measurement/);
+  p._devTab = { key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats: p._devCats(), series: new Map(), n: 24, at: Date.now() };
+  assert.match(p._renderDevicesTab(), /No energy of the devices of these labels/);
+});
+
+test("devices tab: a ring and a bar of the categories, a bar chart with tooltips and one card per category", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: 1 })), totals: {} };
+  const html = p._renderDevicesTab();
+  assert.match(html, /<span class="eb-title">Devices<\/span>/);
+  assert.match(html, /<svg class="donut"/);
+  assert.match(html, /class="sbar"/);
+  assert.match(html, /not assigned/); // the house uses more than the categories explain
+  assert.equal((html.match(/class="bslot"/g) || []).length, 24); // one tooltip slot per hour
+  const tip = JSON.parse(html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.ok(tip.r.some(([, , name]) => name === "Klima"));
+  assert.equal((html.match(/class="eb-card cat"/g) || []).length, 2); // Klima and Licht
+  assert.match(html, /% of the house/);
+  assert.match(html, /data-urange="day"/); // the shared period picker is on top
+  assert.doesNotMatch(html, /kWh per day/); // a single day has no daily average
+  p._usRange = "week";
+  p._usOff = 0;
+  p._devTab = { ...p._devTab, key: p._devKey("week", 0), range: "week", win: p._balWindow("week", 0), n: 7, series: new Map(klima.map((id) => [id, new Array(7).fill(1)])) };
+  p._bal = null;
+  assert.match(p._renderDevicesTab(), /kWh per day/);
+});
+
+test("devices tab: a category shows five devices and unfolds the rest", () => {
+  const p = devicesTabPanel();
+  const ids = Array.from({ length: 7 }, (_, k) => `sensor.klima_${k}_leistung`);
+  ids.forEach((id, k) => { p._hass.states[id] = power(`Gerät ${k}`); p._labelData.entities[id] = ["klima"]; });
+  const cats = p._devCats();
+  p._devTab = { key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, Object.fromEntries(ids.map((id, k) => [id, () => 0.01 * (k + 1)]))) };
+  let html = p._renderDevicesTab();
+  const klima = html.slice(html.indexOf(">Klima<"));
+  const rowsOf = (h) => (h.match(/class="cr"/g) || []).length;
+  assert.match(klima, /Show all \d+/);
+  const before = rowsOf(html);
+  p._open = new Set(["devtab:klima"]);
+  html = p._renderDevicesTab();
+  assert.ok(rowsOf(html) > before);
+  assert.match(html, /Show less/);
+});

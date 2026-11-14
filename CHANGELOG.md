@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Devices tab:** a new tab *Devices* shows the energy of the devices grouped by the selected labels for the chosen day, week, month or year (same period picker as the Consumption tab): a ring and a bar of the categories with kWh and share, the energy per hour, day or month as stacked bars with a tooltip and, with energy counters, the part of the house that no category explains (*not assigned*), then one card per label with a ring and its devices (five at first, *Show all* for the rest) and its share of the house. It uses the long-term statistics and creates no sensors.
+
 ## [0.28.1] - 2026-11-14
 
 ### Changed
