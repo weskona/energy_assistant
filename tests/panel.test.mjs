@@ -4044,7 +4044,7 @@ test("device sensors: the name can be set before the sensors exist and the tarif
   p._draft.device_ids = ["sensor.herd_leistung"];
   p._int = { tariffy: { prices: [{ entity: "sensor.haus", name: "Haushalt" }, { entity: "sensor.wp", name: "Wärmepumpentarif" }] } };
   let html = p._renderDeviceSetup(false);
-  assert.match(html, /placeholder="Herd"/); // the name the sensors would get (no "Leistung")
+  assert.match(html, /value="Herd" placeholder="Herd"/); // the name the sensors get is real text (no "Leistung")
   assert.match(html, /<option value="sensor\.wp">/);
   p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "  Herd Küche " } });
   assert.deepEqual(p._draft.device_names, { "sensor.herd_leistung": "Herd Küche" });
@@ -4053,7 +4053,10 @@ test("device sensors: the name can be set before the sensors exist and the tarif
   html = p._renderDeviceSetup(false);
   assert.match(html, /value="Herd Küche"/);
   assert.match(html, /<option value="sensor\.wp" selected>/);
-  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "" } }); // empty: back to the proposal
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "Herd" } }); // the automatic name is not stored
+  assert.deepEqual(p._draft.device_names, {});
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "Herd Küche" } });
+  p._onChange({ target: { dataset: { devname: "sensor.herd_leistung" }, value: "" } }); // empty: back to the automatic name
   p._onChange({ target: { dataset: { devtariff: "sensor.herd_leistung" }, value: "" } });
   assert.deepEqual(p._draft.device_names, {});
   assert.deepEqual(p._draft.device_tariffs, {});
@@ -4197,4 +4200,13 @@ test("device usage: the card names the devices without Leistung and the three ca
   p._cfg.label_ids = [];
   p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: { "device:sensor.a": { kwh: 0.4, covered: 1, total: 1 } } };
   assert.doesNotMatch(p._renderUsage(), /<div class="cards">/);
+});
+
+test("device sensors: a name given in the device list is what the name field shows", () => {
+  const p = matchPanel();
+  p._draft.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
+  p._draft.device_names = { "sensor.ofen_leistung": "Backofen" }; // renamed with the pencil in the device list
+  const html = p._renderDeviceSetup(false);
+  assert.match(html, /data-devname="sensor\.herd_leistung" value="Herd"/); // not renamed: the name without Leistung
+  assert.match(html, /data-devname="sensor\.ofen_leistung" value="Backofen"/); // renamed: that name
 });

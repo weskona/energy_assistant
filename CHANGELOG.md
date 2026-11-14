@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Names of the devices with their own sensors:** the name field now shows the name the sensors get as real text (the display name from the device list, else the sensor name without *Leistung*), and the column with the sensor names is wider so they are no longer cut off. Only a name that differs from the automatic one is stored, so an untouched name keeps following the sensor.
+
 ## [0.28.0] - 2026-11-14
 
 ### Added
