@@ -1652,7 +1652,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     if (!selected.length || !u || u.key !== this._groupUsageKey(range, off)) return null;
     return selected
-      .map((id) => ({ id, name: this._groupName(kind, id), ...(u.rows?.[`${kind}:${id}`] || { kwh: 0, covered: 0, total: 0 }) }))
+      .map((id) => ({ id, name: this._groupName(kind, id), ...this._groupIcon(kind, id), ...(u.rows?.[`${kind}:${id}`] || { kwh: 0, covered: 0, total: 0 }) }))
       .filter((r) => r.covered > 0)
       .sort((a, b) => b.kwh - a.kwh);
   }
@@ -1685,12 +1685,22 @@ class EnergyAssistantPanel extends HTMLElement {
     const html = shown
       .map((r) => {
         const cover = r.covered < r.total ? ` <small class="cnt" title="${esc(this._t("uLabelsCoverageTip"))}">${esc(this._t("uLabelsCoverage", { n: r.covered, m: r.total }))}</small>` : "";
-        return `<div class="dev"><div class="line"><span class="name"><span class="nt" title="${esc(r.name)}">${esc(r.name)}</span>${cover}</span>
+        return `<div class="dev"><div class="line"><span class="name">${this._iconOnly(r.icon, r.color)}<span class="nt" title="${esc(r.name)}">${esc(r.name)}</span>${cover}</span>
           <span class="val">${num(r.kwh, 2)}<small>kWh</small></span></div>
           <div class="track"><div class="fill" style="width:${max > 0 ? Math.min(100, (r.kwh / max) * 100) : 0}%"></div></div></div>`;
       })
       .join("");
     return `<div class="eb-card">${title}<div class="devgrid${open && folded ? " devlist" : ""}">${html || `<div class="empty">${this._t(u.failed ? "uNeedStats" : "uNone")}</div>`}</div>${button}<div class="hint">${esc(this._t({ area: "uAreasHint", device: "uDevicesHint" }[kind] || "uLabelsHint"))}</div></div>`;
+  }
+
+  /** Icon and color of a label or an area, the same as on the Power tab (devices have none there). */
+  _groupIcon(kind, id) {
+    if (kind === "area") return { icon: this._hass?.areas?.[id]?.icon || "mdi:texture-box", color: null };
+    if (kind === "label") {
+      const l = (this._labelData?.labels || []).find((x) => x.label_id === id);
+      return { icon: l?.icon || "mdi:label", color: l?.color || null };
+    }
+    return { icon: null, color: null };
   }
 
   /** Display name of a label or an area. */
