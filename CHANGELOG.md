@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Past years by hand:** in the settings (*Energy counters*, *Past years (entered by hand)*) you can enter the total consumption of the house for a past year (kWh, optionally the cost). In the year view of the Consumption tab, a year for which Home Assistant has no statistics shows that value (and the change to the year before, which can be entered by hand as well) together with a bar per entered year. Statistics always win: a year that has statistics never uses the entered value. Entries are checked (year from 1990 and not in the future, finite and positive numbers, upper limits) in the panel and again in the backend.
+
 ### Fixed
 
 - **Group cards line up:** when one of the cards *Areas*, *Labels* and *Devices with sensors* has no *Show all* button (its list is exactly as long as the rows shown), it keeps the place of the button, so the hints of the three cards start at the same height.

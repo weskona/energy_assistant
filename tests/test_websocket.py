@@ -608,3 +608,37 @@ async def test_update_config_stores_the_standby_loads_marked_as_normal(
         "sensor.server_power",
         "sensor.fridge_power",
     ]
+
+
+async def test_update_config_stores_the_manual_yearly_values(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {
+                "history_years": {
+                    "2022": {"kwh": 3400, "cost": 950},
+                    "2021": {"kwh": 3100, "cost": None},
+                }
+            },
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["history_years"] == {
+        "2021": {"kwh": 3100.0},
+        "2022": {"kwh": 3400.0, "cost": 950.0},
+    }
+    for bad in (
+        {"22": {"kwh": 5}},  # not a year
+        {"2022": {"kwh": -1}},
+        {"2022": {"kwh": 1e12}},
+        {"2022": {}},  # kWh is required
+    ):
+        await client.send_json_auto_id(
+            {"type": "energy_assistant/update_config", "config": {"history_years": bad}}
+        )
+        msg = await client.receive_json()
+        assert not msg["success"], bad

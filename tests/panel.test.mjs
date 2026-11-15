@@ -4525,3 +4525,80 @@ test("group cards: a card without the Show all button keeps its place so the hin
   // a single card needs no placeholder either
   assert.doesNotMatch(groupCardsPanel({ label: 8 })._renderUsage(), /visibility:hidden/);
 });
+
+// ---- manual yearly house consumption (gap filler for years without statistics)
+
+test("history: cleanHistory keeps plausible years and positive numbers only", () => {
+  const out = Panel.cleanHistory({
+    2022: { kwh: 3400, cost: 950 }, 2021: { kwh: "3100" }, 1800: { kwh: 5 }, abc: { kwh: 5 },
+    2020: { kwh: NaN }, 2019: { kwh: -1 }, 2018: { kwh: 0 }, 2017: "x", 2016: { kwh: 10, cost: -2 }, 2099: { kwh: 10 },
+  }, 2025);
+  assert.deepEqual(out, { 2016: { kwh: 10 }, 2021: { kwh: 3100 }, 2022: { kwh: 3400, cost: 950 } });
+  assert.deepEqual(Panel.cleanHistory(null), {});
+});
+
+function yearPanel(hist, stats) {
+  const p = balPanel({ ...ENERGY_CFG, history_years: hist });
+  p._usRange = "year";
+  p._usOff = -1;
+  p._hass.callWS = async () => stats;
+  return p;
+}
+
+test("history: a year without statistics shows the values entered by hand, with the year bars", async () => {
+  const thisYear = new Date().getFullYear();
+  const p = yearPanel({ [thisYear - 1]: { kwh: 3400, cost: 950 }, [thisYear - 2]: { kwh: 3000 } }, {});
+  await p._loadBalance();
+  assert.equal(p._bal.manual.kwh, 3400);
+  assert.equal(p._bal.before.cons, 3000);
+  const html = p._renderBalance({ bare: true });
+  assert.match(html, /3,400\.0/);
+  assert.match(html, /vs\./); // change to the year before (entered by hand as well)
+  assert.match(html, /Entered by hand/);
+  assert.match(html, /Consumption per year/);
+  assert.match(html, /class="yrow on"/); // the shown year is highlighted
+});
+
+test("history: existing statistics always win over the entered values", async () => {
+  const thisYear = new Date().getFullYear();
+  const p = yearPanel({ [thisYear - 1]: { kwh: 9999 } }, {});
+  const win = p._balWindow("year", -1);
+  p._balFetch = async () => ({ "sensor.imp_e": [{ start: win.edges[0], change: 1200 }] });
+  await p._loadBalance();
+  assert.equal(p._bal.manual, null);
+  assert.doesNotMatch(p._renderBalance({ bare: true }), /9,999|Entered by hand/);
+});
+
+test("history: only the year view uses the entered values", async () => {
+  const thisYear = new Date().getFullYear();
+  const p = yearPanel({ [thisYear - 1]: { kwh: 3400 } }, {});
+  p._usRange = "month";
+  await p._loadBalance();
+  assert.equal(p._bal.manual, null);
+});
+
+test("history: the balance is available with only entered years (no counters)", () => {
+  const p = balPanel({ history_years: { 2020: { kwh: 100 } } });
+  assert.equal(p._balEnabled(), true);
+  assert.equal(balPanel({})._balEnabled(), false);
+});
+
+test("history: the settings add, replace and remove years in the draft", () => {
+  const p = balPanel({ history_years: { 2020: { kwh: 100 } } });
+  p._draft = p._normalize(p._config);
+  p._edited = () => {};
+  const values = { year: "2021", kwh: "3,5", cost: "" };
+  p.shadowRoot = { querySelector: (sel) => ({ value: values[/data-hnew="(\w+)"/.exec(sel)[1]] }) };
+  p._addHistory();
+  assert.deepEqual(p._draft.history_years, { 2020: { kwh: 100 }, 2021: { kwh: 3.5 } });
+  Object.assign(values, { year: "2021", kwh: "4000", cost: "1000" });
+  p._addHistory(); // the same year is replaced
+  assert.deepEqual(p._draft.history_years[2021], { kwh: 4000, cost: 1000 });
+  Object.assign(values, { year: "1850", kwh: "10", cost: "" });
+  p._render = () => {};
+  p._addHistory(); // unusable: a hint and no change
+  assert.match(p._fieldError.history_years, /Enter a year/);
+  assert.equal(Object.keys(p._draft.history_years).length, 2);
+  assert.match(p._renderHistory(false), /data-histrm="2020"/);
+  assert.doesNotMatch(p._renderHistory(true), /data-histadd|data-histrm/); // read only
+});

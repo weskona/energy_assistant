@@ -199,6 +199,8 @@ For the **balance** at the top of the Consumption tab enter your energy counters
 
 The tab reads the long-term statistics of Home Assistant, so the history that already exists is used from the first day. Day (per hour), week from Monday and month (per day) and year (per month) can be paged through with the arrows. Consumption is the measured house counter, otherwise production + import + discharge − export − charge. Self-consumption is the share of the production that was not exported, self-sufficiency the share of the consumption that did not come from the grid. With Tariffy the grid cost and the feed-in revenue are valued with the price of the contract.
 
+**Past years by hand:** for years from before Home Assistant recorded your counters, enter the total consumption of the house in the settings (*Energy counters*, *Past years (entered by hand)*): year, kWh and, optionally, the cost. One value per year, house total only. The year view of the balance then shows it (with the change to the year before and a bar per entered year) as long as Home Assistant has **no statistics** for that year; as soon as statistics exist they are used and the entered value is ignored. Only the year view uses it (not month, week or day). Entries are checked: a year from 1990 and not in the future, a finite number above 0 kWh within a plausible limit; anything else is dropped. The values are stored in the settings of the integration.
+
 ### PV Assistant (optional)
 
 If the [PV Assistant](https://github.com/weskona/pv-assistant) integration is installed as well, Energy Assistant reads its configuration (read-only, nothing is stored or changed there). One rule decides which sensor goes where, for the config flow and the panel:

@@ -12,10 +12,14 @@ from .const import (
     CONF_DEVICE_TARIFFS,
     CONF_GRID_IMPORT,
     CONF_GRID_POWER,
+    CONF_HISTORY_YEARS,
     CONF_HOUSE_POWER,
     CONF_LABEL_TARIFFS,
     CONFIG_KEYS,
     DICT_KEYS,
+    HISTORY_MAX_COST,
+    HISTORY_MAX_KWH,
+    HISTORY_MIN_YEAR,
     ID_KEYS,
     LIST_KEYS,
     NUMBER_KEYS,
@@ -92,6 +96,37 @@ def clean_device_tariffs(value: Any) -> dict[str, str]:
     }
 
 
+def clean_history(
+    value: Any, max_year: int | None = None
+) -> dict[str, dict[str, float]]:
+    """Manual yearly house consumption: {year: {"kwh", "cost"?}}.
+
+    A year needs a plausible number (no future year is checked here, only the range) and a finite,
+    positive, plausible kWh value; the cost is optional and dropped when it is not usable.
+    """
+    if not isinstance(value, dict):
+        return {}
+    years: dict[str, dict[str, float]] = {}
+    for key, entry in value.items():
+        try:
+            year = int(str(key).strip())
+        except ValueError:
+            continue
+        if year < HISTORY_MIN_YEAR or (max_year is not None and year > max_year):
+            continue
+        if not isinstance(entry, dict):
+            continue
+        kwh = clean_number(entry.get("kwh"))
+        if kwh is None or not math.isfinite(kwh) or kwh <= 0 or kwh > HISTORY_MAX_KWH:
+            continue
+        item = {"kwh": kwh}
+        cost = clean_number(entry.get("cost"))
+        if cost is not None and math.isfinite(cost) and 0 < cost <= HISTORY_MAX_COST:
+            item["cost"] = cost
+        years[str(year)] = item
+    return dict(sorted(years.items()))
+
+
 def clean_number(value: Any) -> float | None:
     """A number or None: texts with a decimal comma work, anything unusable (and negative values) means not set."""
     if isinstance(value, bool) or value is None:
@@ -123,6 +158,8 @@ def normalize(data: dict[str, Any]) -> dict[str, Any]:
         if key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS)
         else clean_device_tariffs(data.get(key))
         if key == CONF_DEVICE_TARIFFS
+        else clean_history(data.get(key))
+        if key == CONF_HISTORY_YEARS
         else clean_names(data.get(key))
         if key in DICT_KEYS
         else clean_ids(data.get(key))
@@ -162,6 +199,9 @@ def to_storage(settings: dict[str, Any]) -> dict[str, Any]:
         elif key in (CONF_LABEL_TARIFFS, CONF_AREA_TARIFFS):
             if tariffs := clean_label_tariffs(value):
                 stored[key] = tariffs
+        elif key == CONF_HISTORY_YEARS:
+            if history := clean_history(value):
+                stored[key] = history
         elif key in DICT_KEYS:
             if value:
                 stored[key] = clean_names(value)
