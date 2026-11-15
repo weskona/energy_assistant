@@ -4602,3 +4602,26 @@ test("history: the settings add, replace and remove years in the draft", () => {
   assert.match(p._renderHistory(false), /data-histrm="2020"/);
   assert.doesNotMatch(p._renderHistory(true), /data-histadd|data-histrm/); // read only
 });
+
+test("group cards: areas and labels show their icons like the Power tab, devices none", () => {
+  globalThis.haIcon = true;
+  try {
+    const p = areaGroupPanel();
+    p._hass.areas = { ...p._hass.areas, kueche: { ...(p._hass.areas?.kueche || {}), name: "Küche", icon: "mdi:silverware" } };
+    p._labelData = { labels: [{ label_id: "klima", name: "Klima", icon: "mdi:fan", color: "blue" }] };
+    p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: {
+      "area:kueche": { kwh: 1.5, covered: 2, total: 2 },
+      "area:wohnzimmer": { kwh: 0.1, covered: 1, total: 1 },
+      "label:klima": { kwh: 0.1, covered: 1, total: 1 },
+    } };
+    const num = (v) => v.toFixed(2);
+    const areas = p._renderGroupEnergy("area", { range: "day", off: 0, num });
+    assert.match(areas, /<ha-icon class="ico" icon="mdi:silverware"><\/ha-icon><span class="nt"[^>]*>Küche/);
+    assert.match(areas, /icon="mdi:texture-box"/); // an area without icon gets the default
+    const labels = p._renderGroupEnergy("label", { range: "day", off: 0, num });
+    assert.match(labels, /icon="mdi:fan" style="color:var\(--blue-color/);
+    assert.deepEqual(p._groupIcon("device", "sensor.x"), { icon: null, color: null });
+  } finally {
+    globalThis.haIcon = false;
+  }
+});
