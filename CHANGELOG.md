@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-11-15
+
 ### Fixed
 
 - **Devices tab on a phone:** with long device names a category card was wider than the screen and pushed the whole page sideways (cards and tab bar were cut off). The cards of the Consumption and Devices tabs now always stay within the screen width; long names are shortened with an ellipsis.
