@@ -211,3 +211,30 @@ def test_device_tariffs_keep_only_valid_entries() -> None:
     assert result == {"sensor.wp_power": "sensor.wp_preis"}
     assert normalize({})["device_tariffs"] == {}
     assert "device_tariffs" not in to_storage({"device_tariffs": {}})
+
+
+def test_history_years_are_cleaned_and_stored() -> None:
+    raw = {
+        "2022": {"kwh": "3.400,5".replace(".", "").replace(",", "."), "cost": 950},
+        "2021": {"kwh": 3100},
+        "1800": {"kwh": 10},  # implausible year
+        "abc": {"kwh": 10},
+        "2020": {"kwh": float("nan")},
+        "2019": {"kwh": -5},
+        "2018": {"kwh": float("inf")},
+        "2017": {"kwh": 0},
+        "2016": {"kwh": 99_999_999_999},
+        "2015": "text",
+        "2014": {"kwh": 100, "cost": -3},
+    }
+    settings = normalize({"history_years": raw})
+    assert settings["history_years"] == {
+        "2014": {"kwh": 100.0},
+        "2021": {"kwh": 3100.0},
+        "2022": {"kwh": 3400.5, "cost": 950.0},
+    }
+    assert normalize({})["history_years"] == {}
+    assert normalize({"history_years": "bad"})["history_years"] == {}
+    assert to_storage(settings)["history_years"] == settings["history_years"]
+    assert "history_years" not in to_storage(normalize({}))
+    assert normalize(to_storage(settings)) == settings

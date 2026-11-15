@@ -21,6 +21,13 @@ CONF_STANDBY_NORMAL = "standby_normal"
 CONF_DEVICE_IDS = "device_ids"
 # Tariffy price sensor per such device ({entity_id: entity_id}).
 CONF_DEVICE_TARIFFS = "device_tariffs"
+# Consumption of past years entered by hand: {"2022": {"kwh": 3400.0, "cost": 950.0}} (cost optional).
+# Only shown when Home Assistant has no statistics for that year.
+CONF_HISTORY_YEARS = "history_years"
+# Plausible years and the largest yearly value accepted for a manual entry.
+HISTORY_MIN_YEAR = 1990
+HISTORY_MAX_KWH = 10_000_000.0
+HISTORY_MAX_COST = 100_000_000.0
 # Name patterns like "*_leistung": every power sensor that matches is listed as a device.
 CONF_DEVICE_PATTERNS = "device_patterns"
 # Sensors that a pattern must not add to the device list.
@@ -122,6 +129,7 @@ CONFIG_KEYS = (
     CONF_LABEL_TARIFFS,
     CONF_AREA_TARIFFS,
     CONF_DEVICE_TARIFFS,
+    CONF_HISTORY_YEARS,
     *BOOL_KEYS,
     *NUMBER_KEYS,
 )
