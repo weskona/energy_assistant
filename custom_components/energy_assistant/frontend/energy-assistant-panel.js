@@ -55,7 +55,7 @@ const STYLE = `
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
-.stack{display:grid;gap:var(--eb-gap)}
+.stack{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr)}
 .dtop{display:flex;gap:24px;align-items:center;margin-top:14px;flex-wrap:wrap}
 .dring{flex:none;width:130px}
 .donut{display:block;width:100%;height:auto}

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Devices tab on a phone:** with long device names a category card was wider than the screen and pushed the whole page sideways (cards and tab bar were cut off). The cards of the Consumption and Devices tabs now always stay within the screen width; long names are shortened with an ellipsis.
+
 ### Changed
 
 - **Icons in the Consumption tab:** the *Areas* and *Labels* cards show the icon of every area and label (and the color of a label), like the Power tab. An area or label without an icon gets the default one; devices have no icon on either tab.
