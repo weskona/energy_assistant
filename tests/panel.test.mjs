@@ -4510,3 +4510,18 @@ test("cost tables: devices and labels are sorted the same way", () => {
   assert.deepEqual(names(p._renderGroupCosts("label")), ["Licht", "Klima"]);
   assert.deepEqual(names(p._renderGroupCosts("device")), ["Licht Flur", "Klimaanlage"]);
 });
+
+test("group cards: a card without the Show all button keeps its place so the hints line up", () => {
+  const p = groupCardsPanel({ area: 12, label: 8, device: 12 }); // the labels have exactly as many rows as shown
+  assert.equal(p._groupLimit(), 8);
+  const html = p._renderUsage();
+  const labels = html.slice(html.indexOf(">Labels<"), html.indexOf(">Devices with sensors<"));
+  assert.doesNotMatch(labels, /Show all/);
+  assert.match(labels, /class="linkbtn" style="visibility:hidden"/); // the invisible placeholder in the height of the button
+  assert.equal((html.match(/style="visibility:hidden"/g) || []).length, 1); // only the card that needs it
+  // nothing is folded: no placeholder at all
+  const short = groupCardsPanel({ area: 6, label: 6, device: 6 })._renderUsage();
+  assert.doesNotMatch(short, /visibility:hidden/);
+  // a single card needs no placeholder either
+  assert.doesNotMatch(groupCardsPanel({ label: 8 })._renderUsage(), /visibility:hidden/);
+});

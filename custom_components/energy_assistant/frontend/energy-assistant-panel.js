@@ -1579,7 +1579,8 @@ class EnergyAssistantPanel extends HTMLElement {
     // 4) energy per selected area and label, from the long-term statistics of their sensors
     // Areas, labels and devices with their own sensors stand side by side (up to three columns).
     const groupLimit = this._groupLimit();
-    const groupCards = ["area", "label", "device"].map((kind) => this._renderGroupEnergy(kind, { range, off, num, limit: groupLimit })).filter(Boolean);
+    const spacer = ["area", "label", "device"].some((k) => (this._groupRows(k)?.length || 0) > groupLimit);
+    const groupCards = ["area", "label", "device"].map((kind) => this._renderGroupEnergy(kind, { range, off, num, limit: groupLimit, spacer })).filter(Boolean);
     const groups = groupCards.length > 1 ? `<div class="cards">${groupCards.join("")}</div>` : groupCards.join("");
     const note = !today && !u.devices.length ? `<div class="hint">${esc(this._t("uNeedStats"))}</div>` : "";
     return wrap(`${baseCard}<div class="pair">${topCard}${alwaysCard}</div>${groups}${note}`);
@@ -1613,7 +1614,7 @@ class EnergyAssistantPanel extends HTMLElement {
     return lens.length ? Math.max(MIN_ROWS, Math.min(MAX_ROWS, Math.min(...lens))) : MAX_ROWS;
   }
 
-  _renderGroupEnergy(kind, { range, off, num, limit = MAX_ROWS }) {
+  _renderGroupEnergy(kind, { range, off, num, limit = MAX_ROWS, spacer = false }) {
     const selected = this._cfg[`${kind}_ids`] || [];
     if (!selected.length) return "";
     const title = `<div class="row"><span class="eb-title">${esc(this._t({ area: "uAreasTitle", device: "uDevicesTitle" }[kind] || "uLabelsTitle"))}</span>${this._groupUsageLoading ? `<span class="eb-label">…</span>` : ""}</div>`;
@@ -1625,7 +1626,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const open = this._open?.has(key);
     const folded = rows.length > limit;
     const shown = folded && !open ? rows.slice(0, limit) : rows;
-    const button = folded ? `<button type="button" class="linkbtn" data-open="${key}">${esc(open ? this._t("showLess") : this._t("showAll", { n: rows.length }))}</button>` : "";
+    // A card without the button keeps its place when another card of the row has one, so the hints line up.
+    const button = folded
+      ? `<button type="button" class="linkbtn" data-open="${key}">${esc(open ? this._t("showLess") : this._t("showAll", { n: rows.length }))}</button>`
+      : spacer ? `<button type="button" class="linkbtn" style="visibility:hidden" tabindex="-1" aria-hidden="true">.</button>` : "";
     const html = shown
       .map((r) => {
         const cover = r.covered < r.total ? ` <small class="cnt" title="${esc(this._t("uLabelsCoverageTip"))}">${esc(this._t("uLabelsCoverage", { n: r.covered, m: r.total }))}</small>` : "";

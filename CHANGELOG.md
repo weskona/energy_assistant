@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Group cards line up:** when one of the cards *Areas*, *Labels* and *Devices with sensors* has no *Show all* button (its list is exactly as long as the rows shown), it keeps the place of the button, so the hints of the three cards start at the same height.
 - **Cost tables sorted by cost:** the tables *Cost per label*, *Cost per area* and *Cost per device* in the Costs tab list the biggest cost first (by the year, then the month, the week and the day; equal costs by name) instead of the order of the selection.
 
 ## [0.29.2] - 2026-11-14
