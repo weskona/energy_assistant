@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cost tables sorted by cost:** the tables *Cost per label*, *Cost per area* and *Cost per device* in the Costs tab list the biggest cost first (by the year, then the month, the week and the day; equal costs by name) instead of the order of the selection.
+
 ## [0.29.2] - 2026-11-14
 
 ### Fixed

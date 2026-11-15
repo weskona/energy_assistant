@@ -2641,14 +2641,23 @@ class EnergyAssistantPanel extends HTMLElement {
     const sensors = { area: this._areaEnergy, device: this._deviceEnergy }[kind] || this._labelEnergy;
     const rows = (this._cfg[`${kind}_ids`] || [])
       .map((id) => {
-        const cells = periods.map(([p]) => {
+        const values = periods.map(([p]) => {
           const state = this._hass?.states?.[sensors?.[id]?.[`cost_${p}`]];
           const v = state ? parseFloat(state.state) : NaN;
-          return Number.isFinite(v) ? this._money(v, state.attributes?.unit_of_measurement || "EUR").join(" ") : "–";
+          return { v: Number.isFinite(v) ? v : null, unit: state?.attributes?.unit_of_measurement || "EUR" };
         });
-        return { id, name: this._groupName(kind, id), cells, any: cells.some((c) => c !== "–") };
+        const cells = values.map((x) => (x.v == null ? "–" : this._money(x.v, x.unit).join(" ")));
+        return { id, name: this._groupName(kind, id), cells, values: values.map((x) => x.v), any: cells.some((c) => c !== "–") };
       })
-      .filter((r) => r.any);
+      .filter((r) => r.any)
+      // The biggest cost first: by the year, then the month, the week and the day; the name decides between equals.
+      .sort((a, b) => {
+        for (const k of [3, 2, 1, 0]) {
+          const d = (b.values[k] ?? -1) - (a.values[k] ?? -1);
+          if (d !== 0) return d;
+        }
+        return a.name.localeCompare(b.name);
+      });
     if (!rows.length) return "";
     const head = `<div class="lc head"><span></span>${periods.map(([, k]) => `<span class="n">${esc(this._t(k))}</span>`).join("")}</div>`;
     const body = rows

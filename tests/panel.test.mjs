@@ -4478,3 +4478,35 @@ test("tab bar: on a narrow screen the active tab is brought to the middle, once 
   p._tab = "ev";
   p._centerActiveTab({ scrollWidth: 700, clientWidth: 300, scrollLeft: 0, querySelector: () => null }); // no active tab yet
 });
+
+test("cost tables: the biggest cost comes first (year, then month, week, day), not the order of the selection", () => {
+  const p = areaGroupPanel({ area_ids: ["kueche", "wohnzimmer", "technik", "keller"] });
+  p._hass.areas = { kueche: { name: "Küche" }, wohnzimmer: { name: "Wohnzimmer" }, technik: { name: "Technik" }, keller: { name: "Keller" } };
+  const eur = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR" } });
+  const put = (id, day, week, month, year) => {
+    Object.assign(p._hass.states, { [`s.${id}d`]: eur(day), [`s.${id}w`]: eur(week), [`s.${id}m`]: eur(month), [`s.${id}y`]: eur(year) });
+    return { cost_day: `s.${id}d`, cost_week: `s.${id}w`, cost_month: `s.${id}m`, cost_year: `s.${id}y` };
+  };
+  p._areaEnergy = {
+    kueche: put("k", 0.1, 1, 2, 5), // small
+    wohnzimmer: put("w", 0.3, 4, 9, 40), // the biggest
+    technik: put("t", 0.5, 1, 2, 5), // same year and month as the kitchen, a bigger day
+    keller: put("l", 0.2, 3, 7, 12),
+  };
+  const names = (html) => [...html.matchAll(/class="nm" title="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(names(p._renderGroupCosts("area")), ["Wohnzimmer", "Keller", "Technik", "Küche"]);
+  // equal costs: the name decides; a missing period counts as the smallest
+  p._areaEnergy = { kueche: put("a", 1, 1, 1, 1), wohnzimmer: put("b", 1, 1, 1, 1), technik: { cost_day: "s.ad" }, keller: put("c", 2, 2, 2, 2) };
+  assert.deepEqual(names(p._renderGroupCosts("area")), ["Keller", "Küche", "Wohnzimmer", "Technik"]);
+});
+
+test("cost tables: devices and labels are sorted the same way", () => {
+  const p = devicesTabPanel({ label_ids: ["klima", "licht"], device_ids: ["sensor.klimaanlage_leistung", "sensor.licht_flur_leistung"] });
+  const eur = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR" } });
+  Object.assign(p._hass.states, { "s.a": eur(1), "s.b": eur(9) });
+  p._labelEnergy = { klima: { cost_year: "s.a" }, licht: { cost_year: "s.b" } };
+  p._deviceEnergy = { "sensor.klimaanlage_leistung": { cost_year: "s.a" }, "sensor.licht_flur_leistung": { cost_year: "s.b" } };
+  const names = (html) => [...html.matchAll(/class="nm" title="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(names(p._renderGroupCosts("label")), ["Licht", "Klima"]);
+  assert.deepEqual(names(p._renderGroupCosts("device")), ["Licht Flur", "Klimaanlage"]);
+});
