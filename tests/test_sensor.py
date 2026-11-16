@@ -13,8 +13,10 @@ from custom_components.energy_assistant.const import DOMAIN
 from custom_components.energy_assistant.sensor import (
     PERIODS,
     GroupEnergy,
+    is_phase_sensor,
     period_start,
     unique_id,
+    without_double_phases,
 )
 
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -97,8 +99,11 @@ async def test_power_readings_are_checked(hass: HomeAssistant) -> None:
     assert _power(hass, "1500", None) == 0.0  # no unit
     assert _power(hass, "1500", "mW") == 0.0  # unit that is not understood
     # impossible values do not replace the last good one
-    for bad in ("nan", "inf", "-inf", "-50", "abc", "", "250000"):  # the last is 250 kW
+    for bad in ("nan", "inf", "-inf", "abc", "", "250000"):  # the last is 250 kW
         assert _power(hass, bad) == 0.7, bad
+    # a negative reading is a real value: nothing is consumed, the last positive one must not stay
+    assert _power(hass, "-50") == 0.0
+    assert _power(hass, "-0.2", "kW") == 0.0
 
 
 async def test_a_spike_does_not_reach_the_counters(hass: HomeAssistant) -> None:
@@ -733,3 +738,103 @@ async def test_saving_the_same_selection_again_never_creates_a_second_set(
     )
     await hass.async_block_till_done()
     assert ours() == first
+
+
+async def test_a_negative_reading_does_not_keep_the_last_positive_value(
+    hass: HomeAssistant,
+) -> None:
+    """A clamp wired the other way round reports -50 W: that must not count the last +70 W for hours."""
+    tracker = _tracker(hass)
+    tracker.members = {"sensor.x"}
+    attrs = {"device_class": "power", "unit_of_measurement": "W"}
+    hass.states.async_set("sensor.x", "70", attrs)
+    tracker.powers["sensor.x"] = tracker._power("sensor.x", 0.0)
+    assert tracker.powers["sensor.x"] == 0.07
+    hass.states.async_set("sensor.x", "-50", attrs)
+    tracker.powers["sensor.x"] = tracker._power("sensor.x", tracker.powers["sensor.x"])
+    _run(tracker, 60)
+    assert tracker.values["day"] == 0.0
+
+
+def test_phase_sensors_are_recognised_by_their_object_id() -> None:
+    for name in (
+        "sensor.herd_phase_a_active_power",
+        "sensor.durchlauferhitzer_phase_c_active_power",
+        "sensor.wallbox_3em_phase_b_leistung",
+        "sensor.herd_l2_power",
+        "sensor.herd_l3_power",
+        "sensor.meter_l1",
+    ):
+        assert is_phase_sensor(name), name
+    for name in (
+        "sensor.herd_leistung",
+        "sensor.herd_total_active_power",
+        "sensor.durchlauferhitzer_leistung",
+        "sensor.lamp_power",
+        "sensor.hall_power",  # "all" is not a phase
+        "sensor.pool_leistung",
+    ):
+        assert not is_phase_sensor(name), name
+
+
+def test_phases_are_dropped_only_when_the_device_has_a_total_sensor() -> None:
+    found = {
+        "sensor.herd_leistung",
+        "sensor.herd_phase_a_active_power",
+        "sensor.herd_l2_power",
+        "sensor.meter_phase_a",  # a device with phases only: their sum is its power
+        "sensor.meter_phase_b",
+        "sensor.lamp_power",  # no device
+        "sensor.lamp_phase_a",  # no device: nothing to compare with, stays
+    }
+    device_of = {
+        "sensor.herd_leistung": "herd",
+        "sensor.herd_phase_a_active_power": "herd",
+        "sensor.herd_l2_power": "herd",
+        "sensor.meter_phase_a": "meter",
+        "sensor.meter_phase_b": "meter",
+        "sensor.lamp_power": None,
+        "sensor.lamp_phase_a": None,
+    }
+    assert without_double_phases(found, device_of) == {
+        "sensor.herd_leistung",
+        "sensor.meter_phase_a",
+        "sensor.meter_phase_b",
+        "sensor.lamp_power",
+        "sensor.lamp_phase_a",
+    }
+
+
+async def test_an_area_counts_a_device_once_not_its_total_and_its_phases(
+    hass: HomeAssistant,
+) -> None:
+    """The kitchen case: the stove reports its total and each phase, only the total counts."""
+    from homeassistant.helpers import area_registry as ar
+    from homeassistant.helpers import device_registry as dr
+
+    kitchen = ar.async_get(hass).async_create("Kueche")
+    config = MockConfigEntry(domain="test", data={})
+    config.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=config.entry_id, identifiers={("test", "herd")}
+    )
+    dr.async_get(hass).async_update_device(device.id, area_id=kitchen.id)
+    registry = er.async_get(hass)
+    ids = {}
+    for name in ("herd_leistung", "herd_phase_a_active_power", "herd_l2_power"):
+        reg = registry.async_get_or_create(
+            "sensor",
+            "test",
+            name,
+            suggested_object_id=name,
+            config_entry=config,
+            device_id=device.id,
+        )
+        hass.states.async_set(
+            reg.entity_id, "100", {"device_class": "power", "unit_of_measurement": "W"}
+        )
+        ids[name] = reg.entity_id
+    tracker = GroupEnergy(
+        hass, MockConfigEntry(domain=DOMAIN, data={}), "kueche", "area"
+    )
+    assert tracker._find_members() == {ids["herd_leistung"]}
