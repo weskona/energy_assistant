@@ -71,6 +71,8 @@ const STYLE = `
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
 .eb-label.davg{margin-top:14px;text-transform:none;letter-spacing:0}
 .eb-title .ico,.dl .ico{--mdc-icon-size:18px;margin-right:6px;vertical-align:middle}
+.eb-label.vs.up{color:var(--eb-red)}
+.eb-label.vs.down{color:var(--eb-green)}
 .dchart{margin-top:6px}
 .dchart svg{display:block;width:100%;height:auto}
 .cats2{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
@@ -2450,7 +2452,7 @@ class EnergyAssistantPanel extends HTMLElement {
       let extra = "";
       if (before != null && Math.abs(before) > 0.005) {
         const pct = Math.round(((amount - before) / Math.abs(before)) * 100);
-        extra = `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
+        extra = `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
       }
       return `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div>${extra}</div>`;
     };
@@ -2484,7 +2486,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (before == null || !(before > 0) || cur == null) return "";
       const pct = Math.round(((cur - before) / before) * 100);
       const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "•";
-      return `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
+      return `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
     };
     if (b.manual) return wrap(`${this._renderManualYear(b, delta, tile, kwh, head)}${this._manualYearsChart(b.manual.year)}`);
     const tiles = [];

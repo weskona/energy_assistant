@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Colored changes:** the arrow and the text of the change to the period before (*▲ 8 % vs. last month*) are red when the value went up and green when it went down; an unchanged value stays as it was. This applies to the balance tiles and the costs of the period.
+
 ## [0.30.1] - 2026-11-15
 
 ### Fixed

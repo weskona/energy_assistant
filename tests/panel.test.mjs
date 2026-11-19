@@ -4625,3 +4625,10 @@ test("group cards: areas and labels show their icons like the Power tab, devices
     globalThis.haIcon = false;
   }
 });
+
+test("balance: the change to the period before is red when it went up and green when it went down", () => {
+  const html = loadedBalance()._renderBalance();
+  assert.match(html, /class="eb-label vs up"[^>]*>▲ 200 %/);
+  assert.match(html, /class="eb-label vs down"[^>]*>▼ 25 %/);
+  assert.doesNotMatch(html, /class="eb-label vs"[^>]*>(▲|▼)/); // only an unchanged value stays plain
+});
