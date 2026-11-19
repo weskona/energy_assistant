@@ -215,23 +215,31 @@ def test_device_tariffs_keep_only_valid_entries() -> None:
 
 def test_history_years_are_cleaned_and_stored() -> None:
     raw = {
-        "2022": {"kwh": "3.400,5".replace(".", "").replace(",", "."), "cost": 950},
-        "2021": {"kwh": 3100},
-        "1800": {"kwh": 10},  # implausible year
-        "abc": {"kwh": 10},
-        "2020": {"kwh": float("nan")},
-        "2019": {"kwh": -5},
-        "2018": {"kwh": float("inf")},
-        "2017": {"kwh": 0},
-        "2016": {"kwh": 99_999_999_999},
+        "2022": {
+            "house": {"kwh": "3400,5", "cost": 950},
+            "solar": {"kwh": 5000},
+            "gas": {"kwh": 10},  # not a kind
+        },
+        "2021": {"import": {"kwh": 3100}, "export": {"kwh": 0}},  # export is unusable
+        "2019": {"kwh": 7000, "cost": 1200},  # first version: the house only
+        "1800": {"house": {"kwh": 10}},  # implausible year
+        "abc": {"house": {"kwh": 10}},
+        "2020": {"house": {"kwh": float("nan")}},
+        "2018": {"house": {"kwh": float("inf")}},
+        "2017": {"house": {"kwh": -5}},
+        "2016": {"house": {"kwh": 99_999_999_999}},
         "2015": "text",
-        "2014": {"kwh": 100, "cost": -3},
+        "2014": {"house": {"kwh": 100, "cost": -3}},
     }
     settings = normalize({"history_years": raw})
     assert settings["history_years"] == {
-        "2014": {"kwh": 100.0},
-        "2021": {"kwh": 3100.0},
-        "2022": {"kwh": 3400.5, "cost": 950.0},
+        "2014": {"house": {"kwh": 100.0}},
+        "2019": {"house": {"kwh": 7000.0, "cost": 1200.0}},
+        "2021": {"import": {"kwh": 3100.0}},
+        "2022": {
+            "house": {"kwh": 3400.5, "cost": 950.0},
+            "solar": {"kwh": 5000.0},
+        },
     }
     assert normalize({})["history_years"] == {}
     assert normalize({"history_years": "bad"})["history_years"] == {}

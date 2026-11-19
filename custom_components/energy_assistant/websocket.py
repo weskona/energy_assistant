@@ -21,6 +21,7 @@ from .const import (
     CONF_HOUSE_POWER,
     CONF_LABEL_TARIFFS,
     DOMAIN,
+    HISTORY_KINDS,
     HISTORY_MAX_COST,
     HISTORY_MAX_KWH,
     ID_KEYS,
@@ -72,13 +73,17 @@ _CONFIG_SCHEMA = vol.Schema(
         vol.Optional(CONF_DEVICE_TARIFFS): {cv.entity_id: cv.entity_id},
         vol.Optional(CONF_HISTORY_YEARS): {
             vol.All(cv.string, vol.Match(r"^[0-9]{4}$")): {
-                vol.Required("kwh"): vol.All(
-                    vol.Coerce(float), vol.Range(min=0, max=HISTORY_MAX_KWH)
-                ),
-                vol.Optional("cost"): vol.Any(
-                    None,
-                    vol.All(vol.Coerce(float), vol.Range(min=0, max=HISTORY_MAX_COST)),
-                ),
+                vol.In(HISTORY_KINDS): {
+                    vol.Required("kwh"): vol.All(
+                        vol.Coerce(float), vol.Range(min=0, max=HISTORY_MAX_KWH)
+                    ),
+                    vol.Optional("cost"): vol.Any(
+                        None,
+                        vol.All(
+                            vol.Coerce(float), vol.Range(min=0, max=HISTORY_MAX_COST)
+                        ),
+                    ),
+                }
             }
         },
         vol.Optional(CONF_HOUSE_POWER): vol.Any(None, cv.entity_id),
