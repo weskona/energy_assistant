@@ -71,8 +71,8 @@ const STYLE = `
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
 .eb-label.davg{margin-top:14px;text-transform:none;letter-spacing:0}
 .eb-title .ico,.dl .ico{--mdc-icon-size:18px;margin-right:6px;vertical-align:middle}
-.eb-label.vs.up{color:var(--eb-red)}
-.eb-label.vs.down{color:var(--eb-green)}
+.eb-label.vs.bad{color:var(--eb-red)}
+.eb-label.vs.good{color:var(--eb-green)}
 .dchart{margin-top:6px}
 .dchart svg{display:block;width:100%;height:auto}
 .cats2{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
@@ -2482,6 +2482,11 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** "30 % vs. yesterday" and so on: the change to the period before, named after the chosen period. */
+  /** Color class of a change: good (green) or bad (red) depending on whether more of it is better (production, feed-in) or worse (consumption, grid import, cost). */
+  _vsClass(pct, goodUp) {
+    return pct === 0 ? "" : (pct > 0) === goodUp ? " good" : " bad";
+  }
+
   _vsText(arrow, pct, range, off) {
     return this._t(`bVs_${range}${off < 0 ? "_past" : ""}`, { arrow, pct });
   }
@@ -2508,12 +2513,12 @@ class EnergyAssistantPanel extends HTMLElement {
     if (b.failed || Number.isNaN(price) || t.imp == null) return card(`<div class="empty">${this._t("bNoData")}</div>`);
     const currency = String(priceState.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
     const feed = this._feedInTariff();
-    const tile = (label, amount, before) => {
+    const tile = (label, amount, before, goodUp = false) => {
       const [n, sym] = this._money(amount, currency);
       let extra = "";
       if (before != null && Math.abs(before) > 0.005) {
         const pct = Math.round(((amount - before) / Math.abs(before)) * 100);
-        extra = `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
+        extra = `<div class="eb-label vs${this._vsClass(pct, goodUp)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
       }
       return `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div>${extra}</div>`;
     };
@@ -2521,8 +2526,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const tiles = [tile(this._t("bCost"), cost, prev?.imp != null ? prev.imp * price : null)];
     if (t.exp != null && feed != null) {
       const revenue = t.exp * feed;
-      tiles.push(tile(this._t("bRevenue"), revenue, prev?.exp != null ? prev.exp * feed : null));
-      tiles.push(tile(this._t("bSaldo"), revenue - cost, prev?.imp != null && prev?.exp != null ? prev.exp * feed - prev.imp * price : null));
+      tiles.push(tile(this._t("bRevenue"), revenue, prev?.exp != null ? prev.exp * feed : null, true));
+      tiles.push(tile(this._t("bSaldo"), revenue - cost, prev?.imp != null && prev?.exp != null ? prev.exp * feed - prev.imp * price : null, true));
     }
     return card(`<div class="tiles">${tiles.join("")}</div><div class="hint">${esc(this._t("bPriceNote"))}</div>`);
   }
@@ -2543,15 +2548,15 @@ class EnergyAssistantPanel extends HTMLElement {
     const t = b.totals, prev = b.before;
     const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
-    const delta = (cur, before) => {
+    const delta = (cur, before, goodUp = true) => {
       if (before == null || !(before > 0) || cur == null) return "";
       const pct = Math.round(((cur - before) / before) * 100);
       const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "•";
-      return `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
+      return `<div class="eb-label vs${this._vsClass(pct, goodUp)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
     };
     const tiles = [];
     for (const [key, label] of [["solar", "bSolar"], ["cons", "bHouse"], ["imp", "bImport"], ["exp", "bExport"], ["chg", "bCharge"], ["dis", "bDischarge"]]) {
-      if (t[key] != null) tiles.push(tile(this._t(label), kwh(t[key]), "kWh", delta(t[key], prev?.[key])));
+      if (t[key] != null) tiles.push(tile(this._t(label), kwh(t[key]), "kWh", delta(t[key], prev?.[key], key !== "cons" && key !== "imp")));
     }
     if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
     if (t.self != null) tiles.push(tile(this._t("bSelf"), Math.round(t.self), "%", delta(t.self, prev?.self)));

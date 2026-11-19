@@ -4632,3 +4632,47 @@ test("history: the settings add, edit and remove years and kinds in the draft", 
   p._onClick({ target: { closest: (sel) => (sel === "[data-histrm]" ? { dataset: { histrm: "2020:house" } } : null) } });
   assert.deepEqual(Object.keys(p._draft.history_years), ["2021"]);
 });
+
+
+test("group cards: areas and labels show their icons like the Power tab, devices none", () => {
+  globalThis.haIcon = true;
+  try {
+    const p = areaGroupPanel();
+    p._hass.areas = { ...p._hass.areas, kueche: { ...(p._hass.areas?.kueche || {}), name: "Küche", icon: "mdi:silverware" } };
+    p._labelData = { labels: [{ label_id: "klima", name: "Klima", icon: "mdi:fan", color: "blue" }] };
+    p._groupUsage = { key: p._groupUsageKey("day", 0), at: Date.now(), rows: {
+      "area:kueche": { kwh: 1.5, covered: 2, total: 2 },
+      "area:wohnzimmer": { kwh: 0.1, covered: 1, total: 1 },
+      "label:klima": { kwh: 0.1, covered: 1, total: 1 },
+    } };
+    const num = (v) => v.toFixed(2);
+    const areas = p._renderGroupEnergy("area", { range: "day", off: 0, num });
+    assert.match(areas, /<ha-icon class="ico" icon="mdi:silverware"><\/ha-icon><span class="nt"[^>]*>Küche/);
+    assert.match(areas, /icon="mdi:texture-box"/); // an area without icon gets the default
+    const labels = p._renderGroupEnergy("label", { range: "day", off: 0, num });
+    assert.match(labels, /icon="mdi:fan" style="color:var\(--blue-color/);
+    assert.deepEqual(p._groupIcon("device", "sensor.x"), { icon: null, color: null });
+  } finally {
+    globalThis.haIcon = false;
+  }
+});
+
+test("balance: the change is green when it is good and red when it is bad, per tile", () => {
+  const html = loadedBalance()._renderBalance();
+  const tile = (label) => new RegExp(`${label}</div><div class="eb-value">[^<]*<small>[^<]*</small></div><div class="eb-label vs( good| bad)?"[^>]*>(▲|▼)`).exec(html);
+  // production 30 vs 10 (up): good; grid import 6 vs 8 (down): good; feed-in 7 vs 1 (up): good
+  assert.equal(tile("Production")[1], " good");
+  assert.equal(tile("Grid import")[1], " good");
+  assert.equal(tile("Feed-in")[1], " good");
+  const p = loadedBalance();
+  assert.equal(p._vsClass(10, true), " good");
+  assert.equal(p._vsClass(10, false), " bad"); // more consumption or import is bad
+  assert.equal(p._vsClass(-10, true), " bad"); // less production or feed-in is bad
+  assert.equal(p._vsClass(-10, false), " good");
+  assert.equal(p._vsClass(0, true), ""); // unchanged stays plain
+  // consumption up is red
+  const q = loadedBalance();
+  q._bal.totals.cons = 20;
+  q._bal.before = { ...q._bal.before, cons: 10 };
+  assert.match(q._renderBalance(), /Consumption<\/div><div class="eb-value">20\.0<small>kWh<\/small><\/div><div class="eb-label vs bad"/);
+});
