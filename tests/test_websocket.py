@@ -619,8 +619,11 @@ async def test_update_config_stores_the_manual_yearly_values(
             "type": "energy_assistant/update_config",
             "config": {
                 "history_years": {
-                    "2022": {"kwh": 3400, "cost": 950},
-                    "2021": {"kwh": 3100, "cost": None},
+                    "2022": {
+                        "house": {"kwh": 3400, "cost": 950},
+                        "solar": {"kwh": 5000},
+                    },
+                    "2021": {"import": {"kwh": 3100, "cost": None}},
                 }
             },
         }
@@ -628,14 +631,16 @@ async def test_update_config_stores_the_manual_yearly_values(
     msg = await client.receive_json()
     assert msg["success"]
     assert msg["result"]["history_years"] == {
-        "2021": {"kwh": 3100.0},
-        "2022": {"kwh": 3400.0, "cost": 950.0},
+        "2021": {"import": {"kwh": 3100.0}},
+        "2022": {"house": {"kwh": 3400.0, "cost": 950.0}, "solar": {"kwh": 5000.0}},
     }
     for bad in (
-        {"22": {"kwh": 5}},  # not a year
-        {"2022": {"kwh": -1}},
-        {"2022": {"kwh": 1e12}},
-        {"2022": {}},  # kWh is required
+        {"22": {"house": {"kwh": 5}}},  # not a year
+        {"2022": {"house": {"kwh": -1}}},
+        {"2022": {"house": {"kwh": 1e12}}},
+        {"2022": {"house": {}}},  # kWh is required
+        {"2022": {"gas": {"kwh": 5}}},  # not a kind
+        {"2022": {"kwh": 5}},  # the old shape is not accepted from the panel
     ):
         await client.send_json_auto_id(
             {"type": "energy_assistant/update_config", "config": {"history_years": bad}}

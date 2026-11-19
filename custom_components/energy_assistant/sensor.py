@@ -57,34 +57,6 @@ COST = "cost_"  # prefix of the period in the unique id of a cost sensor
 # Unit of a power sensor -> factor to kW. Other units are ignored.
 _TO_KW = {"W": 0.001, "kW": 1.0}
 _TICK = timedelta(minutes=1)
-# A sensor of one phase of a device ("herd_phase_a_active_power", "..._l2_power"): its power is
-# already part of the total sensor of the same device, so it must not be added on top of it.
-_PHASE = re.compile(r"(^|_)(phase_[abc]|l[123])(_|$)")
-
-
-def is_phase_sensor(entity_id: str) -> bool:
-    """Whether the object id names one phase of a device (phase_a/b/c or l1/l2/l3)."""
-    return _PHASE.search(entity_id.split(".", 1)[-1]) is not None
-
-
-def without_double_phases(
-    found: set[str], device_of: dict[str, str | None]
-) -> set[str]:
-    """Drop the phase sensors of a device that also has a sensor for its total.
-
-    The total sensor already contains the phases, so counting both would count the same power
-    twice. A device that has only phase sensors keeps all of them (their sum is its power).
-    """
-    by_device: dict[str, list[str]] = {}
-    for entity_id in found:
-        if device_id := device_of.get(entity_id):
-            by_device.setdefault(device_id, []).append(entity_id)
-    drop: set[str] = set()
-    for entity_ids in by_device.values():
-        if any(not is_phase_sensor(e) for e in entity_ids):
-            drop.update(e for e in entity_ids if is_phase_sensor(e))
-    return found - drop
-
 
 # Protection against bad values. The counters only ever grow within a period, so one wrong value
 # would stay in the sum until the period ends; implausible input is therefore not taken over.
@@ -259,7 +231,6 @@ class GroupEnergy:
         excluded = _excluded(self.entry)
         devices = dr.async_get(self.hass)
         found: set[str] = set()
-        device_of: dict[str, str | None] = {}
         for reg in er.async_get(self.hass).entities.values():
             if reg.domain != "sensor" or reg.disabled:
                 continue
@@ -282,15 +253,14 @@ class GroupEnergy:
                 and not excluded(reg.entity_id)
             ):
                 found.add(reg.entity_id)
-                device_of[reg.entity_id] = reg.device_id
-        return without_double_phases(found, device_of)
+        return found
 
     def _power(self, entity_id: str, previous: float = 0.0) -> float:
         """Current power of a sensor in kW.
 
         A sensor that is gone, unavailable or unknown counts as 0 (the device is off or offline).
-        A value that cannot be right (text, NaN, infinity, above MAX_SENSOR_KW) is not taken over:
-        the previous value stays until the sensor reports a sane one. A negative value counts as 0.
+        A value that cannot be right (text, NaN, infinity, negative, above MAX_SENSOR_KW) is not
+        taken over: the previous value stays until the sensor reports a sane one.
         """
         state = self.hass.states.get(entity_id)
         if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -302,12 +272,9 @@ class GroupEnergy:
             value = float(state.state) * factor
         except ValueError:
             return previous
-        if not _finite(value) or value > MAX_SENSOR_KW:
+        if not _finite(value) or value < 0 or value > MAX_SENSOR_KW:
             return previous
-        # A negative reading is a real value (a clamp wired the other way round, a phase that feeds
-        # back): nothing is consumed then. The last positive value must not stay, or it would be
-        # counted for hours.
-        return max(value, 0.0)
+        return value
 
     def _refresh_members(self) -> None:
         members = self._find_members()

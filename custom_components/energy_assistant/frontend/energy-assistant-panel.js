@@ -71,6 +71,8 @@ const STYLE = `
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
 .eb-label.davg{margin-top:14px;text-transform:none;letter-spacing:0}
 .eb-title .ico,.dl .ico{--mdc-icon-size:18px;margin-right:6px;vertical-align:middle}
+.eb-label.vs.up{color:var(--eb-red)}
+.eb-label.vs.down{color:var(--eb-green)}
 .dchart{margin-top:6px}
 .dchart svg{display:block;width:100%;height:auto}
 .cats2{display:grid;gap:var(--eb-gap);grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))}
@@ -177,6 +179,14 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .histtab td{padding:4px 6px;border-top:1px solid var(--eb-tile-border)}
 .histadd{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .histadd input{flex:1 1 90px;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--eb-tile-border);background:var(--eb-tile);color:inherit;font:inherit}
+.ykind{margin-top:10px}
+.ibtn{border:0;background:none;color:var(--eb-muted);cursor:pointer;padding:4px 6px;border-radius:8px;font-size:15px;line-height:1}
+.ibtn:hover{color:var(--eb-text);background:var(--eb-tile)}
+.ibtn[data-histrm]:hover{color:var(--eb-red)}
+.ibtn ha-icon{--mdc-icon-size:18px}
+.histtab td.acts{text-align:right;white-space:nowrap}
+.histtab tr.on td{background:var(--eb-tile)}
+.histadd select{flex:1 1 110px;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--eb-tile-border);background:var(--eb-tile);color:inherit;font:inherit}
 .yrow{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;padding:5px 0;font-size:13px}
 .ytrack{background:var(--eb-tile);border-radius:6px;height:12px;overflow:hidden}
 .ytrack i{display:block;height:100%;background:var(--ea-house);opacity:.45;border-radius:6px}
@@ -367,15 +377,23 @@ const STRINGS = {
     f_energy_battery_discharge: "From storage (discharging)",
     f_energy_house: "House consumption (optional, otherwise calculated)",
     f_history_years: "Past years (entered by hand)",
-    histHint: "Total consumption of the house for years without statistics in Home Assistant. It only shows in the year view; existing statistics always win.",
+    histHint: "Energy of past years that Home Assistant has no statistics for. It only shows in the year view; existing statistics always win.",
+    histKind: "What",
+    histHouse: "Consumption",
+    histSolar: "Production",
+    histImport: "Grid import",
+    histExport: "Feed-in",
+    histEdit: "Edit",
+    histApply: "Apply",
+    histCancel: "Cancel",
     histYear: "Year",
     histKwh: "kWh",
     histCost: "Cost (optional)",
     histAdd: "Add",
-    histInvalid: "Enter a year (1990 or later, not in the future) and a consumption above 0 kWh.",
+    histInvalid: "Enter a year (1990 or later, not in the future) and an energy above 0 kWh.",
     bManual: "Entered by hand",
-    bManualNote: "No statistics for this year in Home Assistant. These are the values you entered.",
-    bYearsTitle: "Consumption per year",
+    bManualNote: "Some values of this year are the ones you entered; Home Assistant has no statistics for them.",
+    bYearsTitle: "Energy per year",
     bCostYear: "Cost",
     energyHint: "Cumulative kWh counters or utility meters. The Balance tab reads their long-term statistics, so the history that already exists is used.",
     energyAsk: "The Energy dashboard of Home Assistant has counters. Do you want to take them over?",
@@ -702,15 +720,23 @@ const STRINGS = {
     f_energy_battery_discharge: "Aus Speicher (Entladen)",
     f_energy_house: "Hausverbrauch (optional, sonst berechnet)",
     f_history_years: "Vergangene Jahre (von Hand)",
-    histHint: "Gesamtverbrauch des Hauses für Jahre ohne Statistik in Home Assistant. Er erscheint nur in der Jahresansicht; vorhandene Statistik hat immer Vorrang.",
+    histHint: "Energie vergangener Jahre, für die Home Assistant keine Statistik hat. Sie erscheint nur in der Jahresansicht; vorhandene Statistik hat immer Vorrang.",
+    histKind: "Was",
+    histHouse: "Verbrauch",
+    histSolar: "Erzeugung",
+    histImport: "Netzbezug",
+    histExport: "Einspeisung",
+    histEdit: "Bearbeiten",
+    histApply: "Übernehmen",
+    histCancel: "Abbrechen",
     histYear: "Jahr",
     histKwh: "kWh",
     histCost: "Kosten (optional)",
     histAdd: "Hinzufügen",
-    histInvalid: "Gib ein Jahr (ab 1990, nicht in der Zukunft) und einen Verbrauch über 0 kWh ein.",
+    histInvalid: "Gib ein Jahr (ab 1990, nicht in der Zukunft) und eine Energie über 0 kWh ein.",
     bManual: "Von Hand eingetragen",
-    bManualNote: "Für dieses Jahr gibt es keine Statistik in Home Assistant. Gezeigt werden deine eingetragenen Werte.",
-    bYearsTitle: "Verbrauch je Jahr",
+    bManualNote: "Einige Werte dieses Jahres hast du von Hand eingetragen; dafür gibt es keine Statistik in Home Assistant.",
+    bYearsTitle: "Energie je Jahr",
     bCostYear: "Kosten",
     energyHint: "Fortlaufende kWh-Zähler oder Utility Meter. Der Tab Bilanz liest deren Langzeitstatistik, der vorhandene Verlauf wird also genutzt.",
     energyAsk: "Das Energie-Dashboard von Home Assistant hat Zähler. Sollen sie übernommen werden?",
@@ -973,19 +999,31 @@ function zonedTime(y, m, d, h, tz) {
 const BAL_CATS = [["solar", "energy_solar"], ["imp", "energy_grid_import"], ["exp", "energy_grid_export"], ["chg", "energy_battery_charge"], ["dis", "energy_battery_discharge"], ["house", "energy_house"]];
 const NUMBER_KEYS = ["battery_capacity", "battery_min_soc"];
 const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
-/** Manual yearly values {year: {kwh, cost?}}: plausible years and positive finite numbers only (like the backend). */
+/** What can be entered per year; the key is the total of the balance it replaces. */
+const HISTORY_KINDS = [["house", "cons", "histHouse"], ["solar", "solar", "histSolar"], ["import", "imp", "histImport"], ["export", "exp", "histExport"]];
+
+/**
+ * Manual yearly values {year: {kind: {kwh, cost?}}}: plausible years, known kinds and positive finite numbers only
+ * (like the backend). The first version stored {year: {kwh, cost?}} for the house; that is the kind "house".
+ */
 function cleanHistory(value, maxYear = Infinity) {
   const out = {};
   if (!value || typeof value !== "object") return out;
   for (const key of Object.keys(value).sort()) {
     const year = Number(key), e = value[key];
     if (!Number.isInteger(year) || year < 1990 || year > maxYear || !e || typeof e !== "object") continue;
-    const kwh = Number(e.kwh);
-    if (!Number.isFinite(kwh) || kwh <= 0) continue;
-    const item = { kwh };
-    const cost = e.cost == null || e.cost === "" ? null : Number(e.cost);
-    if (cost != null && Number.isFinite(cost) && cost > 0) item.cost = cost;
-    out[String(year)] = item;
+    const kinds = "kwh" in e ? { house: e } : e;
+    const row = {};
+    for (const [kind] of HISTORY_KINDS) {
+      const v = kinds[kind];
+      const kwh = v && typeof v === "object" ? Number(v.kwh) : NaN;
+      if (!Number.isFinite(kwh) || kwh <= 0) continue;
+      const item = { kwh };
+      const cost = v.cost == null || v.cost === "" ? null : Number(v.cost);
+      if (cost != null && Number.isFinite(cost) && cost > 0) item.cost = cost;
+      row[kind] = item;
+    }
+    if (Object.keys(row).length) out[String(year)] = row;
   }
   return out;
 }
@@ -2099,10 +2137,33 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const sum = (key) => (rows.some((r) => r[key] != null) ? rows.reduce((a, r) => a + (r[key] ?? 0), 0) : null);
     const totals = { solar: sum("solar"), imp: sum("imp"), exp: sum("exp"), chg: sum("chg"), dis: sum("dis"), cons: sum("cons") };
+    this._balShares(totals);
+    return { rows, totals };
+  }
+
+  /** Self-consumption and self-sufficiency from the totals (null where the data is missing). */
+  _balShares(totals) {
     const share = (v) => Math.max(0, Math.min(100, v));
     totals.self = totals.solar > 0 ? share(((totals.solar - (totals.exp ?? 0)) / totals.solar) * 100) : null;
     totals.autarky = totals.cons > 0 && totals.imp != null ? share(((totals.cons - totals.imp) / totals.cons) * 100) : null;
-    return { rows, totals };
+    return totals;
+  }
+
+  /**
+   * Fills the totals of a year with the values entered by hand where the statistics have nothing for that
+   * kind (statistics always win). Returns the kinds that were filled.
+   */
+  _balManual(totals, year) {
+    const hist = cleanHistory(this._cfg.history_years)[year] || {};
+    const used = [];
+    for (const [kind, key] of HISTORY_KINDS) {
+      if (hist[kind] && !(totals[key] > 0)) {
+        totals[key] = hist[kind].kwh;
+        used.push(kind);
+      }
+    }
+    if (used.length) this._balShares(totals);
+    return used;
   }
 
   async _balFetch(win) {
@@ -2143,11 +2204,13 @@ class EnergyAssistantPanel extends HTMLElement {
       // Years without statistics fall back to the values entered by hand (statistics always win).
       let manual = null;
       if (range === "year" && cur != null) {
-        const hist = cleanHistory(this._cfg.history_years);
         const year = tzParts(win.start, this._tz()).y;
-        const empty = (t) => !t || ["solar", "imp", "exp", "cons"].every((k) => !(t[k] > 0));
-        if (hist[year] && empty(data.totals)) manual = { year, ...hist[year] };
-        if (hist[year - 1] && empty(before)) before = { cons: hist[year - 1].kwh };
+        const keys = this._balManual(data.totals, year);
+        if (keys.length) manual = { year, keys };
+        if (cleanHistory(this._cfg.history_years)[year - 1]) {
+          before = before || {};
+          this._balManual(before, year - 1);
+        }
       }
       this._bal = { range, off, win, ...data, before, manual, failed: cur == null, at: Date.now() };
     } finally {
@@ -2450,7 +2513,7 @@ class EnergyAssistantPanel extends HTMLElement {
       let extra = "";
       if (before != null && Math.abs(before) > 0.005) {
         const pct = Math.round(((amount - before) / Math.abs(before)) * 100);
-        extra = `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
+        extra = `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
       }
       return `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${n}<small>${esc(sym)}</small></div>${extra}</div>`;
     };
@@ -2484,36 +2547,42 @@ class EnergyAssistantPanel extends HTMLElement {
       if (before == null || !(before > 0) || cur == null) return "";
       const pct = Math.round(((cur - before) / before) * 100);
       const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "•";
-      return `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
+      return `<div class="eb-label vs${pct > 0 ? " up" : pct < 0 ? " down" : ""}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(arrow, Math.abs(pct), range, off))}</div>`;
     };
-    if (b.manual) return wrap(`${this._renderManualYear(b, delta, tile, kwh, head)}${this._manualYearsChart(b.manual.year)}`);
     const tiles = [];
     for (const [key, label] of [["solar", "bSolar"], ["cons", "bHouse"], ["imp", "bImport"], ["exp", "bExport"], ["chg", "bCharge"], ["dis", "bDischarge"]]) {
       if (t[key] != null) tiles.push(tile(this._t(label), kwh(t[key]), "kWh", delta(t[key], prev?.[key])));
     }
     if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
     if (t.self != null) tiles.push(tile(this._t("bSelf"), Math.round(t.self), "%", delta(t.self, prev?.self)));
-    const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>` : `<div class="empty">${this._t("bNoData")}</div>`}</div>`;
-    return wrap(`${first}${this._balanceChart(b)}`);
+    if (b.manual) { // the cost entered with a value, and where the numbers come from
+      for (const [kind, , label] of HISTORY_KINDS) {
+        const c = cleanHistory(this._cfg.history_years)[b.manual.year]?.[kind]?.cost;
+        if (c != null && b.manual.keys.includes(kind)) tiles.push(tile(`${this._t(label)} · ${this._t("bCostYear")}`, c.toLocaleString(lang, { maximumFractionDigits: 2 }), ""));
+      }
+    }
+    const note = b.manual ? `<div class="hint">${esc(this._t("bManualNote"))}</div>` : "";
+    const first = `<div class="eb-card">${head}${tiles.length ? `<div class="tiles">${tiles.join("")}</div>` : `<div class="empty">${this._t("bNoData")}</div>`}${note}</div>`;
+    // Without any bar from the statistics the entered years are compared instead of an empty chart.
+    const bars = b.rows.some((r) => ["solar", "cons", "imp", "exp"].some((k) => r[k] > 0));
+    return wrap(`${first}${b.manual && !bars ? this._manualYearsChart(b.manual.year) : this._balanceChart(b)}`);
   }
 
-  /** The year view of a year without statistics: the values entered by hand, marked as such. */
-  _renderManualYear(b, delta, tile, kwh, head) {
-    const m = b.manual, lang = this._hass?.language || "en";
-    const tiles = [tile(this._t("bHouse"), kwh(m.kwh), "kWh", delta(m.kwh, b.before?.cons))];
-    if (m.cost != null) tiles.push(tile(this._t("bCostYear"), m.cost.toLocaleString(lang, { maximumFractionDigits: 2 }), ""));
-    return `<div class="eb-card">${head}<div class="tiles">${tiles.join("")}</div><div class="hint">${esc(this._t("bManualNote"))}</div></div>`;
-  }
-
-  /** One bar per year entered by hand, the shown year highlighted. */
+  /** One bar per year entered by hand for every kind that has entries, the shown year highlighted. */
   _manualYearsChart(selected) {
-    const lang = this._hass?.language || "en";
+    const lang = this._langOf();
     const hist = cleanHistory(this._cfg.history_years);
-    const years = Object.keys(hist);
-    const max = Math.max(...years.map((y) => hist[y].kwh), 1);
-    const rows = years.map((y) => `<div class="yrow${Number(y) === selected ? " on" : ""}"><span class="yname">${esc(y)}</span><span class="ytrack"><i style="width:${Math.max(1, Math.round((hist[y].kwh / max) * 100))}%"></i></span><span class="yval">${hist[y].kwh.toLocaleString(lang, { maximumFractionDigits: 0 })} kWh</span></div>`).join("");
-    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("bYearsTitle"))}</span><span class="eb-label">${esc(this._t("bManual"))}</span></div>${rows}</div>`;
+    const cards = HISTORY_KINDS.map(([kind, , label]) => {
+      const years = Object.keys(hist).filter((y) => hist[y][kind]);
+      if (!years.length) return "";
+      const max = Math.max(...years.map((y) => hist[y][kind].kwh), 1);
+      const rows = years.map((y) => `<div class="yrow${Number(y) === selected ? " on" : ""}"><span class="yname">${esc(y)}</span><span class="ytrack"><i style="width:${Math.max(1, Math.round((hist[y][kind].kwh / max) * 100))}%"></i></span><span class="yval">${hist[y][kind].kwh.toLocaleString(lang, { maximumFractionDigits: 0 })} kWh</span></div>`).join("");
+      return `<div class="ykind"><div class="eb-label">${esc(this._t(label))}</div>${rows}</div>`;
+    }).join("");
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("bYearsTitle"))}</span><span class="eb-label">${esc(this._t("bManual"))}</span></div>${cards}</div>`;
   }
+
+  _langOf() { return this._hass?.language || "en"; }
 
   /** Grouped bars per bucket (production, consumption, import, export) with a title tooltip and the table. */
   _balanceChart(b) {
@@ -3022,9 +3091,26 @@ class EnergyAssistantPanel extends HTMLElement {
     const histRm = e.target.closest("[data-histrm]");
     if (histRm && this._isAdmin) {
       this._fieldError = {};
-      const next = { ...(this._draft.history_years || {}) };
-      delete next[histRm.dataset.histrm];
+      const [year, kind] = histRm.dataset.histrm.split(":");
+      const next = JSON.parse(JSON.stringify(this._draft.history_years || {}));
+      if (next[year]) { delete next[year][kind]; if (!Object.keys(next[year]).length) delete next[year]; }
       this._draft.history_years = next;
+      if (this._histForm?.id === histRm.dataset.histrm) this._histForm = null;
+      this._edited();
+      return;
+    }
+    const histEdit = e.target.closest("[data-histedit]");
+    if (histEdit && this._isAdmin) {
+      this._fieldError = {};
+      const id = histEdit.dataset.histedit, [year, kind] = id.split(":");
+      const v = this._draft.history_years?.[year]?.[kind];
+      if (v) this._histForm = { id, year, kind, kwh: v.kwh, cost: v.cost ?? "" };
+      this._edited();
+      return;
+    }
+    if (e.target.closest("[data-histcancel]") && this._isAdmin) {
+      this._fieldError = {};
+      this._histForm = null;
       this._edited();
       return;
     }
@@ -3111,6 +3197,7 @@ class EnergyAssistantPanel extends HTMLElement {
     } else if (e.target.closest("[data-save]") && this._isAdmin && !this._saveDisabled()) {
       this._save();
     } else if (e.target.closest("[data-discard]")) {
+      this._histForm = null;
       this._draft = this._normalize(this._config);
       this._edited();
     }
@@ -3502,33 +3589,58 @@ class EnergyAssistantPanel extends HTMLElement {
         <button class="btn ghost" data-discard ${dirty ? "" : "disabled"}>${this._t("discard")}</button>${msg}</div>`}</div>`;
   }
 
-  /** Manual yearly house consumption: the entered years and a row to add one (admins only). */
+  /** An icon button (ha-icon in Home Assistant, a character in the tests and without it). */
+  _iconBtn(attr, value, icon, fallback, title) {
+    const glyph = globalThis.customElements?.get?.("ha-icon") ? `<ha-icon icon="${icon}"></ha-icon>` : fallback;
+    return `<button type="button" class="ibtn" ${attr}="${esc(value)}" title="${esc(title)}" aria-label="${esc(title)}">${glyph}</button>`;
+  }
+
+  /** Manual yearly values: the entered rows (edit and delete) and a row to add one (admins only). */
   _renderHistory(ro) {
     const lang = this._hass?.language || "en";
     const hist = this._draft.history_years || {};
     const num = (v) => v.toLocaleString(lang, { maximumFractionDigits: 2 });
-    const rows = Object.entries(hist).map(([year, e]) => `<tr><td>${esc(year)}</td><td>${num(e.kwh)} kWh</td><td>${e.cost != null ? esc(num(e.cost)) : "–"}</td><td>${ro ? "" : `<button type="button" class="linkbtn" data-histrm="${esc(year)}" aria-label="${esc(this._t("remove"))}">×</button>`}</td></tr>`).join("");
-    const table = rows ? `<table class="histtab"><tr><th>${esc(this._t("histYear"))}</th><th>${esc(this._t("histKwh"))}</th><th>${esc(this._t("histCost"))}</th><th></th></tr>${rows}</table>` : "";
-    const add = ro ? "" : `<div class="histadd"><input type="number" inputmode="numeric" min="1990" step="1" data-hnew="year" placeholder="${esc(this._t("histYear"))}"><input type="number" inputmode="decimal" min="0" step="any" data-hnew="kwh" placeholder="${esc(this._t("histKwh"))}"><input type="number" inputmode="decimal" min="0" step="any" data-hnew="cost" placeholder="${esc(this._t("histCost"))}"><button type="button" class="btn ghost" data-histadd>${esc(this._t("histAdd"))}</button></div>`;
+    const kindName = (kind) => this._t(HISTORY_KINDS.find(([k]) => k === kind)[2]);
+    const rows = Object.entries(hist).flatMap(([year, kinds]) => HISTORY_KINDS.filter(([k]) => kinds[k]).map(([kind]) => {
+      const e = kinds[kind], id = `${year}:${kind}`;
+      const buttons = ro ? "" : `${this._iconBtn("data-histedit", id, "mdi:pencil", "✎", this._t("histEdit"))}${this._iconBtn("data-histrm", id, "mdi:delete-outline", "×", this._t("remove"))}`;
+      return `<tr${this._histForm?.id === id ? ' class="on"' : ""}><td>${esc(year)}</td><td>${esc(kindName(kind))}</td><td>${num(e.kwh)} kWh</td><td>${e.cost != null ? esc(num(e.cost)) : "–"}</td><td class="acts">${buttons}</td></tr>`;
+    })).join("");
+    const table = rows ? `<table class="histtab"><tr><th>${esc(this._t("histYear"))}</th><th>${esc(this._t("histKind"))}</th><th>${esc(this._t("histKwh"))}</th><th>${esc(this._t("histCost"))}</th><th></th></tr>${rows}</table>` : "";
+    const f = this._histForm || {};
+    const editing = !!f.id;
+    const options = HISTORY_KINDS.map(([k, , label]) => `<option value="${k}"${(f.kind || "house") === k ? " selected" : ""}>${esc(this._t(label))}</option>`).join("");
+    const val = (v) => (v == null ? "" : ` value="${esc(String(v))}"`);
+    const add = ro ? "" : `<div class="histadd"><input type="number" inputmode="numeric" min="1990" step="1" data-hnew="year" placeholder="${esc(this._t("histYear"))}"${val(f.year)}><select data-hnew="kind" aria-label="${esc(this._t("histKind"))}">${options}</select><input type="number" inputmode="decimal" min="0" step="any" data-hnew="kwh" placeholder="${esc(this._t("histKwh"))}"${val(f.kwh)}><input type="number" inputmode="decimal" min="0" step="any" data-hnew="cost" placeholder="${esc(this._t("histCost"))}"${val(f.cost)}><button type="button" class="btn ghost" data-histadd>${esc(this._t(editing ? "histApply" : "histAdd"))}</button>${editing ? `<button type="button" class="btn ghost" data-histcancel>${esc(this._t("histCancel"))}</button>` : ""}</div>`;
     const err = this._fieldError?.history_years ? `<div class="ferr">${esc(this._fieldError.history_years)}</div>` : "";
     return `<div class="fld span"><label>${esc(this._t("f_history_years"))}</label>${table}${add}${err}<div class="hint">${esc(this._t("histHint"))}</div></div>`;
   }
 
-  /** Adds (or replaces) the year of the entry row in the draft; shows a hint when the input is not usable. */
+  /** Adds (or replaces) the year and kind of the entry row in the draft; shows a hint when the input is not usable. */
   _addHistory() {
     const get = (k) => this.shadowRoot.querySelector(`[data-hnew="${k}"]`)?.value ?? "";
     const year = parseInt(get("year"), 10), kwh = parseFloat(String(get("kwh")).replace(",", "."));
+    const kind = HISTORY_KINDS.some(([k]) => k === get("kind")) ? get("kind") : "house";
     const costText = String(get("cost")).replace(",", ".").trim();
     const thisYear = tzParts(Date.now(), this._tz()).y;
     const entry = { kwh, ...(costText ? { cost: parseFloat(costText) } : {}) };
-    const clean = cleanHistory({ [year]: entry }, thisYear);
+    const clean = cleanHistory({ [year]: { [kind]: entry } }, thisYear);
     if (!Object.keys(clean).length) {
+      this._histForm = { ...(this._histForm || {}), year: get("year"), kind, kwh: get("kwh"), cost: get("cost") };
       this._fieldError = { history_years: this._t("histInvalid") };
       this._settingsDirty = true;
       this._render();
       return;
     }
-    this._draft.history_years = cleanHistory({ ...(this._draft.history_years || {}), ...clean });
+    // Editing may change the year or the kind: the row that was edited is replaced, not kept.
+    const hist = JSON.parse(JSON.stringify(this._draft.history_years || {}));
+    if (this._histForm?.id) {
+      const [oy, ok] = this._histForm.id.split(":");
+      if (hist[oy]) { delete hist[oy][ok]; if (!Object.keys(hist[oy]).length) delete hist[oy]; }
+    }
+    for (const [y, kinds] of Object.entries(clean)) hist[y] = { ...(hist[y] || {}), ...kinds };
+    this._draft.history_years = cleanHistory(hist);
+    this._histForm = null;
     this._edited();
   }
 

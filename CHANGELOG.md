@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.30.2] - 2026-11-16
+## [0.31.0] - 2026-11-19
 
-### Fixed
+### Changed
 
-- **Too high energy and cost of an area or label.** The power sensors of an area or label were simply added up, so a device that reports its total and every phase (a stove with `…_leistung`, `…_phase_a_active_power`, `…_l2_power`, a water heater with three phases) was counted several times. Phase sensors (`phase_a/b/c`, `l1/l2/l3`) are now skipped when the same device has a sensor for its total in the same area or label; a device with phase sensors only keeps all of them. Two total sensors of one device still count twice: exclude one of them in the settings. Values already counted stay as they are.
-- **A negative power reading kept the last positive value.** A sensor that reports a negative value (for example a clamp wired the other way round on one phase) was ignored and its last positive value stayed, so a few hundred watts were counted for hours. A negative reading now counts as 0 W. Text, NaN, infinity and values above 100 kW are still ignored.
+- **Past years by hand, with a kind:** besides the house consumption you can now enter the production, the grid import and the feed-in of a past year (what you enter is chosen in the form), every row has a pencil to edit it (also its year and kind) and a bin to delete it. In the year view each entered kind fills in only where Home Assistant has no statistics for it, self-sufficiency and self-consumption are derived when the data allows it, and the chart compares the entered years per kind. Values entered with 0.30.0 (house only) are kept as consumption.
+
+- **Colored changes:** the arrow and the text of the change to the period before (*▲ 8 % vs. last month*) are red when the value went up and green when it went down; an unchanged value stays as it was. This applies to the balance tiles and the costs of the period.
 
 ## [0.30.1] - 2026-11-15
 

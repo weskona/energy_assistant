@@ -17,6 +17,7 @@ from .const import (
     CONF_LABEL_TARIFFS,
     CONFIG_KEYS,
     DICT_KEYS,
+    HISTORY_KINDS,
     HISTORY_MAX_COST,
     HISTORY_MAX_KWH,
     HISTORY_MIN_YEAR,
@@ -96,17 +97,31 @@ def clean_device_tariffs(value: Any) -> dict[str, str]:
     }
 
 
+def clean_history_entry(entry: Any) -> dict[str, float] | None:
+    """One value: a finite, positive, plausible kWh number and an optional cost (dropped when unusable)."""
+    if not isinstance(entry, dict):
+        return None
+    kwh = clean_number(entry.get("kwh"))
+    if kwh is None or not math.isfinite(kwh) or kwh <= 0 or kwh > HISTORY_MAX_KWH:
+        return None
+    item = {"kwh": kwh}
+    cost = clean_number(entry.get("cost"))
+    if cost is not None and math.isfinite(cost) and 0 < cost <= HISTORY_MAX_COST:
+        item["cost"] = cost
+    return item
+
+
 def clean_history(
     value: Any, max_year: int | None = None
-) -> dict[str, dict[str, float]]:
-    """Manual yearly house consumption: {year: {"kwh", "cost"?}}.
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Energy of past years entered by hand: {year: {kind: {"kwh", "cost"?}}}.
 
-    A year needs a plausible number (no future year is checked here, only the range) and a finite,
-    positive, plausible kWh value; the cost is optional and dropped when it is not usable.
+    The first version stored {year: {"kwh", "cost"?}} for the house only; that shape is taken over as the kind
+    "house". A year needs a plausible number and at least one valid kind.
     """
     if not isinstance(value, dict):
         return {}
-    years: dict[str, dict[str, float]] = {}
+    years: dict[str, dict[str, dict[str, float]]] = {}
     for key, entry in value.items():
         try:
             year = int(str(key).strip())
@@ -116,14 +131,14 @@ def clean_history(
             continue
         if not isinstance(entry, dict):
             continue
-        kwh = clean_number(entry.get("kwh"))
-        if kwh is None or not math.isfinite(kwh) or kwh <= 0 or kwh > HISTORY_MAX_KWH:
-            continue
-        item = {"kwh": kwh}
-        cost = clean_number(entry.get("cost"))
-        if cost is not None and math.isfinite(cost) and 0 < cost <= HISTORY_MAX_COST:
-            item["cost"] = cost
-        years[str(year)] = item
+        kinds = {"house": entry} if "kwh" in entry else entry
+        cleaned = {
+            kind: item
+            for kind in HISTORY_KINDS
+            if (item := clean_history_entry(kinds.get(kind))) is not None
+        }
+        if cleaned:
+            years[str(year)] = cleaned
     return dict(sorted(years.items()))
 
 
