@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-19
+
 ### Changed
 
 - **Past years by hand, with a kind:** besides the house consumption you can now enter the production, the grid import and the feed-in of a past year (what you enter is chosen in the form), every row has a pencil to edit it (also its year and kind) and a bin to delete it. In the year view each entered kind fills in only where Home Assistant has no statistics for it, self-sufficiency and self-consumption are derived when the data allows it, and the chart compares the entered years per kind. Values entered with 0.30.0 (house only) are kept as consumption.
