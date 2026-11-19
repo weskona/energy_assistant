@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Colors of the change to the period before:** green and red now follow what is good for each value. More consumption, grid import or cost is red and less is green; more production, feed-in, revenue, storage in and out, self-sufficiency and self-consumption is green and less is red. An unchanged value stays plain.
+
 ## [0.31.0] - 2026-11-19
 
 ### Changed
