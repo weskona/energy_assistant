@@ -1184,7 +1184,7 @@ function resPole() {
   return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h30" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
     + `<rect x="22" y="146" width="9" height="15" rx="2.5" fill="#55607a" stroke="#7a89ad" stroke-width="1"/>`
     + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="31.5" cy="115" r="2.5" fill="#aab6cf"/>`
-    + `<path d="M31.5 115Q46 138 60 153" fill="none" stroke="#37405a" stroke-width="1.8"/><path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
+    + `<path d="M31.5 115Q46 138 60 153" fill="none" stroke="#37405a" stroke-width="1.8"/><circle cx="27" cy="131" r="2.4" fill="#aab6cf"/><path d="M27 131Q52 148 82 163" fill="none" stroke="#37405a" stroke-width="1.8"/><path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
 }
 
 const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
@@ -1200,8 +1200,8 @@ function resFlows(flows, socs) {
   let out = "";
   if (flows.pv) out += path("M125 130V174", RES_FLOW.pv) + label(RES_FLOW.pv, flows.pv, 131, 156, "start");
   // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
-  if (flows.in) out += path("M28 111Q42 133 56 148", RES_FLOW.in, 2.4) + label(RES_FLOW.in, flows.in, 56, 178);
-  if (flows.out) out += path("M68 158Q53 145 39 123", RES_FLOW.out, 2.4) + label(RES_FLOW.out, flows.out, 56, flows.in ? 190 : 178);
+  if (flows.in) out += path("M31.5 115Q46 138 60 153", RES_FLOW.in, 2.4) + label(RES_FLOW.in, flows.in, 46, 112, "start", 8.5);
+  if (flows.out) out += path("M82 163Q52 148 27 131", RES_FLOW.out, 2.4) + label(RES_FLOW.out, flows.out, 56, 178, "middle", 8.5);
   if (socs.length && (flows.charge || flows.discharge)) {
     const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n);
     for (let i = 0; i < n; i++) {
