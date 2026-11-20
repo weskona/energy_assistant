@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Smaller House card:** the tiles under the live power only show flows of at least 1 W, so a night without PV shows the grid import and the self-sufficiency instead of seven tiles with zeros; the tiles are a little smaller and denser. With production, feed-in or storage the tiles come back.
+
 ### Fixed
 
 - **Colors of the entered years:** the bars of *Energy per year* use the colors of the balance chart (consumption, production, grid import, feed-in) instead of one grey for all, and the kind has a colored dot.

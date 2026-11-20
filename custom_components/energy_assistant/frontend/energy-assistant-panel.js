@@ -95,6 +95,10 @@ const STYLE = `
 .lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lc .n{text-align:right;font-weight:600;white-space:nowrap}
 .lc.head .n{font-weight:500}
+.tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
+.tiles.compact .eb-tile{padding:8px 10px}
+.tiles.compact .eb-label{font-size:10.5px}
+.tiles.compact .eb-value{font-size:17px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
@@ -4272,8 +4276,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const mix = this._mix(cur);
     const split = this._pvSplit(cur, cur.direct);
     const sharePv = split ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(split.map((p) => `${p.pct} % ${this._t(p.key)}`).join(" · "))}</div>` : "";
+    // Only values that say something: a flow of less than 1 W (or none) gets no tile, so a night without PV
+    // shows the grid import and the self-sufficiency instead of a wall of zeros.
     const tile = (label, w, extra = "") => {
-      if (w == null) return "";
+      if (w == null || Math.abs(w) < 1) return "";
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };
@@ -4298,7 +4304,7 @@ class EnergyAssistantPanel extends HTMLElement {
             <span><i style="background:var(--eb-solar)"></i>PV ${Math.round(mix.solar * 100)} %</span>
             ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>${this._t("storage")} ${Math.round(mix.battery * 100)} %</span>` : ""}
             <span><i style="background:var(--eb-grid)"></i>${this._t("grid")} ${Math.round(mix.grid * 100)} %</span></div>` : ""}
-        <div class="tiles">
+        <div class="tiles compact">
           ${cur.autarky == null ? "" : `<div class="eb-tile"><div class="eb-label">${this._t("autarky")}</div><div class="eb-value">${Math.round(cur.autarky)}<small>%</small></div></div>`}
           ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
           ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
