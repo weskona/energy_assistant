@@ -95,31 +95,49 @@ const STYLE = `
 .lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lc .n{text-align:right;font-weight:600;white-space:nowrap}
 .lc.head .n{font-weight:500}
+.reshero{display:grid;grid-template-columns:minmax(0,1fr)}
+.resillu{display:none}
+.eb-card.res{--eb-text:#1b2a41;--eb-muted:#5f6f86;--eb-line:#e1e8f0;background:#fff;color:#1b2a41;border:0;border-radius:28px;padding:24px 28px;box-shadow:0 18px 44px rgba(10,25,60,.28);position:relative;z-index:1}
 .eb-card.res .row{align-items:center}
-.resdrive{display:flex;align-items:center;gap:10px;margin-left:auto;text-align:left}
-.resdrive .rico{--mdc-icon-size:30px;color:var(--ea-grid)}
-.resub{font-size:14px;color:var(--eb-text)}
-.resub b{font-size:16px}
-.resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:14px}
-.resl{padding-right:24px;border-right:1px solid var(--eb-line)}
-.resr{padding-left:24px;display:flex;flex-direction:column;justify-content:center;gap:0;min-width:0}
-.resh{display:flex;align-items:center;gap:8px}
-.resh .rico{--mdc-icon-size:20px;color:var(--ea-prod)}
-.resbig{font-size:30px;font-weight:800;line-height:1.1;margin-top:4px}
-.resbig.huge{font-size:44px}
-.resbig small{font-size:15px;font-weight:600;color:var(--eb-muted);margin-left:3px}
-.resper{font-size:13px;font-weight:500;color:var(--eb-muted)}
-.rbars{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:14px}
-.rbars i{flex:1;min-width:2px;border-radius:3px 3px 0 0;background:linear-gradient(to top,var(--ea-grid),var(--eb-green))}
-.rbars i:hover{filter:brightness(1.2)}
-.resself{display:flex;align-items:center;gap:16px;padding-bottom:16px}
-.resring{position:relative;flex:none;width:88px;height:88px}
-.resring .donut{width:88px;height:88px;display:block}
-.resring .rico.mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);--mdc-icon-size:30px;color:var(--eb-muted)}
-.ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;border-top:1px solid var(--eb-line)}
-.ressave .pig{--mdc-icon-size:44px;color:var(--eb-green);flex:none}
-.resfoot{margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:13.5px}
-@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:16px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}}
+.eb-card.res .eb-title{font-size:22px;font-weight:700;letter-spacing:0;text-transform:none;color:#1b2a41}
+.eb-card.res .eb-label{color:#5f6f86}
+.eb-card.res .vs.good{color:#1e9e57}
+.eb-card.res .vs.bad{color:#d64545}
+.resdrive{display:flex;align-items:center;gap:12px;margin-left:auto;border:1px solid #dbe4ee;border-radius:16px;padding:8px 16px}
+.resdrive .car{color:#1b2a41;display:flex}
+.resub{font-size:14px;color:#3d4d66}
+.resdk{font-size:14px;color:#1b2a41}.resdk b{font-size:17px}
+.resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
+.resl{padding-right:28px;border-right:1px solid #e1e8f0}
+.resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.reslab{font-size:20px;font-weight:700;color:#1b2a41}
+.resnum{display:flex;align-items:center;gap:10px;font-size:50px;font-weight:800;line-height:1.1;color:#1b2a41;margin-top:6px}
+.resnum small{font-size:20px;font-weight:600;color:#3d4d66;margin-left:-4px}
+.stackbadge{display:flex;flex-direction:column;gap:3px;margin-left:8px}
+.stackbadge i{display:block;height:7px;width:38px;border-radius:2px;background:#78d08a}
+.stackbadge i:nth-child(2){background:#5aa9e6;width:30px}
+.stackbadge i:nth-child(3){background:#f5a623;width:34px}
+.stackbadge i:nth-child(4){background:#5ad0e6;width:24px}
+.rbars{display:flex;align-items:flex-end;gap:6px;height:84px;margin-top:18px;border-bottom:1px solid #e1e8f0}
+.rbars i{flex:1;min-width:2px;border-radius:6px 6px 0 0;opacity:.9}
+.rbars i:hover{opacity:1}
+.resbig{font-size:36px;font-weight:800;line-height:1.1;color:#1b2a41}
+.resbig small{font-size:18px;font-weight:700;margin-left:3px}
+.reslab2{font-size:16px;color:#3d4d66;margin-top:2px}
+.resper{font-size:14px;font-weight:500;color:#5f6f86}
+.resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
+.resring{position:relative;flex:none;width:96px;height:96px}
+.resring .donut{width:96px;height:96px;display:block}
+.resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
+.ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid #e1e8f0}
+.ressave .pig{flex:none;display:flex}
+.resfoot{margin-top:20px;padding:14px 18px;border-radius:14px;background:#eef3f8;color:#25364f;font-size:15px}
+.resfoot b{color:#12203a}
+@media (min-width:960px){
+.reshero{grid-template-columns:minmax(240px,.62fr) minmax(0,1.6fr);align-items:stretch}
+.resillu{display:flex;align-items:flex-end;border-radius:28px;background:linear-gradient(165deg,#e6f0fb,#f8fbff);padding:24px 56px 8px 20px;margin-right:-44px;overflow:hidden;opacity:.98}
+}
+@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -329,15 +347,19 @@ const STRINGS = {
     resTitle: "Your results",
     resCost: "Electricity cost",
     resSaving: "Savings",
+    resYield_day: "Daily yield",
+    resYield_week: "Weekly yield",
+    resYield_month: "Monthly yield",
+    resYield_year: "Annual yield",
     resPer_day: "per day",
     resPer_week: "per week",
     resPer_month: "per month",
     resPer_year: "per year",
     resDrive: "Driving",
     resKmElectric: "km electric",
-    resFootKm: "You drive {km} km electrically ({kwh} kWh charged at home).",
-    resFootEv: "Your electric car charged {kwh} kWh at home.",
-    resFootSelf: "You cover {pct} % of your electricity needs yourself.",
+    resFootKm: "**{km} km** you drive electrically ({kwh} kWh charged at home).",
+    resFootEv: "Your electric car charged **{kwh} kWh** at home.",
+    resFootSelf: "You cover **{pct} %** of your electricity needs yourself.",
     resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
@@ -689,15 +711,19 @@ const STRINGS = {
     resTitle: "Ihre Ergebnisse",
     resCost: "Stromkosten",
     resSaving: "Einsparung",
+    resYield_day: "Tagesertrag",
+    resYield_week: "Wochenertrag",
+    resYield_month: "Monatsertrag",
+    resYield_year: "Jahresertrag",
     resPer_day: "am Tag",
     resPer_week: "pro Woche",
     resPer_month: "pro Monat",
     resPer_year: "jährlich",
     resDrive: "Fahren",
     resKmElectric: "km elektrisch",
-    resFootKm: "{km} km fahren Sie elektrisch ({kwh} kWh zu Hause geladen).",
-    resFootEv: "Ihr Elektroauto hat {kwh} kWh zu Hause geladen.",
-    resFootSelf: "Sie decken {pct} % Ihres Strombedarfs selbst.",
+    resFootKm: "**{km} km** fahren Sie elektrisch ({kwh} kWh zu Hause geladen).",
+    resFootEv: "Ihr Elektroauto hat **{kwh} kWh** zu Hause geladen.",
+    resFootSelf: "Sie decken **{pct} %** Ihres Strombedarfs selbst.",
     resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
@@ -1092,6 +1118,14 @@ function cleanHistory(value, maxYear = Infinity) {
   }
   return out;
 }
+
+// Flat illustrations of the results card (inline, so they do not depend on an icon font).
+const RES_ART = {
+  car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#fff"/><circle cx="40" cy="23" r="3.8" fill="#fff"/></svg>`,
+  house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#1b2a41" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f5a623"/></svg>`,
+  pig: `<svg viewBox="0 0 72 60" width="64" height="54" aria-hidden="true"><circle cx="34" cy="9" r="7" fill="#ffd54a" stroke="#f2b400" stroke-width="2"/><path d="M34 5v8" stroke="#f2b400" stroke-width="2" stroke-linecap="round"/><ellipse cx="34" cy="36" rx="25" ry="17" fill="#9be07a" stroke="#4aa83f" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#9be07a" stroke="#4aa83f" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#b9ee9c" stroke="#4aa83f" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#2b4a2b"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#8ad46a" stroke="#4aa83f" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#8ad46a" stroke="#4aa83f" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#4aa83f" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+  hero: `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><ellipse cx="200" cy="268" rx="205" ry="24" fill="#b7df7c"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#cdea9b"/><rect x="82" y="150" width="228" height="108" fill="#f6eedb"/><rect x="82" y="150" width="228" height="8" fill="#e7dcc0"/><polygon points="52,156 150,64 318,64 318,156" fill="#2b3a55"/><polygon points="52,156 150,64 160,64 66,156" fill="#3a4b6b"/><g transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#3b78c4"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#cfe3f7" stroke-width="2"/></g><path d="M122 70l6 6-6 6-6-6z" fill="#f5a623"/><path d="M134 82l4 4-4 4-4-4z" fill="#ffd54a"/><rect x="82" y="182" width="86" height="76" fill="#dfe5ec"/><path d="M82 198h86M82 214h86M82 230h86M82 246h86" stroke="#c4cdd8" stroke-width="2"/><rect x="198" y="178" width="46" height="44" fill="#cfe8f7" stroke="#fff" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#fff" stroke-width="3"/><rect x="258" y="184" width="30" height="74" fill="#a9b8c9"/><rect x="262" y="190" width="22" height="26" fill="#cfe8f7"/><circle cx="46" cy="252" r="20" fill="#7cc24a"/><circle cx="68" cy="258" r="14" fill="#8fd35a"/><circle cx="336" cy="256" r="16" fill="#7cc24a"/><circle cx="352" cy="260" r="11" fill="#8fd35a"/></svg>`,
+};
 
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
@@ -2709,39 +2743,43 @@ class EnergyAssistantPanel extends HTMLElement {
       const pct = Math.round(((cur - before) / before) * 100);
       return `<div class="eb-label vs${this._vsClass(pct, true)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
     };
-    // Production: bars per bucket, in a gradient from the first to the last bucket (like the stacked-bars badge).
+    // Production: bars per bucket in four colors (by quarter of the period, like the picture of a calculator result)
+    const colors = ["#7ed6d0", "#78d08a", "#5aa9e6", "#a6d85a"];
     const top = Math.max(...b.rows.map((r) => r.solar ?? 0), 0.001);
-    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [["--ea-prod", `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
-    // Self-consumption ring with the house in the middle
+    const n = b.rows.length;
+    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%;background:${colors[Math.min(3, Math.floor((i * 4) / n))]}" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [[colors[Math.min(3, Math.floor((i * 4) / n))], `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
+    // Self-consumption ring (blue = fed in, green = used) with the house in the middle
     const self = t.self != null ? Math.round(t.self) : null;
-    const ring = self != null ? `<div class="resring">${this._donut([{ value: self, color: "var(--ea-prod)" }, { value: 100 - self, color: "var(--eb-tile-border)" }], "", "")}${ico("mdi:home-lightning-bolt-outline", "mid")}</div>` : "";
-    const selfBlock = self != null ? `<div class="resself">${ring}<div><div class="resbig">${self}<small>%</small></div><div class="eb-label">${esc(this._t("bSelf"))}</div>${delta(t.self, prev?.self)}</div></div>` : "";
+    const selfBlock = self != null ? `<div class="resself"><div class="resring">${this._donut([{ value: self, color: "#7cc24a" }, { value: 100 - self, color: "#4a90d4" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
+      <div><div class="resbig">${self}<small>%</small></div><div class="reslab2">${esc(this._t("bSelf"))}</div>${delta(t.self, prev?.self)}</div></div>` : "";
     // Savings (Tariffy): self-used solar energy at the contract price plus the feed-in revenue
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
     if (price) {
       const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
-      const [n, sym] = this._money(saving(t), price.currency, 0);
-      savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="eb-label">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
-        <div class="resbig">${n}<small>${esc(sym)}</small> <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div>${delta(saving(t), prev?.solar > 0 ? saving(prev) : null)}</div>${ico("mdi:piggy-bank-outline", "pig")}</div>`;
+      const [n2, sym] = this._money(saving(t), price.currency, 0);
+      savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
+        <div class="resbig">${n2}<small>${esc(sym)}</small> <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div>${delta(saving(t), prev?.solar > 0 ? saving(prev) : null)}</div><span class="pig">${RES_ART.pig}</span></div>`;
     }
     // Electric car
     const cons = this._cfg.ev_consumption;
     const ev = b.ev != null && b.ev > 0.05 ? b.ev : null;
     const km = ev != null && cons > 0 ? (ev / cons) * 100 : null;
-    const drive = km != null ? `<div class="resdrive">${ico("mdi:car-electric-outline")}<div><div class="eb-label">${esc(this._t("resDrive"))}</div><div class="resub"><b>${num(km)}</b> ${esc(this._t("resKmElectric"))}</div></div></div>` : "";
-    // The sentence under it all
+    const drive = km != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("resDrive"))}</div><div class="resdk"><b>${num(km)}</b> ${esc(this._t("resKmElectric"))}</div></div></div>` : "";
+    // The sentence under it all (**x** is bold)
     let foot = "";
     if (km != null) foot = this._t("resFootKm", { km: num(km), kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
-    return `<div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
+    const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    return `<div class="reshero"><div class="resillu" aria-hidden="true">${RES_ART.hero}</div>
+      <div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
-        <div class="resl"><div class="resh">${ico("mdi:solar-power", "sun")}<span class="eb-label">${esc(this._t("bSolar"))}</span></div>
-          <div class="resbig huge">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></div>${delta(t.solar, prev?.solar)}
-          <div class="rbars" aria-hidden="true">${bars}</div></div>
+        <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
+          <div class="resnum">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>${delta(t.solar, prev?.solar)}
+          <div class="rbars">${bars}</div></div>
         <div class="resr">${selfBlock}${savings}</div>
-      </div>${foot ? `<div class="resfoot">${esc(foot)}</div>` : ""}</div>`;
+      </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
