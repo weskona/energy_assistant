@@ -97,29 +97,28 @@ const STYLE = `
 .lc.head .n{font-weight:500}
 .reshero{display:grid;grid-template-columns:minmax(0,1fr)}
 .resillu{display:none}
-.eb-card.res{background:linear-gradient(160deg,#1a1f2b,var(--eb-panel) 55%);border:1px solid var(--eb-tile-border);border-radius:28px;padding:24px 28px;box-shadow:0 18px 44px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);position:relative;z-index:1}
+.eb-card.res{border-radius:var(--eb-radius-card);padding:24px 28px;box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 44px rgba(52,211,153,.07);position:relative;z-index:1;overflow:visible}
 .eb-card.res .row{align-items:center}
-.eb-card.res .eb-title{font-size:22px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--eb-text)}
-.resdrive{display:flex;align-items:center;gap:12px;margin-left:auto;border:1px solid var(--eb-tile-border);background:var(--eb-tile);border-radius:16px;padding:8px 16px}
-.resdrive .car{color:var(--eb-text);display:flex}
-.resub{font-size:14px;color:var(--eb-muted)}
+.resdrive{display:flex;align-items:center;gap:12px;margin-left:auto;border:1px solid var(--eb-tile-border);background:var(--eb-tile);border-radius:var(--eb-radius-tile);padding:8px 16px}
+.resdrive .car{color:var(--eb-green);display:flex;filter:drop-shadow(0 0 6px rgba(52,211,153,.55))}
+.resub{font-size:12.5px;color:var(--eb-muted)}
 .resdk{font-size:14px;color:var(--eb-text)}.resdk b{font-size:17px}
 .resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
 .resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
-.reslab{font-size:20px;font-weight:700;color:var(--eb-text)}
-.resnum{display:flex;align-items:flex-start;gap:10px;font-size:50px;font-weight:800;line-height:1.1;color:var(--eb-text);margin-top:6px}
+.reslab{font-size:11px;font-weight:600;letter-spacing:var(--eb-label-spacing);text-transform:uppercase;color:var(--eb-muted)}
+.resnum{display:flex;align-items:flex-start;gap:10px;font-size:56px;font-weight:800;line-height:1.05;color:var(--eb-text);margin-top:8px}
 .resnum small{font-size:20px;font-weight:600;color:var(--eb-muted)}
 .rn{display:flex;align-items:baseline;gap:8px;min-width:0}
 .stackbadge{display:flex;flex-direction:column;gap:4px;margin-left:auto;align-self:flex-start;margin-top:4px}
-.stackbadge i{display:block;height:7px;width:38px;border-radius:2px;background:#34d399}
-.stackbadge i:nth-child(2){background:#60a5fa;width:30px}
-.stackbadge i:nth-child(3){background:#f7b733;width:34px}
-.stackbadge i:nth-child(4){background:#38bdf8;width:24px}
+.stackbadge i{display:block;height:7px;width:38px;border-radius:3px;background:var(--eb-green);box-shadow:0 0 8px rgba(52,211,153,.5)}
+.stackbadge i:nth-child(2){background:var(--eb-blue);width:30px;box-shadow:0 0 8px rgba(96,165,250,.5)}
+.stackbadge i:nth-child(3){background:var(--eb-solar);width:34px;box-shadow:0 0 8px rgba(255,152,0,.5)}
+.stackbadge i:nth-child(4){background:var(--eb-cyan);width:24px;box-shadow:0 0 8px rgba(56,189,248,.5)}
 .rbars{display:flex;gap:14px;margin-top:20px}
 .rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
 .rcol{width:100%;height:96px;display:flex;align-items:flex-end;border-bottom:1px solid var(--eb-line)}
-.rcol i{display:block;width:100%;border-radius:8px 8px 0 0;opacity:.9}
+.rcol i{display:block;width:100%;border-radius:8px 8px 0 0;opacity:.92;box-shadow:0 0 16px -2px rgba(255,255,255,.25)}
 .rcol i:hover{opacity:1}
 .rbar span{font-size:12px;color:var(--eb-dim);white-space:nowrap}
 .resbig{font-size:36px;font-weight:800;line-height:1.1;color:var(--eb-text)}
@@ -129,22 +128,25 @@ const STYLE = `
 .ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
 .resring{position:relative;flex:none;width:96px;height:96px}
-.resring .donut{width:96px;height:96px;display:block}
+.resring .donut{width:96px;height:96px;display:block;filter:drop-shadow(0 0 7px rgba(52,211,153,.45))}
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
 .ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid var(--eb-line)}
 .ressave .pig{flex:none;display:flex}
-.resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 28px 28px;background:rgba(255,255,255,.045);border-top:1px solid var(--eb-line);color:var(--eb-muted);font-size:15px}
+.resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
 .reshero{grid-template-columns:minmax(300px,1fr) minmax(0,1.32fr);align-items:stretch;max-width:1020px;width:100%;margin:0 auto}
 .resillu{display:block;position:relative;z-index:2;margin-right:-96px;pointer-events:none}
-.resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:26px;background:#1c212d;border:1px solid var(--eb-tile-border);opacity:.9;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+.resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resghost::before{content:"";position:absolute;left:22px;top:20px;width:64px;height:16px;border-radius:4px;background:rgba(52,211,153,.35)}
 .resghost::after{content:"";position:absolute;left:22px;top:52px;right:60px;height:46px;border-radius:6px;background:repeating-linear-gradient(rgba(255,255,255,.08) 0 7px,transparent 7px 17px)}
+.resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:-14px;right:0;bottom:-8px;width:calc(100% + 14px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.resillu .glowp{filter:drop-shadow(0 0 10px rgba(96,165,250,.75))}
+.resillu .glowa{filter:drop-shadow(0 0 9px rgba(255,200,100,.8))}
 .resfoot{padding-left:112px}
 }
-@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px;border-radius:0 0 28px 28px}}
+@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -352,12 +354,12 @@ const STRINGS = {
     f_battery_min_soc: "Minimum charge level (%)",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
     resTitle: "Your results",
-    resCost: "Electricity cost:",
+    resCost: "Electricity cost",
     resSaving: "Savings",
-    resYield_day: "Daily yield:",
-    resYield_week: "Weekly yield:",
-    resYield_month: "Monthly yield:",
-    resYield_year: "Annual yield:",
+    resYield_day: "Daily yield",
+    resYield_week: "Weekly yield",
+    resYield_month: "Monthly yield",
+    resYield_year: "Annual yield",
     resPer_day: "per day",
     resPer_week: "per week",
     resPer_month: "per month",
@@ -716,12 +718,12 @@ const STRINGS = {
     f_battery_min_soc: "Mindest-Ladestand (%)",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
     resTitle: "Ihre Ergebnisse",
-    resCost: "Stromkosten:",
+    resCost: "Stromkosten",
     resSaving: "Einsparung",
-    resYield_day: "Tagesertrag:",
-    resYield_week: "Wochenertrag:",
-    resYield_month: "Monatsertrag:",
-    resYield_year: "Jahresertrag:",
+    resYield_day: "Tagesertrag",
+    resYield_week: "Wochenertrag",
+    resYield_month: "Monatsertrag",
+    resYield_year: "Jahresertrag",
     resPer_day: "am Tag",
     resPer_week: "pro Woche",
     resPer_month: "pro Monat",
@@ -1131,7 +1133,7 @@ const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
   pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
-  hero: `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><defs><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="200" cy="268" rx="205" ry="24" fill="#1d4a30"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><path d="M122 70l6 6-6 6-6-6z" fill="#f7b733"/><path d="M134 82l4 4-4 4-4-4z" fill="#ffd36b"/><rect x="82" y="182" width="86" height="76" fill="#363e51"/><path d="M82 198h86M82 214h86M82 230h86M82 246h86" stroke="#2a3141" stroke-width="2"/><rect x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/><rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/><circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/><circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/></svg>`,
+  hero: `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><defs><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="200" cy="268" rx="205" ry="24" fill="#1d4a30"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><path d="M122 70l6 6-6 6-6-6z" fill="#f7b733"/><path d="M134 82l4 4-4 4-4-4z" fill="#ffd36b"/><rect x="82" y="182" width="86" height="76" fill="#363e51"/><path d="M82 198h86M82 214h86M82 230h86M82 246h86" stroke="#2a3141" stroke-width="2"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/><rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/><circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/><circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/></svg>`,
 };
 
 const SETTINGS_SECTIONS = [
@@ -2751,7 +2753,7 @@ class EnergyAssistantPanel extends HTMLElement {
       return `<div class="eb-label vs${this._vsClass(pct, true)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
     };
     // Production: bars per bucket in four colors (by quarter of the period, like the picture of a calculator result)
-    const colors = ["#4fd1c5", "#34d399", "#60a5fa", "#a3e635"];
+    const colors = ["var(--eb-cyan)", "var(--eb-green)", "var(--eb-blue)", "var(--eb-gold)"];
     const tz = this._tz();
     const rows = b.rows, n = rows.length;
     const size = n <= 7 ? 1 : Math.ceil(n / 4); // a week keeps its days, everything else is four bars
@@ -2773,7 +2775,7 @@ class EnergyAssistantPanel extends HTMLElement {
     }).join("");
     // Self-consumption ring (blue = fed in, green = used) with the house in the middle
     const self = t.self != null ? Math.round(t.self) : null;
-    const selfBlock = self != null ? `<div class="resself"><div class="resring">${this._donut([{ value: self, color: "#34d399" }, { value: 100 - self, color: "#60a5fa" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
+    const selfBlock = self != null ? `<div class="resself"><div class="resring">${this._donut([{ value: self, color: "var(--eb-green)" }, { value: 100 - self, color: "var(--ea-feed)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
       <div><div class="resbig">${self}<small>%</small></div><div class="reslab2">${esc(this._t("bSelf"))}</div></div></div>` : "";
     // Savings (Tariffy): self-used solar energy at the contract price plus the feed-in revenue
     const price = this._price(), feed = this._feedInTariff();
@@ -2796,7 +2798,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero}</div>
-      <div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
           <div class="resnum"><span class="rn">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
