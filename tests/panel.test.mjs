@@ -4792,15 +4792,18 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   assert.match(html, /<div class="resfoot">You cover <b>78 %<\/b> of your electricity needs yourself\.<\/div>/);
 });
 
-test("results: no savings without a price, no card without a production counter or while loading, also a day without sun", () => {
+test("results: no savings without a price, the card also on a day without sun and without production counter, not while loading or failed", () => {
   const p = resultsPanel();
   assert.doesNotMatch(p._renderResults(), /Savings/);
   p._bal.totals.solar = 0; // a day without sun: the card is still there (a production counter is set up)
   assert.match(p._renderResults(), /<div class="resnum"><span class="rn">0[.,]0<small>kWh/);
   const noPv = resultsPanel();
-  noPv._config = { ...noPv._config, energy_solar: [] }; // no production counter and no production: no card
+  noPv._config = { ...noPv._config, energy_solar: [] }; // no production counter and no production: the card is still there
   noPv._bal.totals.solar = null;
-  assert.equal(noPv._renderResults(), "");
+  assert.match(noPv._renderResults(), /<div class="resnum"><span class="rn">0[.,]0<small>kWh/);
+  const failed = resultsPanel();
+  failed._bal.failed = true; // only a failed request leaves it out
+  assert.equal(failed._renderResults(), "");
   const q = resultsPanel();
   q._usRange = "month"; // the data is of another period
   assert.equal(q._renderResults(), "");
