@@ -4777,13 +4777,15 @@ function resultsPanel(extraCfg = {}, int = {}) {
 test("results: production, self-consumption ring and the savings with Tariffy", () => {
   const p = resultsPanel({}, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } });
   const html = p._renderResults();
-  assert.match(html, /<span class="eb-title">Results<\/span>/);
-  assert.match(html, /Production<\/div>\s*<div class="eb-value big2">30\.0<small>kWh/);
+  assert.match(html, /<span class="eb-title">Your results<\/span>/);
+  assert.match(html, /<div class="resbig huge">30\.0<small>kWh/);
   assert.match(html, /class="donut"/); // the self-consumption ring
+  assert.match(html, /<div class="resbig">77<small>%/);
   assert.match(html, /class="rbars"/);
-  // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR
-  assert.match(html, /Savings<\/div><div class="eb-value">7<small>€/); // shown in whole euros
-  assert.match(html, /Self-sufficiency/);
+  // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR, shown in whole euros
+  assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">7<small>€<\/small> <span class="resper">per week/);
+  // no electric car: the sentence is about the self-sufficiency
+  assert.match(html, /<div class="resfoot">You cover 78 % of your electricity needs yourself\.<\/div>/);
 });
 
 test("results: no savings without a price, no card without production or while loading", () => {
@@ -4796,17 +4798,19 @@ test("results: no savings without a price, no card without production or while l
   assert.equal(q._renderResults(), "");
 });
 
-test("results: the electric car shows kWh, and kilometres only with its consumption", () => {
+test("results: the electric car shows the kilometres with its consumption, otherwise the kWh in the sentence", () => {
   const withKm = resultsPanel({ ev_consumption: 17.5 });
   withKm._bal.ev = 285;
-  assert.match(withKm._renderResults(), /EV charged<\/div><div class="eb-value">285<small>kWh/);
-  assert.match(withKm._renderResults(), /Driven \(approx\.\)<\/div><div class="eb-value">1[.,]?629<small>km/);
+  const html = withKm._renderResults();
+  assert.match(html, /Driving<\/div><div class="resub"><b>1[.,]?629<\/b> km electric/);
+  assert.match(html, /You drive 1[.,]?629 km electrically \(285 kWh charged at home\)\./);
   const noKm = resultsPanel();
   noKm._bal.ev = 285;
-  assert.doesNotMatch(noKm._renderResults(), /Driven/);
+  assert.doesNotMatch(noKm._renderResults(), /Driving/);
+  assert.match(noKm._renderResults(), /Your electric car charged 285 kWh at home\./);
   const none = resultsPanel({ ev_consumption: 17.5 });
   none._bal.ev = null; // no EV Assistant or no statistics
-  assert.doesNotMatch(none._renderResults(), /EV charged/);
+  assert.doesNotMatch(none._renderResults(), /Driving|electric car charged/);
 });
 
 test("results: the energy of the wallboxes comes from the statistics with the balance", async () => {

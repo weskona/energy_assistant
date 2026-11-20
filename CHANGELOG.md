@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Results card:** on top of the Consumption tab (below the period picker) a card sums up the shown period: the production with the change to the period before and small bars per hour, day or month, a ring with the self-consumption, the self-sufficiency, the **savings** (self-used solar energy at the price of your Tariffy contract plus the feed-in revenue, in whole euros; only with Tariffy) and what the **electric car** charged (kWh from the statistics of the wallbox power sensor of EV Assistant, read only). With the new setting *Electric car: consumption* (kWh per 100 km, *Energy counters*) it also shows the approximate kilometres. The card only appears with production.
+- **Results card:** the first card of the Consumption tab (below the period picker) sums up the shown period in one friendly card, like a calculator result: the production with the change to the period before and bars per hour, day or month, a ring with the self-consumption (house in the middle), the **savings** with a piggy bank (self-used solar energy at the price of your Tariffy contract plus the feed-in revenue, whole euros; only with Tariffy), at the top right the **kilometres driven electrically** and a sentence at the bottom. The kilometres come from what the wallbox of EV Assistant charged (statistics of its power sensor, read only) and the new setting *Electric car: consumption* (kWh per 100 km, *Energy counters*); without it the sentence names the kWh, without a car the sentence is about the self-sufficiency. The card only appears with production.
 
 ### Changed
 

@@ -95,16 +95,31 @@ const STYLE = `
 .lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lc .n{text-align:right;font-weight:600;white-space:nowrap}
 .lc.head .n{font-weight:500}
-.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;margin-top:12px;align-items:center}
-.resl .big2{font-size:40px;font-weight:800;line-height:1.1;margin-top:4px}
-.resl .big2 small{font-size:16px}
-.rbars{display:flex;align-items:flex-end;gap:2px;height:64px;margin-top:12px}
-.rbars i{flex:1;min-width:2px;background:var(--ea-prod);border-radius:2px 2px 0 0;opacity:.85}
-.resr{display:flex;align-items:center;gap:16px;min-width:0}
-.resring{flex:none;min-width:96px;text-align:center}
-.resring .donut{width:96px;height:96px;display:block}
-.resr .tiles{flex:1;margin-top:0;min-width:0}
-@media (max-width:640px){.res{grid-template-columns:minmax(0,1fr)}}
+.eb-card.res .row{align-items:center}
+.resdrive{display:flex;align-items:center;gap:10px;margin-left:auto;text-align:left}
+.resdrive .rico{--mdc-icon-size:30px;color:var(--ea-grid)}
+.resub{font-size:14px;color:var(--eb-text)}
+.resub b{font-size:16px}
+.resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:14px}
+.resl{padding-right:24px;border-right:1px solid var(--eb-line)}
+.resr{padding-left:24px;display:flex;flex-direction:column;justify-content:center;gap:0;min-width:0}
+.resh{display:flex;align-items:center;gap:8px}
+.resh .rico{--mdc-icon-size:20px;color:var(--ea-prod)}
+.resbig{font-size:30px;font-weight:800;line-height:1.1;margin-top:4px}
+.resbig.huge{font-size:44px}
+.resbig small{font-size:15px;font-weight:600;color:var(--eb-muted);margin-left:3px}
+.resper{font-size:13px;font-weight:500;color:var(--eb-muted)}
+.rbars{display:flex;align-items:flex-end;gap:3px;height:70px;margin-top:14px}
+.rbars i{flex:1;min-width:2px;border-radius:3px 3px 0 0;background:linear-gradient(to top,var(--ea-grid),var(--eb-green))}
+.rbars i:hover{filter:brightness(1.2)}
+.resself{display:flex;align-items:center;gap:16px;padding-bottom:16px}
+.resring{position:relative;flex:none;width:88px;height:88px}
+.resring .donut{width:88px;height:88px;display:block}
+.resring .rico.mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);--mdc-icon-size:30px;color:var(--eb-muted)}
+.ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;border-top:1px solid var(--eb-line)}
+.ressave .pig{--mdc-icon-size:44px;color:var(--eb-green);flex:none}
+.resfoot{margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--eb-tile);border:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:13.5px}
+@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:16px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -311,11 +326,19 @@ const STRINGS = {
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
-    resTitle: "Results",
+    resTitle: "Your results",
+    resCost: "Electricity cost",
     resSaving: "Savings",
+    resPer_day: "per day",
+    resPer_week: "per week",
+    resPer_month: "per month",
+    resPer_year: "per year",
+    resDrive: "Driving",
+    resKmElectric: "km electric",
+    resFootKm: "You drive {km} km electrically ({kwh} kWh charged at home).",
+    resFootEv: "Your electric car charged {kwh} kWh at home.",
+    resFootSelf: "You cover {pct} % of your electricity needs yourself.",
     resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
-    resEv: "EV charged",
-    resKm: "Driven (approx.)",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
     stCharging: "Charging",
@@ -663,11 +686,19 @@ const STRINGS = {
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
-    resTitle: "Ergebnisse",
-    resSaving: "Ersparnis",
+    resTitle: "Ihre Ergebnisse",
+    resCost: "Stromkosten",
+    resSaving: "Einsparung",
+    resPer_day: "am Tag",
+    resPer_week: "pro Woche",
+    resPer_month: "pro Monat",
+    resPer_year: "jährlich",
+    resDrive: "Fahren",
+    resKmElectric: "km elektrisch",
+    resFootKm: "{km} km fahren Sie elektrisch ({kwh} kWh zu Hause geladen).",
+    resFootEv: "Ihr Elektroauto hat {kwh} kWh zu Hause geladen.",
+    resFootSelf: "Sie decken {pct} % Ihres Strombedarfs selbst.",
     resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
-    resEv: "E-Auto geladen",
-    resKm: "Gefahren (ca.)",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
     stCharging: "Lädt",
@@ -2661,9 +2692,9 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * The results of the shown period at a glance: production with the change to the period before and small bars,
-   * the self-consumption ring, the savings (needs Tariffy) and what the electric car charged (EV Assistant, with
-   * the kilometres when the consumption of the car is set). Empty without production.
+   * The results of the shown period as one friendly card: the production with the change to the period before and
+   * bars, a ring with the self-consumption, the savings (needs Tariffy), what the electric car charged (EV Assistant,
+   * kilometres when the consumption of the car is set) and a sentence that sums it up. Empty without production.
    */
   _renderResults() {
     const b = this._bal;
@@ -2672,37 +2703,45 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const t = b.totals, prev = b.before;
     const num = (v, d = 0) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    const ico = (name, cls = "") => (globalThis.customElements?.get?.("ha-icon") ? `<ha-icon class="rico ${cls}" icon="${name}"></ha-icon>` : "");
     const delta = (cur, before) => {
       if (before == null || !(before > 0)) return "";
       const pct = Math.round(((cur - before) / before) * 100);
       return `<div class="eb-label vs${this._vsClass(pct, true)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
     };
-    const tile = (label, value, unit, extra = "", tip = "") => `<div class="eb-tile"${tip ? ` title="${esc(tip)}"` : ""}><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
-    const tiles = [];
-    if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
+    // Production: bars per bucket, in a gradient from the first to the last bucket (like the stacked-bars badge).
+    const top = Math.max(...b.rows.map((r) => r.solar ?? 0), 0.001);
+    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [["--ea-prod", `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
+    // Self-consumption ring with the house in the middle
+    const self = t.self != null ? Math.round(t.self) : null;
+    const ring = self != null ? `<div class="resring">${this._donut([{ value: self, color: "var(--ea-prod)" }, { value: 100 - self, color: "var(--eb-tile-border)" }], "", "")}${ico("mdi:home-lightning-bolt-outline", "mid")}</div>` : "";
+    const selfBlock = self != null ? `<div class="resself">${ring}<div><div class="resbig">${self}<small>%</small></div><div class="eb-label">${esc(this._t("bSelf"))}</div>${delta(t.self, prev?.self)}</div></div>` : "";
+    // Savings (Tariffy): self-used solar energy at the contract price plus the feed-in revenue
     const price = this._price(), feed = this._feedInTariff();
+    let savings = "";
     if (price) {
       const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
       const [n, sym] = this._money(saving(t), price.currency, 0);
-      tiles.push(tile(this._t("resSaving"), n, sym, delta(saving(t), prev?.solar > 0 ? saving(prev) : null), this._t("resSavingTip")));
+      savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="eb-label">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
+        <div class="resbig">${n}<small>${esc(sym)}</small> <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div>${delta(saving(t), prev?.solar > 0 ? saving(prev) : null)}</div>${ico("mdi:piggy-bank-outline", "pig")}</div>`;
     }
-    if (b.ev != null && b.ev > 0.05) {
-      tiles.push(tile(this._t("resEv"), num(b.ev, b.ev < 100 ? 1 : 0), "kWh"));
-      const cons = this._cfg.ev_consumption;
-      if (cons > 0) tiles.push(tile(this._t("resKm"), num((b.ev / cons) * 100), "km"));
-    }
-    const self = t.self != null ? Math.round(t.self) : null;
-    const ring = self != null ? this._donut([{ value: self, color: "var(--ea-prod)" }, { value: 100 - self, color: "var(--eb-tile-border)" }], String(self), "%") : "";
-    const top = Math.max(...b.rows.map((r) => r.solar ?? 0), 0.001);
-    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [["--ea-prod", `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
-    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>
-      <div class="res">
-        <div class="resl"><div class="eb-label">${esc(this._t("bSolar"))}</div>
-          <div class="eb-value big2">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></div>${delta(t.solar, prev?.solar)}
+    // Electric car
+    const cons = this._cfg.ev_consumption;
+    const ev = b.ev != null && b.ev > 0.05 ? b.ev : null;
+    const km = ev != null && cons > 0 ? (ev / cons) * 100 : null;
+    const drive = km != null ? `<div class="resdrive">${ico("mdi:car-electric-outline")}<div><div class="eb-label">${esc(this._t("resDrive"))}</div><div class="resub"><b>${num(km)}</b> ${esc(this._t("resKmElectric"))}</div></div></div>` : "";
+    // The sentence under it all
+    let foot = "";
+    if (km != null) foot = this._t("resFootKm", { km: num(km), kwh: num(ev, ev < 100 ? 1 : 0) });
+    else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
+    else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
+    return `<div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
+      <div class="resgrid">
+        <div class="resl"><div class="resh">${ico("mdi:solar-power", "sun")}<span class="eb-label">${esc(this._t("bSolar"))}</span></div>
+          <div class="resbig huge">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></div>${delta(t.solar, prev?.solar)}
           <div class="rbars" aria-hidden="true">${bars}</div></div>
-        <div class="resr">${ring ? `<div class="resring">${ring}<div class="eb-label">${esc(this._t("bSelf"))}</div></div>` : ""}
-          <div class="tiles compact">${tiles.join("")}</div></div>
-      </div></div>`;
+        <div class="resr">${selfBlock}${savings}</div>
+      </div>${foot ? `<div class="resfoot">${esc(foot)}</div>` : ""}</div>`;
   }
 
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
