@@ -1202,16 +1202,23 @@ function resFlows(flows, socs) {
   // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
   if (flows.in) out += path("M31.5 115Q46 138 60 153", RES_FLOW.in, 2.4) + label(RES_FLOW.in, flows.in, 46, 112, "start", 8.5);
   if (flows.out) out += path("M82 163Q52 148 27 131", RES_FLOW.out, 2.4) + label(RES_FLOW.out, flows.out, 56, 178, "middle", 8.5);
-  if (socs.length && (flows.charge || flows.discharge)) {
-    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n);
+  if (socs.length && (flows.charge || flows.discharge || flows.units)) {
+    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), fs = n <= 3 ? 8.5 : 7.5;
     for (let i = 0; i < n; i++) {
-      const cx = RES_BAT_X + i * (w + gap) + w / 2;
-      if (flows.charge) out += path(`M${cx - 6} 160V190`, RES_FLOW.charge, 2.6);
-      if (flows.discharge) out += path(`M${cx + 6} 190V160`, RES_FLOW.discharge, 2.6);
+      const cx = RES_BAT_X + i * (w + gap) + w / 2, u = flows.units?.[i];
+      const c = flows.units ? u?.charge : flows.charge, d = flows.units ? u?.discharge : flows.discharge;
+      if (c) out += path(`M${cx - 6} 160V190`, RES_FLOW.charge, 2.6);
+      if (d) out += path(`M${cx + 6} 190V160`, RES_FLOW.discharge, 2.6);
+      if (flows.units) { // every storage with its own values
+        if (c) out += label(RES_FLOW.charge, c, cx, 146, "middle", fs);
+        if (d) out += label(RES_FLOW.discharge, d, cx, c ? 157 : 146, "middle", fs);
+      }
     }
-    const mid = RES_BAT_X + (n * w + (n - 1) * gap) / 2; // the texts sit above the lines, centred over the storages
-    if (flows.charge) out += label(RES_FLOW.charge, flows.charge, mid, 146, "middle", 8.5);
-    if (flows.discharge) out += label(RES_FLOW.discharge, flows.discharge, mid, flows.charge ? 157 : 146, "middle", 8.5);
+    if (!flows.units) { // the totals of all storages above the group
+      const mid = RES_BAT_X + (n * w + (n - 1) * gap) / 2;
+      if (flows.charge) out += label(RES_FLOW.charge, flows.charge, mid, 146, "middle", fs);
+      if (flows.discharge) out += label(RES_FLOW.discharge, flows.discharge, mid, flows.charge ? 157 : 146, "middle", fs);
+    }
   }
   return out;
 }
@@ -2508,7 +2515,20 @@ class EnergyAssistantPanel extends HTMLElement {
         const m = await this._statsKwh(wallboxes, win, range);
         if (m && m.size) ev = [...m.values()].reduce((a, b) => a + b, 0);
       }
-      this._bal = { range, off, win, ...data, before, manual, ev, failed: cur == null, at: Date.now() };
+      // Several storages: the charge and discharge counters are matched to the storages in the order of the settings
+      // (the first counter belongs to the first storage, ...), when there are as many counters as storages.
+      const nStores = this._storageLevels().length;
+      const sumOf = (id) => {
+        const rows = cur?.[id];
+        if (!rows?.length) return null;
+        const v = rows.reduce((a, r) => a + (Number.isFinite(r.change) ? r.change : 0), 0);
+        return Number.isFinite(v) ? v : null;
+      };
+      const chgIds = this._cfg.energy_battery_charge || [], disIds = this._cfg.energy_battery_discharge || [];
+      const units = nStores > 1 && (chgIds.length === nStores || disIds.length === nStores)
+        ? Array.from({ length: nStores }, (_, i) => ({ chg: chgIds.length === nStores ? sumOf(chgIds[i]) : null, dis: disIds.length === nStores ? sumOf(disIds[i]) : null }))
+        : null;
+      this._bal = { range, off, win, ...data, before, manual, ev, units, failed: cur == null, at: Date.now() };
     } finally {
       this._balLoading = false;
       this._render();
@@ -2891,7 +2911,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero" style="--resx:${(424 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows(t))}</div>
+    return `<div class="reshero" style="--resx:${(424 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows(t, b.units))}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
@@ -2902,7 +2922,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** The flows of the picture from the totals of the shown period (kWh): { pv, in, out, charge, discharge } as texts, or null. */
-  _resFlows(totals) {
+  _resFlows(totals, units = null) {
     if (!totals) return null;
     const lang = this._hass?.language || "en";
     const txt = (v) => `${v.toLocaleString(lang, { minimumFractionDigits: v < 100 ? 1 : 0, maximumFractionDigits: v < 100 ? 1 : 0 })} kWh`;
@@ -2911,6 +2931,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const v = totals[src];
       if (v != null && Number.isFinite(v) && v >= 0.05) out[key] = txt(v);
     }
+    if (units) out.units = units.map((u) => ({ charge: u.chg != null && u.chg >= 0.05 ? txt(u.chg) : null, discharge: u.dis != null && u.dis >= 0.05 ? txt(u.dis) : null }));
     return Object.keys(out).length ? out : null;
   }
 

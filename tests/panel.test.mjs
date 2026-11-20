@@ -4932,3 +4932,32 @@ test("results: flows without energy are left out, the storage lines need a stora
   assert.equal((past._renderResults().match(/class="flow"/g) || []).length, 2); // not only the running period
   assert.equal(p._resFlows(null), null);
 });
+
+test("results: every storage shows its own charge and discharge when the counters match the storages", async () => {
+  const cfg = { ...ENERGY_CFG, energy_battery_charge: ["sensor.c1", "sensor.c2"], energy_battery_discharge: ["sensor.d1", "sensor.d2"], battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] };
+  const p = balPanel(cfg, { "sensor.s1": { state: "70", attributes: {} }, "sensor.s2": { state: "30", attributes: {} } });
+  p._int = {};
+  p._usRange = "week";
+  const win = p._balWindow("week", 0);
+  const row = (v) => [{ start: win.edges[0], change: v }];
+  p._balFetch = async (w) => (w.off === 0 ? { "sensor.c1": row(10), "sensor.c2": row(4), "sensor.d1": row(8), "sensor.d2": row(2), "sensor.pv_e": row(30) } : {});
+  await p._loadBalance();
+  assert.deepEqual(p._bal.units, [{ chg: 10, dis: 8 }, { chg: 4, dis: 2 }]);
+  const html = p._renderResults();
+  for (const v of ["10[.,]0", "4[.,]0", "8[.,]0", "2[.,]0"]) assert.match(html, new RegExp(`>${v} kWh<`));
+  assert.equal((html.match(/class="flow"[^>]*stroke="#f06292"/g) || []).length, 2); // a charging line for each storage
+  assert.equal((html.match(/class="flow"[^>]*stroke="#4db6ac"/g) || []).length, 2); // and a discharging line
+  // a storage without energy in one direction has no line for it
+  p._bal.units[1].dis = null;
+  assert.equal((p._renderResults().match(/class="flow"[^>]*stroke="#4db6ac"/g) || []).length, 1);
+});
+
+test("results: the counters are not matched when their number differs from the storages", async () => {
+  const cfg = { ...ENERGY_CFG, energy_battery_charge: ["sensor.c1"], energy_battery_discharge: ["sensor.d1"], battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] };
+  const p = balPanel(cfg, { "sensor.s1": { state: "70", attributes: {} }, "sensor.s2": { state: "30", attributes: {} } });
+  p._int = {};
+  p._usRange = "week";
+  p._balFetch = async () => ({});
+  await p._loadBalance();
+  assert.equal(p._bal.units, null); // the totals above the group stay
+});
