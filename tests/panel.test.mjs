@@ -4607,10 +4607,13 @@ test("history: the settings add, edit and remove years and kinds in the draft", 
   p._draft = p._normalize(p._config);
   p._edited = () => {};
   p._render = () => {};
+  let saves = 0;
+  p._save = () => { saves += 1; };
   const values = { year: "2021", kind: "solar", kwh: "3,5", cost: "" };
   p.shadowRoot = { querySelector: (sel) => ({ value: values[/data-hnew="(\w+)"/.exec(sel)[1]] }) };
   p._addHistory();
   assert.deepEqual(p._draft.history_years, { 2020: { house: { kwh: 100 } }, 2021: { solar: { kwh: 3.5 } } });
+  assert.equal(saves, 1); // adding saves at once, no need to scroll to the Save button
   // edit: the row is loaded into the form, a changed year/kind replaces the old row
   p._onClick({ target: { closest: (sel) => (sel === "[data-histedit]" ? { dataset: { histedit: "2021:solar" } } : null) } });
   assert.deepEqual(p._histForm, { id: "2021:solar", year: "2021", kind: "solar", kwh: 3.5, cost: "" });
@@ -4623,6 +4626,7 @@ test("history: the settings add, edit and remove years and kinds in the draft", 
   Object.assign(values, { year: "1850", kind: "house", kwh: "10", cost: "" });
   p._addHistory(); // unusable: a hint and no change
   assert.match(p._fieldError.history_years, /Enter a year/);
+  assert.equal(saves, 2); // (the edit above saved, the unusable input did not)
   assert.equal(Object.keys(p._draft.history_years).length, 2);
   const html = p._renderHistory(false);
   assert.match(html, /data-histedit="2020:house"/);

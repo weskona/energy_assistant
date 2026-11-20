@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Past years save at once:** the *Add* / *Apply* button of the past years saves the settings right away, so you no longer have to scroll down to the Save button. (It saves the whole form, like the Save button.)
+
 ## [0.32.0] - 2026-11-20
 
 ### Added

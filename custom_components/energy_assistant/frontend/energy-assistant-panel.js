@@ -3740,6 +3740,8 @@ class EnergyAssistantPanel extends HTMLElement {
     this._draft.history_years = cleanHistory(hist);
     this._histForm = null;
     this._edited();
+    // Saved at once, so there is no need to scroll down to the Save button (it saves the whole form, like the button).
+    if (!this._saveDisabled()) this._save();
   }
 
   /** The offer of the Energy dashboard in the energy section: hint, question and the button (admins only). */
