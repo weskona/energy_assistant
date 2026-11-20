@@ -1177,12 +1177,15 @@ function resBatteries(socs) {
   return out;
 }
 
+// The two wires from the pole to the house run parallel, 7 units apart: import on the upper, feed-in on the lower one.
+const RES_WIRE = { in: ["36 115.5", "50.5 137.5", "64.5 150.5"], out: ["30 121", "44.5 143", "58.5 156"] };
 /** The power pole at the left of the house: the grid (import and feed-in), with the wire to the house. */
 function resPole() {
-  return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h30" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
+  return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h35" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
     + `<rect x="22" y="146" width="9" height="15" rx="2.5" fill="#55607a" stroke="#7a89ad" stroke-width="1"/>`
-    + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="31.5" cy="115" r="2.5" fill="#aab6cf"/>`
-    + `<path d="M31.5 115Q46 138 60 153" fill="none" stroke="#37405a" stroke-width="1.8"/><circle cx="27" cy="131" r="2.4" fill="#aab6cf"/><path d="M27 131Q52 154 84 174" fill="none" stroke="#37405a" stroke-width="1.8"/><path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
+    + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="36" cy="115.5" r="2.4" fill="#aab6cf"/><circle cx="30" cy="121" r="2.4" fill="#aab6cf"/>`
+    + `<path d="M${RES_WIRE.in[0]}Q${RES_WIRE.in[1]} ${RES_WIRE.in[2]}" fill="none" stroke="#37405a" stroke-width="1.4"/><path d="M${RES_WIRE.out[0]}Q${RES_WIRE.out[1]} ${RES_WIRE.out[2]}" fill="none" stroke="#37405a" stroke-width="1.4"/>`
+    + `<path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
 }
 
 const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
@@ -1196,7 +1199,7 @@ function resFlows(flows, socs) {
   // The line width follows the share of the flow: the biggest flow in the picture is 100 %.
   const all = [flows.pv, flows.in, flows.out, flows.charge, flows.discharge, ...(flows.units || []).flatMap((u) => [u?.charge, u?.discharge])].filter(Boolean).map((f) => f.v);
   const max = Math.max(...all, 0.0001);
-  const width = (f) => +(1.6 + 4.6 * (f.v / max)).toFixed(2);
+  const width = (f) => +(1.2 + 1.8 * (f.v / max)).toFixed(2);
   const label = (color, txt, tx, ty, anchor = "middle", size = 9) => `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="${size}" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
   // A flow: a band of the width of its share and a triangular head at its end, turned along the line. `from` and `to`
   // are the ends, `via` the control point of a curve (or null for a straight line).
@@ -1204,17 +1207,17 @@ function resFlows(flows, socs) {
     const w = width(f), color = RES_FLOW[key];
     const dx = to[0] - (via ? via[0] : from[0]), dy = to[1] - (via ? via[1] : from[1]);
     const len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
-    const L = 6 + w * 1.2, H = 3.5 + w * 0.9; // head length and half width
-    const bx = to[0] - ux * L, by = to[1] - uy * L; // base of the head, where the band ends
+    const L = 4.5 + w * 1.4, H = 2.4 + w * 0.9; // head length and half width
+    const bx = to[0] - ux * L, by = to[1] - uy * L; // base of the head, where the line ends
     const d = via ? `M${from[0]} ${from[1]}Q${via[0]} ${via[1]} ${bx.toFixed(1)} ${by.toFixed(1)}` : `M${from[0]} ${from[1]}L${bx.toFixed(1)} ${by.toFixed(1)}`;
     const head = `${to[0]},${to[1]} ${(bx - uy * H).toFixed(1)},${(by + ux * H).toFixed(1)} ${(bx + uy * H).toFixed(1)},${(by - ux * H).toFixed(1)}`;
-    return `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="butt" data-share="${Math.round((f.v / max) * 100)}"/><polygon class="flowhead" points="${head}" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/>`;
+    return `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-dasharray="4 3.2" stroke-linecap="butt" data-share="${Math.round((f.v / max) * 100)}"/><polygon class="flowhead" points="${head}" fill="${color}" stroke="${color}" stroke-width=".6" stroke-linejoin="round"/>`;
   };
   let out = "";
   if (flows.pv) out += path([125, 130], null, [125, 172], "pv", flows.pv) + label(RES_FLOW.pv, flows.pv.txt, 134, 156, "start");
   // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
-  if (flows.in) out += path([31.5, 115], [46, 138], [58, 152], "in", flows.in) + label(RES_FLOW.in, flows.in.txt, 46, 112, "start", 8.5);
-  if (flows.out) out += path([82, 172], [52, 154], [30, 133], "out", flows.out) + label(RES_FLOW.out, flows.out.txt, 50, 190, "middle", 8.5);
+  if (flows.in) out += path(RES_WIRE.in[0].split(" ").map(Number), RES_WIRE.in[1].split(" ").map(Number), RES_WIRE.in[2].split(" ").map(Number), "in", flows.in) + label(RES_FLOW.in, flows.in.txt, 50, 110, "start", 8.5);
+  if (flows.out) out += path(RES_WIRE.out[2].split(" ").map(Number), RES_WIRE.out[1].split(" ").map(Number), RES_WIRE.out[0].split(" ").map(Number), "out", flows.out) + label(RES_FLOW.out, flows.out.txt, 46, 176, "middle", 8.5);
   if (socs.length && (flows.charge || flows.discharge || flows.units)) {
     const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), fs = n <= 3 ? 8.5 : 7.5, off = w >= 27 ? 8 : 7;
     for (let i = 0; i < n; i++) {

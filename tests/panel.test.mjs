@@ -4972,12 +4972,12 @@ test("results: the counters are not matched when their number differs from the s
 test("results: the flow lines stand still, the width follows the share of the biggest flow, an arrow shows the direction", () => {
   const p = flowPanel({ solar: 100, imp: 50, exp: 10, chg: null, dis: null });
   const html = p._renderResults();
-  assert.doesNotMatch(html, /class="flow"[^>]*(stroke-dasharray|animation)/); // no motion (the ring has its dashes, the flow lines not)
+  assert.doesNotMatch(html, /animation|@keyframes/); // no motion, the lines are dashed but stand still
   assert.match(html, /<polygon class="flowhead"[^>]*fill="#ff9800"/); // the arrow head of the sun flow
   assert.equal((html.match(/class="flowhead"/g) || []).length, 3); // one head for each flow
   const width = (key) => Number(new RegExp(`stroke="${{ pv: "#ff9800", in: "#60a5fa", out: "#a78bfa" }[key]}" stroke-width="([\\d.]+)"`).exec(html)[1]);
   assert.ok(width("pv") > width("in") && width("in") > width("out")); // 100 % > 50 % > 10 %
-  assert.equal(width("pv"), 6.2); // the biggest flow
+  assert.equal(width("pv"), 3); // the biggest flow, thin like the others
   assert.match(html, /data-share="100"/);
   assert.match(html, /data-share="50"/);
   assert.match(html, /data-share="10"/);
