@@ -1189,28 +1189,29 @@ function resPole() {
 
 const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
 /**
- * The energy flow of the picture as moving dashes (live values, see _resFlows): sun and modules into the house, the grid
- * between the pole and the house (import to the house, feed-in to the pole) and the storages (charging from the
- * house, discharging into the house). `flows` has the active ones with their text.
+ * The energy flow of the picture as moving dashes, with the kWh of the shown period (see _resFlows): the sun into the
+ * house, the grid between the pole and the house (import towards the house, feed-in towards the pole) and the
+ * storages (charging from the house, discharging into the house). `flows` has the ones with energy and their texts.
  */
 function resFlows(flows, socs) {
   if (!flows) return "";
-  const line = (d, color, txt, tx, ty, anchor = "middle") => `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="3" style="color:${color}"/>`
-    + `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="9" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
+  const label = (color, txt, tx, ty, anchor = "middle", size = 9) => `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="${size}" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
+  const path = (d, color, width = 3) => `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="${width}" style="color:${color}"/>`;
   let out = "";
-  if (flows.pv) out += line("M125 130V174", RES_FLOW.pv, flows.pv.txt, 131, 156, "start");
-  if (flows.grid) {
-    const into = flows.grid.dir === "in";
-    out += line(into ? "M31.5 115Q46 138 60 153" : "M60 153Q46 138 31.5 115", RES_FLOW[flows.grid.dir], flows.grid.txt, 40, 178);
-  }
-  if (flows.store && socs.length) {
-    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), charge = flows.store.dir === "charge";
+  if (flows.pv) out += path("M125 130V174", RES_FLOW.pv) + label(RES_FLOW.pv, flows.pv, 131, 156, "start");
+  // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
+  if (flows.in) out += path("M28 111Q42 133 56 148", RES_FLOW.in, 2.4) + label(RES_FLOW.in, flows.in, 56, 178);
+  if (flows.out) out += path("M68 158Q53 145 39 123", RES_FLOW.out, 2.4) + label(RES_FLOW.out, flows.out, 56, flows.in ? 190 : 178);
+  if (socs.length && (flows.charge || flows.discharge)) {
+    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n);
     for (let i = 0; i < n; i++) {
       const cx = RES_BAT_X + i * (w + gap) + w / 2;
-      out += `<path class="flow" d="${charge ? `M${cx} 160V190` : `M${cx} 190V160`}" fill="none" stroke="${RES_FLOW[flows.store.dir]}" stroke-width="3" style="color:${RES_FLOW[flows.store.dir]}"/>`;
+      if (flows.charge) out += path(`M${cx - 6} 160V190`, RES_FLOW.charge, 2.6);
+      if (flows.discharge) out += path(`M${cx + 6} 190V160`, RES_FLOW.discharge, 2.6);
     }
-    const c0 = RES_BAT_X + w / 2;
-    out += `<text x="${c0 + 6}" y="176" font-size="8.5" font-weight="700" fill="${RES_FLOW[flows.store.dir]}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${flows.store.txt}</text>`;
+    const mid = RES_BAT_X + (n * w + (n - 1) * gap) / 2; // the texts sit above the lines, centred over the storages
+    if (flows.charge) out += label(RES_FLOW.charge, flows.charge, mid, 146, "middle", 8.5);
+    if (flows.discharge) out += label(RES_FLOW.discharge, flows.discharge, mid, flows.charge ? 157 : 146, "middle", 8.5);
   }
   return out;
 }
@@ -2890,7 +2891,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero" style="--resx:${(400 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows())}</div>
+    return `<div class="reshero" style="--resx:${(400 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows(t))}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
@@ -2900,20 +2901,16 @@ class EnergyAssistantPanel extends HTMLElement {
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
-  /** The live flows for the picture (only in the running period): { pv, grid, store } with their texts, or null. */
-  _resFlows() {
-    if ((this._usOff ?? 0) !== 0) return null;
-    const c = this._current();
-    if (!c) return null;
+  /** The flows of the picture from the totals of the shown period (kWh): { pv, in, out, charge, discharge } as texts, or null. */
+  _resFlows(totals) {
+    if (!totals) return null;
     const lang = this._hass?.language || "en";
-    const txt = (w) => (w >= 1000 ? `${(w / 1000).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kW` : `${Math.round(w)} W`);
-    const on = (w) => w != null && Number.isFinite(w) && w >= FLOW_W;
+    const txt = (v) => `${v.toLocaleString(lang, { minimumFractionDigits: v < 100 ? 1 : 0, maximumFractionDigits: v < 100 ? 1 : 0 })} kWh`;
     const out = {};
-    if (on(c.solar)) out.pv = { txt: txt(c.solar) };
-    if (on(c.gridIn)) out.grid = { dir: "in", txt: txt(c.gridIn) };
-    else if (on(c.gridOut)) out.grid = { dir: "out", txt: txt(c.gridOut) };
-    if (on(c.discharge)) out.store = { dir: "discharge", txt: txt(c.discharge) };
-    else if (on(c.charge)) out.store = { dir: "charge", txt: txt(c.charge) };
+    for (const [key, src] of [["pv", "solar"], ["in", "imp"], ["out", "exp"], ["charge", "chg"], ["discharge", "dis"]]) {
+      const v = totals[src];
+      if (v != null && Number.isFinite(v) && v >= 0.05) out[key] = txt(v);
+    }
     return Object.keys(out).length ? out : null;
   }
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Energy flow and power pole in the picture:** a power pole stands left of the house, it is the grid. Moving dashes show the live energy flow in the picture of the results card: the sun into the house (production), the wire between the pole and the house (grid import in blue towards the house, feed-in in purple towards the pole) and the line to each storage (charging in pink, discharging in teal), each with its power. A flow only shows from 20 W on; the lines are live values, so they only show in the running period (not when you page back). With reduced motion set in the system the dashes stand still.
+- **Energy flow and power pole in the picture:** a power pole stands left of the house, it is the grid. Moving dashes show the energy flow of the shown period in kWh in the picture of the results card: the sun into the house (production), two wires between the pole and the house (grid import in blue towards the house, feed-in in purple towards the pole) and the lines to the storages (charging in pink, discharging in teal), each with its kWh. A flow without energy is left out, the storage lines need a storage. It works in every period (day to year), not only now. With reduced motion set in the system the dashes stand still.
 
 ### Added
 

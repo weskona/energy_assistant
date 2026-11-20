@@ -4895,38 +4895,40 @@ test("results: with several storages the picture grows, so the card moves to the
   assert.match(three, /viewBox="0 0 4[5-9]\d 290"/);
 });
 
-// ---- energy flow in the picture of the results card
+// ---- energy flow in the picture of the results card (kWh of the shown period)
 
-function flowPanel(states, cfg) {
+function flowPanel(totals, cfg) {
   const p = resultsPanel(cfg);
-  for (const [id, v] of Object.entries(states)) p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: "W" } };
+  p._bal.totals = { ...p._bal.totals, ...totals };
   return p;
 }
-const FLOW_CFG = { solar_power: ["sensor.pv"], grid_import: ["sensor.gi"], grid_export: ["sensor.ge"], battery_charge: ["sensor.bc"], battery_discharge: ["sensor.bd"] };
 
-test("results: the power pole is always there, the flows follow the live values", () => {
-  const idle = flowPanel({ "sensor.pv": 0, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 0 }, FLOW_CFG);
-  assert.match(idle._renderResults(), /M18 270V104/); // the pole (grid)
-  assert.doesNotMatch(idle._renderResults(), /class="flow"/);
-  const exporting = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 1800, "sensor.bc": 900, "sensor.bd": 0 }, FLOW_CFG);
-  const html = exporting._renderResults();
-  assert.equal((html.match(/class="flow"/g) || []).length, 2); // sun into the house, feed-in to the pole (no storage drawn)
-  const withStore = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 1800, "sensor.bc": 900, "sensor.bd": 0, "sensor.soc": 50 }, { ...FLOW_CFG, battery_soc: ["sensor.soc"] });
-  assert.equal((withStore._renderResults().match(/class="flow"/g) || []).length, 3); // plus the line to the storage
-  assert.match(html, />3[.,]2 kW</);
-  assert.match(html, /M60 153Q46 138 31\.5 115/); // feed-in runs from the house to the pole
-  assert.match(html, /stroke="#a78bfa"/);
-  const importing = flowPanel({ "sensor.pv": 0, "sensor.gi": 1800, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 600, "sensor.soc": 50 }, { ...FLOW_CFG, battery_soc: ["sensor.soc"] });
-  const html2 = importing._renderResults();
-  assert.match(html2, /M31\.5 115Q46 138 60 153/); // import runs from the pole to the house
-  assert.match(html2, /stroke="#60a5fa"/);
-  assert.match(html2, />600 W</);
+test("results: the power pole is always there, the flows show the kWh of the period", () => {
+  const none = flowPanel({ solar: 30, imp: null, exp: null, chg: null, dis: null });
+  assert.match(none._renderResults(), /M18 270V104/); // the pole (grid)
+  const html = flowPanel({ solar: 7910, imp: 256.2, exp: 33.1, chg: 81.9, dis: 76.9 }, { battery_soc: ["sensor.soc"] })._renderResults();
+  assert.doesNotMatch(html, /class="flow"[^>]*stroke="#f06292"/); // (no state for the storage here: nothing drawn)
+  const p = flowPanel({ solar: 7910, imp: 256.2, exp: 33.1, chg: 81.9, dis: 76.9 }, { battery_soc: ["sensor.soc"] });
+  p._hass.states["sensor.soc"] = { state: "50", attributes: { unit_of_measurement: "%" } };
+  const full = p._renderResults();
+  assert.equal((full.match(/class="flow"/g) || []).length, 5); // sun, import, feed-in, charging, discharging
+  assert.match(full, />7,?910 kWh</);
+  assert.match(full, />256 kWh</); // from 100 kWh on without decimals
+  assert.match(full, />33[.,]1 kWh</);
+  assert.match(full, />81[.,]9 kWh</);
+  assert.match(full, />76[.,]9 kWh</);
+  assert.match(full, /stroke="#60a5fa"/); // import
+  assert.match(full, /stroke="#a78bfa"/); // feed-in
 });
 
-test("results: storage flow lines need a storage, and past periods show no live flow", () => {
-  const p = flowPanel({ "sensor.pv": 0, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 900, "sensor.bd": 0 }, FLOW_CFG);
-  assert.doesNotMatch(p._renderResults(), /class="flow"/); // no storage drawn, so no line to it
-  const q = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 0 }, FLOW_CFG);
-  q._usOff = -1;
-  assert.equal(q._resFlows(), null);
+test("results: flows without energy are left out, the storage lines need a storage, they also show in past periods", () => {
+  const p = flowPanel({ solar: 30, imp: 0.01, exp: 5, chg: 12, dis: null });
+  const html = p._renderResults();
+  assert.equal((html.match(/class="flow"/g) || []).length, 2); // sun and feed-in; no storage drawn, nothing imported
+  assert.match(html, />5[.,]0 kWh</);
+  const past = flowPanel({ solar: 30, imp: null, exp: 5, chg: null, dis: null });
+  past._usOff = -1;
+  past._bal.off = -1;
+  assert.equal((past._renderResults().match(/class="flow"/g) || []).length, 2); // not only the running period
+  assert.equal(p._resFlows(null), null);
 });
