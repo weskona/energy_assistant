@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Better car in the picture:** the electric car in the garage is redrawn from the side: a long sloping roof with a glass house, white front light and red rear LED, door lines, wheels with tire, rim and spokes in their arches and a glowing charge port at the rear, where the line from the house ends.
+- **Better car in the picture:** the electric car in the garage keeps its rear view, but the wheels are no longer flat dark ovals: tall tires with a tread stand on the floor below the body, and the roof, rear window and body are a little rounder with a soft sheen.
 
 ### Fixed
 
