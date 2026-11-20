@@ -4784,7 +4784,7 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   assert.match(html, /class="resillu"/); // the illustration beside the card
   // the bars come in the four colors of the picture
   assert.match(html, /class="rbars"/);
-  assert.match(html, /background:#7ed6d0/);
+  assert.match(html, /background:#4fd1c5/);
   // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR, shown in whole euros
   assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">7<small>€<\/small> <span class="resper">per week/);
   // no electric car: the sentence is about the self-sufficiency, with the figure in bold
