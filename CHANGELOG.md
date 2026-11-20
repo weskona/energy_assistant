@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Colors of the entered years:** the bars of *Energy per year* use the colors of the balance chart (consumption, production, grid import, feed-in) instead of one grey for all, and the kind has a colored dot.
+
 ### Changed
 
 - **Past years save at once:** the *Add* / *Apply* button of the past years saves the settings right away, so you no longer have to scroll down to the Save button. (It saves the whole form, like the Save button.)

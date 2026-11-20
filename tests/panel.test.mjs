@@ -4574,6 +4574,11 @@ test("history: a year without statistics shows the entered values, derived share
   assert.match(html, /Entered by hand/);
   assert.match(html, /Energy per year/);
   assert.match(html, /class="yrow on"/); // the shown year is highlighted
+  // every kind has the color of the balance chart
+  assert.match(html, /width:\d+%;background:var\(--ea-house\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-prod\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-grid\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-feed\)/);
 });
 
 test("history: existing statistics win per kind over the entered values", async () => {

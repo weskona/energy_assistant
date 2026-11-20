@@ -1007,6 +1007,8 @@ const NUMBER_KEYS = ["battery_capacity", "battery_min_soc"];
 const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
 /** What can be entered per year; the key is the total of the balance it replaces. */
 const HISTORY_KINDS = [["house", "cons", "histHouse"], ["solar", "solar", "histSolar"], ["import", "imp", "histImport"], ["export", "exp", "histExport"]];
+// The colors of the balance chart for the same values.
+const HISTORY_COLORS = { house: "--ea-house", solar: "--ea-prod", import: "--ea-grid", export: "--ea-feed" };
 
 /**
  * Manual yearly values {year: {kind: {kwh, cost?}}}: plausible years, known kinds and positive finite numbers only
@@ -2674,8 +2676,8 @@ class EnergyAssistantPanel extends HTMLElement {
       const years = Object.keys(hist).filter((y) => hist[y][kind]);
       if (!years.length) return "";
       const max = Math.max(...years.map((y) => hist[y][kind].kwh), 1);
-      const rows = years.map((y) => `<div class="yrow${Number(y) === selected ? " on" : ""}"><span class="yname">${esc(y)}</span><span class="ytrack"><i style="width:${Math.max(1, Math.round((hist[y][kind].kwh / max) * 100))}%"></i></span><span class="yval">${hist[y][kind].kwh.toLocaleString(lang, { maximumFractionDigits: 0 })} kWh</span></div>`).join("");
-      return `<div class="ykind"><div class="eb-label">${esc(this._t(label))}</div>${rows}</div>`;
+      const rows = years.map((y) => `<div class="yrow${Number(y) === selected ? " on" : ""}"><span class="yname">${esc(y)}</span><span class="ytrack"><i style="width:${Math.max(1, Math.round((hist[y][kind].kwh / max) * 100))}%;background:var(${HISTORY_COLORS[kind]})"></i></span><span class="yval">${hist[y][kind].kwh.toLocaleString(lang, { maximumFractionDigits: 0 })} kWh</span></div>`).join("");
+      return `<div class="ykind"><div class="eb-label"><i class="dot" style="background:var(${HISTORY_COLORS[kind]});margin-right:6px"></i>${esc(this._t(label))}</div>${rows}</div>`;
     }).join("");
     return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("bYearsTitle"))}</span><span class="eb-label">${esc(this._t("bManual"))}</span></div>${cards}</div>`;
   }
