@@ -53,6 +53,9 @@ const STYLE = `
 .bpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .bpick .segs{margin-top:0}
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
+.eb-card.pickbar{padding:8px 16px;border-radius:16px}
+.pickbar .bpick{margin-top:0}
+.pickbar .seg{padding:3px 12px;line-height:1.25}
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
 .stack{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr)}
@@ -2704,7 +2707,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const win = this._balWindow(range, off);
-    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, win)}</div>`;
+    const picker = `<div class="eb-card pickbar">${this._rangePicker("u", range, off, win)}</div>`;
     const stack = (...cards) => `<div class="stack">${[picker, ...cards].join("")}</div>`;
     const note = (key) => `<div class="eb-card"><div class="empty">${esc(this._t(key))}</div></div>`;
     if (!(this._cfg.label_ids || []).length) return stack(note("devNoLabels"));
@@ -2806,7 +2809,7 @@ class EnergyAssistantPanel extends HTMLElement {
   _renderConsumption() {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
+    const picker = `<div class="eb-card pickbar">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
     const parts = [picker];
     if (this._balEnabled()) parts.push(this._renderResults(), this._renderBalance({ bare: true }));
     if (this._usageEnabled()) parts.push(this._renderUsage({ bare: true }));

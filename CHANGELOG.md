@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Slim period bar:** the card with the period picker (*Day / Week / Month / Year* and the arrows) in the Consumption and Devices tabs is much lower: little padding, smaller buttons, one slim row.
+
 ## [0.33.1] - 2026-11-20
 
 ### Changed
