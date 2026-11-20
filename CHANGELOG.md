@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-20
+
+### Added
+
+- **Energy flow and power pole in the picture:** a power pole stands left of the house, it is the grid. Moving dashes show the energy flow of the shown period in kWh in the picture of the results card: the sun into the house (production), two separate wires between the pole and the house, import from the upper and feed-in to the lower cross arm (grid import in blue towards the house, feed-in in purple towards the pole) and the lines to the storages (charging in pink, discharging in teal), each with its kWh. A flow without energy is left out, the storage lines need a storage. It works in every period (day to year), not only now. With reduced motion set in the system the dashes stand still.
+
+- **Storages in the picture:** in the picture of the results card (where the door was) a home storage unit for every storage stands (housing on two feet with a bolt, a display slot with six LED segments filled up to its charge level, a status light and the percentage below it; green from 60 %, amber from 25 %, red below). The first storage is the charge level sensor as before, the new setting *Further storages: charge level sensors* (*Solar and storage*) adds more; they stand apart in front of the house, and with several storages the picture grows so the card moves to the right; up to four batteries are drawn, without a storage the door stays. With several storages the Storage card of the Power tab shows the mean charge level.
+
+- **Results card:** the first card of the Consumption tab (below the period picker) sums up the shown period like the result page of a PV calculator, in the glow design of the panel (glowing green card edge, small uppercase titles and labels, the panel colors, a sun with rays that hit the solar modules, glowing windows, an electric car seen from behind in the garage): *Your results* with the kilometres driven electrically in a frame at the top right, *Annual yield* (daily, weekly or monthly yield for the other periods) as a big figure with four wide bars (quarters of the year, weeks of the month, parts of the day, the seven days of a week), a ring with the self-consumption and a house in the middle, *Electricity cost / Savings* with a piggy bank (self-used solar energy at the price of your Tariffy contract plus the feed-in revenue, whole euros; only with Tariffy) and a sentence in a band at the bottom. On wide screens the card spans the full width (like the other cards) and the layers are like the picture: a faded card behind, an evening house with lit windows in front overlapping the card. The kilometres come from what the wallbox of EV Assistant charged (statistics of its power sensor, read only) and the new setting *Electric car: consumption* (kWh per 100 km, *Energy counters*); without it the sentence names the kWh, without a car the sentence is about the self-sufficiency. The card only appears with production.
+
+### Changed
+
+- **Own values for every storage:** with several storages each one shows its own charging and discharging in the picture (pink and teal lines with their kWh above it). The energy counters *Storage charge* and *Storage discharge* are matched to the storages in the order of the settings (first counter = first storage, the first storage is the charge level sensor, then the further ones); this needs as many counters as storages. Otherwise the totals of all storages are shown above the group, as before.
+
+- **Smaller House card:** the tiles under the live power are smaller and denser (two rows instead of three on a normal card). They always show the same set, which depends only on the configured sensors and never on the current values, so the card keeps its size and nothing flickers in or out during the day. The tile *PV direkt verbraucht* is called *PV direkt* (*Solar direct*) so it fits on one line.
+
+- **Past years save at once:** the *Add* / *Apply* button of the past years saves the settings right away, so you no longer have to scroll down to the Save button. (It saves the whole form, like the Save button.)
+
+### Fixed
+
+- **Colors of the entered years:** the bars of *Energy per year* use the colors of the balance chart (consumption, production, grid import, feed-in) instead of one grey for all, and the kind has a colored dot.
+
 ## [0.32.0] - 2026-11-20
 
 ### Added

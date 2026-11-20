@@ -4574,6 +4574,11 @@ test("history: a year without statistics shows the entered values, derived share
   assert.match(html, /Entered by hand/);
   assert.match(html, /Energy per year/);
   assert.match(html, /class="yrow on"/); // the shown year is highlighted
+  // every kind has the color of the balance chart
+  assert.match(html, /width:\d+%;background:var\(--ea-house\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-prod\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-grid\)/);
+  assert.match(html, /width:\d+%;background:var\(--ea-feed\)/);
 });
 
 test("history: existing statistics win per kind over the entered values", async () => {
@@ -4607,10 +4612,13 @@ test("history: the settings add, edit and remove years and kinds in the draft", 
   p._draft = p._normalize(p._config);
   p._edited = () => {};
   p._render = () => {};
+  let saves = 0;
+  p._save = () => { saves += 1; };
   const values = { year: "2021", kind: "solar", kwh: "3,5", cost: "" };
   p.shadowRoot = { querySelector: (sel) => ({ value: values[/data-hnew="(\w+)"/.exec(sel)[1]] }) };
   p._addHistory();
   assert.deepEqual(p._draft.history_years, { 2020: { house: { kwh: 100 } }, 2021: { solar: { kwh: 3.5 } } });
+  assert.equal(saves, 1); // adding saves at once, no need to scroll to the Save button
   // edit: the row is loaded into the form, a changed year/kind replaces the old row
   p._onClick({ target: { closest: (sel) => (sel === "[data-histedit]" ? { dataset: { histedit: "2021:solar" } } : null) } });
   assert.deepEqual(p._histForm, { id: "2021:solar", year: "2021", kind: "solar", kwh: 3.5, cost: "" });
@@ -4623,6 +4631,7 @@ test("history: the settings add, edit and remove years and kinds in the draft", 
   Object.assign(values, { year: "1850", kind: "house", kwh: "10", cost: "" });
   p._addHistory(); // unusable: a hint and no change
   assert.match(p._fieldError.history_years, /Enter a year/);
+  assert.equal(saves, 2); // (the edit above saved, the unusable input did not)
   assert.equal(Object.keys(p._draft.history_years).length, 2);
   const html = p._renderHistory(false);
   assert.match(html, /data-histedit="2020:house"/);
@@ -4735,4 +4744,220 @@ test("notices: the last full hours of a device are measured from the history", (
   assert.ok(Math.abs(d.recent[0] - 90) < 25); // the 130 W started in the middle of the first of the three hours
   assert.equal(Math.round(d.recent[1]), 130);
   assert.equal(Math.round(d.recent[2]), 130);
+});
+
+test("house card: the tiles depend on the configured sensors, not on the current values, in a compact grid", () => {
+  const cfg = { solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_discharge: ["bd"], house_power: "h" };
+  const mk = (states) => {
+    const p = panel(cfg, states);
+    p._ready = true;
+    p._hass.language = "en";
+    return p._renderHouse();
+  };
+  const night = mk({ pv: st(0), gi: st(1803), ge: st(0), bd: st(0), h: st(1803) });
+  const day = mk({ pv: st(3000), gi: st(0), ge: st(1200), bd: st(500), h: st(2300) });
+  assert.match(night, /<div class="tiles compact">/);
+  const tiles = (html) => [...html.matchAll(/<div class="eb-tile"><div class="eb-label">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(tiles(night), tiles(day)); // the same tiles at night and during the day
+  assert.ok(tiles(night).includes("Grid export") && tiles(night).includes("Solar") && tiles(night).includes("From storage"));
+  assert.ok(!tiles(night).includes("To storage")); // no sensor for it
+});
+
+// ---- results card of the Consumption tab
+
+function resultsPanel(extraCfg = {}, int = {}) {
+  const p = loadedBalance();
+  p._config = { ...p._config, ...extraCfg };
+  p._int = int;
+  p._hass.states["sensor.t_preis"] = { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } };
+  p._hass.states["sensor.t_feed"] = { state: "0.08", attributes: {} };
+  return p;
+}
+
+test("results: production, self-consumption ring and the savings with Tariffy", () => {
+  const p = resultsPanel({}, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } });
+  const html = p._renderResults();
+  assert.match(html, /<span class="eb-title">Your results<\/span>/);
+  assert.match(html, /<div class="reslab">Weekly yield<\/div>\s*<div class="resnum"><span class="rn">30\.0<small>kWh/);
+  assert.match(html, /class="donut"/); // the self-consumption ring with the house in the middle
+  assert.match(html, /<div class="resbig">77<small>%/);
+  assert.match(html, /class="resillu"/); // the illustration beside the card
+  // the bars come in the four colors of the picture, a week keeps its seven days, each with its label
+  assert.match(html, /class="rbars"/);
+  assert.match(html, /background:var\(--eb-cyan\)/);
+  assert.equal((html.match(/class="rbar"/g) || []).length, 7);
+  // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR, shown in whole euros
+  assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">7 € <span class="resper">per week/);
+  // no electric car: the sentence is about the self-sufficiency, with the figure in bold
+  assert.match(html, /<div class="resfoot">You cover <b>78 %<\/b> of your electricity needs yourself\.<\/div>/);
+});
+
+test("results: no savings without a price, no card without production or while loading", () => {
+  const p = resultsPanel();
+  assert.doesNotMatch(p._renderResults(), /Savings/);
+  p._bal.totals.solar = 0;
+  assert.equal(p._renderResults(), "");
+  const q = resultsPanel();
+  q._usRange = "month"; // the data is of another period
+  assert.equal(q._renderResults(), "");
+});
+
+test("results: the electric car shows the kilometres with its consumption, otherwise the kWh in the sentence", () => {
+  const withKm = resultsPanel({ ev_consumption: 17.5 });
+  withKm._bal.ev = 285;
+  const html = withKm._renderResults();
+  assert.match(html, /Driving<\/div><div class="resdk"><b>1[.,]?629<\/b> km electric/);
+  assert.match(html, /<b>1[.,]?629 km<\/b> you drive electrically \(285 kWh charged at home\)\./);
+  const noKm = resultsPanel();
+  noKm._bal.ev = 285;
+  assert.doesNotMatch(noKm._renderResults(), /Driving/);
+  assert.match(noKm._renderResults(), /Your electric car charged <b>285 kWh<\/b> at home\./);
+  const none = resultsPanel({ ev_consumption: 17.5 });
+  none._bal.ev = null; // no EV Assistant or no statistics
+  assert.doesNotMatch(none._renderResults(), /Driving|electric car charged/);
+});
+
+test("results: the energy of the wallboxes comes from the statistics with the balance", async () => {
+  const p = balPanel();
+  p._int = { ev_assistant: { vehicles: [{ name: "EV", wallbox_power: "sensor.wb" }] } };
+  p._usRange = "week";
+  p._statsKwh = async (ids) => { assert.deepEqual(ids, ["sensor.wb"]); return new Map([["sensor.wb", 12.5]]); };
+  p._hass.callWS = async () => ({});
+  await p._loadBalance();
+  assert.equal(p._bal.ev, 12.5);
+  p._int = {}; // without EV Assistant
+  await p._loadBalance();
+  assert.equal(p._bal.ev, null);
+});
+
+test("results: other periods are shown as four bars (quarters, weeks of the month, parts of the day)", () => {
+  const four = (range, n) => {
+    const p = resultsPanel();
+    p._usRange = range;
+    p._usOff = 0;
+    const win = p._balWindow(range, 0);
+    assert.equal(win.edges.length - 1 >= n - 1, true);
+    p._bal = { range, off: 0, win, at: Date.now(), failed: false, rows: Array.from({ length: win.edges.length - 1 }, (_, i) => ({ t: win.edges[i], solar: i + 1, imp: null, exp: null, cons: null })), totals: { solar: 100, self: 50 }, before: null };
+    return p._renderResults();
+  };
+  const year = four("year", 12);
+  assert.equal((year.match(/class="rbar"/g) || []).length, 4);
+  assert.match(year, /<span>Q1<\/span>[\s\S]*<span>Q4<\/span>/);
+  assert.equal((four("month", 28).match(/class="rbar"/g) || []).length, 4);
+  assert.equal((four("day", 24).match(/class="rbar"/g) || []).length, 4);
+  assert.match(four("day", 24), /<span>0–6<\/span>/);
+});
+
+// ---- batteries of the storages in the picture of the results card
+
+function batteryPanel(cfg, levels) {
+  const p = resultsPanel(cfg);
+  for (const [id, v] of Object.entries(levels)) p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: "%" } };
+  return p;
+}
+
+test("results: a battery for every storage, filled up to its charge level, instead of the door", () => {
+  const none = resultsPanel();
+  assert.doesNotMatch(none._renderResults(), /class="unit"/);
+  assert.match(none._renderResults(), /fill="#46506a"/); // the door stays without a storage
+  const one = batteryPanel({ battery_soc: ["sensor.s1"] }, { "sensor.s1": 78 });
+  const html1 = one._renderResults();
+  assert.equal((html1.match(/class="unit"/g) || []).length, 1);
+  assert.equal((html1.match(/class="glowb"[^>]*width="\d+"/g) || []).length >= 5, true); // 78 % = 5 of 6 LED segments lit
+  assert.match(html1, />78%</);
+  assert.doesNotMatch(html1, /fill="#46506a"/);
+  const three = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.s3"] }, { "sensor.s1": 78, "sensor.s2": 34, "sensor.s3": 12 });
+  const html3 = three._renderResults();
+  assert.equal((html3.match(/class="unit"/g) || []).length, 3);
+  assert.match(html3, />34%</);
+  assert.match(html3, /fill="#34d399"[^>]*><\/rect>|fill="#34d399"/); // full green
+  assert.match(html3, /fill="#f7b733" style="color:#f7b733"/); // 34 % is amber
+  assert.match(html3, /fill="#f87171" style="color:#f87171"/); // 12 % is red
+});
+
+test("results: storages without a value are left out, at most four are drawn, the storage card uses the mean", () => {
+  const p = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.gone", "sensor.s3", "sensor.s4", "sensor.s5"] },
+    { "sensor.s1": 100, "sensor.s2": 50, "sensor.s3": 40, "sensor.s4": 30, "sensor.s5": 20 });
+  assert.deepEqual(p._storageLevels(), [100, 50, 40, 30, 20]);
+  assert.equal((p._renderResults().match(/class="unit"/g) || []).length, 4);
+  const q = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] }, { "sensor.s1": 80, "sensor.s2": 40 });
+  assert.equal(q._storage({}).soc, 60);
+});
+
+test("results: with several storages the picture grows, so the card moves to the right and the batteries stay clear of it", () => {
+  const widthOf = (html) => Number(/--resx:([\d.]+)/.exec(html)[1]);
+  const one = batteryPanel({ battery_soc: ["sensor.s1"] }, { "sensor.s1": 50 })._renderResults();
+  const three = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.s3"] }, { "sensor.s1": 50, "sensor.s2": 50, "sensor.s3": 50 })._renderResults();
+  const none = resultsPanel()._renderResults();
+  assert.ok(Math.abs(widthOf(none) - 1.06) < 0.001); // a little room at the left for the power pole
+  assert.equal(widthOf(one), widthOf(none)); // one battery fits as it is
+  assert.ok(widthOf(three) > widthOf(none) + 0.1); // three need room
+  assert.match(three, /viewBox="-24 0 4[5-9]\d 290"/);
+});
+
+// ---- energy flow in the picture of the results card (kWh of the shown period)
+
+function flowPanel(totals, cfg) {
+  const p = resultsPanel(cfg);
+  p._bal.totals = { ...p._bal.totals, ...totals };
+  return p;
+}
+
+test("results: the power pole is always there, the flows show the kWh of the period", () => {
+  const none = flowPanel({ solar: 30, imp: null, exp: null, chg: null, dis: null });
+  assert.match(none._renderResults(), /M18 270V104/); // the pole (grid)
+  const html = flowPanel({ solar: 7910, imp: 256.2, exp: 33.1, chg: 81.9, dis: 76.9 }, { battery_soc: ["sensor.soc"] })._renderResults();
+  assert.doesNotMatch(html, /class="flow"[^>]*stroke="#f06292"/); // (no state for the storage here: nothing drawn)
+  const p = flowPanel({ solar: 7910, imp: 256.2, exp: 33.1, chg: 81.9, dis: 76.9 }, { battery_soc: ["sensor.soc"] });
+  p._hass.states["sensor.soc"] = { state: "50", attributes: { unit_of_measurement: "%" } };
+  const full = p._renderResults();
+  assert.equal((full.match(/class="flow"/g) || []).length, 5); // sun, import, feed-in, charging, discharging
+  assert.match(full, />7,?910 kWh</);
+  assert.match(full, />256 kWh</); // from 100 kWh on without decimals
+  assert.match(full, />33[.,]1 kWh</);
+  assert.match(full, />81[.,]9 kWh</);
+  assert.match(full, />76[.,]9 kWh</);
+  assert.match(full, /stroke="#60a5fa"/); // import
+  assert.match(full, /stroke="#a78bfa"/); // feed-in
+});
+
+test("results: flows without energy are left out, the storage lines need a storage, they also show in past periods", () => {
+  const p = flowPanel({ solar: 30, imp: 0.01, exp: 5, chg: 12, dis: null });
+  const html = p._renderResults();
+  assert.equal((html.match(/class="flow"/g) || []).length, 2); // sun and feed-in; no storage drawn, nothing imported
+  assert.match(html, />5[.,]0 kWh</);
+  const past = flowPanel({ solar: 30, imp: null, exp: 5, chg: null, dis: null });
+  past._usOff = -1;
+  past._bal.off = -1;
+  assert.equal((past._renderResults().match(/class="flow"/g) || []).length, 2); // not only the running period
+  assert.equal(p._resFlows(null), null);
+});
+
+test("results: every storage shows its own charge and discharge when the counters match the storages", async () => {
+  const cfg = { ...ENERGY_CFG, energy_battery_charge: ["sensor.c1", "sensor.c2"], energy_battery_discharge: ["sensor.d1", "sensor.d2"], battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] };
+  const p = balPanel(cfg, { "sensor.s1": { state: "70", attributes: {} }, "sensor.s2": { state: "30", attributes: {} } });
+  p._int = {};
+  p._usRange = "week";
+  const win = p._balWindow("week", 0);
+  const row = (v) => [{ start: win.edges[0], change: v }];
+  p._balFetch = async (w) => (w.off === 0 ? { "sensor.c1": row(10), "sensor.c2": row(4), "sensor.d1": row(8), "sensor.d2": row(2), "sensor.pv_e": row(30) } : {});
+  await p._loadBalance();
+  assert.deepEqual(p._bal.units, [{ chg: 10, dis: 8 }, { chg: 4, dis: 2 }]);
+  const html = p._renderResults();
+  for (const v of ["10[.,]0", "4[.,]0", "8[.,]0", "2[.,]0"]) assert.match(html, new RegExp(`>${v} kWh<`));
+  assert.equal((html.match(/class="flow"[^>]*stroke="#f06292"/g) || []).length, 2); // a charging line for each storage
+  assert.equal((html.match(/class="flow"[^>]*stroke="#4db6ac"/g) || []).length, 2); // and a discharging line
+  // a storage without energy in one direction has no line for it
+  p._bal.units[1].dis = null;
+  assert.equal((p._renderResults().match(/class="flow"[^>]*stroke="#4db6ac"/g) || []).length, 1);
+});
+
+test("results: the counters are not matched when their number differs from the storages", async () => {
+  const cfg = { ...ENERGY_CFG, energy_battery_charge: ["sensor.c1"], energy_battery_discharge: ["sensor.d1"], battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] };
+  const p = balPanel(cfg, { "sensor.s1": { state: "70", attributes: {} }, "sensor.s2": { state: "30", attributes: {} } });
+  p._int = {};
+  p._usRange = "week";
+  p._balFetch = async () => ({});
+  await p._loadBalance();
+  assert.equal(p._bal.units, null); // the totals above the group stay
 });

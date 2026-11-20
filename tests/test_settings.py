@@ -246,3 +246,11 @@ def test_history_years_are_cleaned_and_stored() -> None:
     assert to_storage(settings)["history_years"] == settings["history_years"]
     assert "history_years" not in to_storage(normalize({}))
     assert normalize(to_storage(settings)) == settings
+
+
+def test_ev_consumption_is_a_number_or_not_set() -> None:
+    assert normalize({"ev_consumption": "17,5"})["ev_consumption"] == 17.5
+    assert normalize({})["ev_consumption"] is None
+    assert normalize({"ev_consumption": -3})["ev_consumption"] is None
+    assert to_storage(normalize({"ev_consumption": 18}))["ev_consumption"] == 18.0
+    assert "ev_consumption" not in to_storage(normalize({}))

@@ -47,11 +47,20 @@ CONF_INVERT_BATTERY = "invert_battery"
 
 # Storage: charge level sensor (%), capacity (kWh) and minimum charge level (%) for the storage card.
 CONF_BATTERY_SOC = "battery_soc"  # one sensor
+# Charge level sensors of further storages (the first one is CONF_BATTERY_SOC); the results card shows one
+# battery for each.
+CONF_BATTERY_SOC_MORE = "battery_soc_more"
 CONF_BATTERY_CAPACITY = "battery_capacity"  # kWh
 CONF_BATTERY_MIN_SOC = "battery_min_soc"  # %
+# Consumption of the electric car in kWh per 100 km (for the kilometres of the results card).
+CONF_EV_CONSUMPTION = "ev_consumption"
 # Numbers (kWh, %): empty means not set. Upper limits for the settings API.
-NUMBER_KEYS = (CONF_BATTERY_CAPACITY, CONF_BATTERY_MIN_SOC)
-NUMBER_MAX = {CONF_BATTERY_CAPACITY: 100000.0, CONF_BATTERY_MIN_SOC: 100.0}
+NUMBER_KEYS = (CONF_BATTERY_CAPACITY, CONF_BATTERY_MIN_SOC, CONF_EV_CONSUMPTION)
+NUMBER_MAX = {
+    CONF_BATTERY_CAPACITY: 100000.0,
+    CONF_BATTERY_MIN_SOC: 100.0,
+    CONF_EV_CONSUMPTION: 200.0,
+}
 
 # Energy counters (kWh, cumulative or utility meters) for the balance tab; one or more each, summed.
 CONF_ENERGY_SOLAR = "energy_solar"
@@ -83,6 +92,7 @@ LIST_KEYS = (
     CONF_DEVICE_STANDBY,
     CONF_STANDBY_NORMAL,
     CONF_ALERT_EXCLUDE,
+    CONF_BATTERY_SOC_MORE,
     CONF_DEVICE_IDS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,

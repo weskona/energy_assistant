@@ -663,3 +663,20 @@ async def test_update_config_stores_the_devices_without_notices(
     assert msg["success"]
     assert msg["result"]["alert_exclude"] == ["sensor.wallbox_power"]
     assert entry.options["alert_exclude"] == ["sensor.wallbox_power"]
+
+
+async def test_update_config_limits_the_ev_consumption(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "energy_assistant/update_config", "config": {"ev_consumption": 17.5}}
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["ev_consumption"] == 17.5
+    await client.send_json_auto_id(
+        {"type": "energy_assistant/update_config", "config": {"ev_consumption": 500}}
+    )
+    msg = await client.receive_json()
+    assert not msg["success"]
