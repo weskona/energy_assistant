@@ -144,6 +144,8 @@ The config flow (and the options, which can be changed later with *Configure*) h
 
 With a **charge level sensor** (percent) in the settings (section *Solar and storage*) the Power tab shows a **Storage** card: the charge level as a bar with the minimum level marked, the status (charging, discharging, idle) and, with the **capacity** (kWh) and the **minimum charge level** (%), what is stored and what is usable. While the storage discharges it says when it is empty, while it charges when it is full, from the current power (from 20 W on). PV Assistant offers its charge level sensor, capacity and minimum level with the button of the notice.
 
+**Picture of the Power tab:** the Power tab starts with the house of the results card, but with the power of now (whole watts): the consumption, where it comes from (sun, grid, storage, feed-in), the self-sufficiency as a ring, what the sun saves per hour (Tariffy), and the electric car with its charging power (EV Assistant). The lines show the flows of now from 20 W on, the storages show their live charge level. The notices stay on top, the cards below are unchanged.
+
 ### Notices
 
 A card **Notices** at the top of the Power tab appears when something needs attention, otherwise it is not there:
