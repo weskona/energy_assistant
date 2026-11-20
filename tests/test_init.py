@@ -60,6 +60,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "device_standby": [],
         "device_ids": [],
         "standby_normal": [],
+        "alert_exclude": [],
         "device_patterns": ["*_power"],
         "device_exclude": ["sensor.skip_power"],
         "device_exclude_patterns": ["alpha_ess_*"],

@@ -508,6 +508,9 @@ const STRINGS = {
     f_battery_grid_charge: "Storage charged from grid",
     f_device_power: "Additional device sensors (optional)",
     f_device_standby: "Standby devices",
+    f_alert_exclude: "No notices for these devices",
+    h_alert_exclude: "These devices never trigger a notice about running for hours or using more than usual (for example the wallbox).",
+    alUnusual: "{name} has been using more than usual for {hours} hours: on average {now} (usually up to {ref})",
     f_label_tariffs: "Tariff per label (for the cost sensors)",
     h_label_tariffs: "Which Tariffy electricity contract prices the cost of a label, e.g. the heat pump tariff for the heat pump label. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     tariffDefault: "Default ({name})",
@@ -851,6 +854,9 @@ const STRINGS = {
     f_battery_grid_charge: "Speicher aus dem Netz geladen",
     f_device_power: "Zusätzliche Geräte-Sensoren (optional)",
     f_device_standby: "Standby-Geräte",
+    f_alert_exclude: "Keine Hinweise für diese Geräte",
+    h_alert_exclude: "Diese Geräte lösen nie einen Hinweis über stundenlanges Laufen oder ungewöhnlich hohen Verbrauch aus (zum Beispiel die Wallbox).",
+    alUnusual: "{name} verbraucht seit {hours} Stunden mehr als üblich: im Schnitt {now} (sonst höchstens {ref})",
     f_label_tariffs: "Tarif pro Label (für die Kostensensoren)",
     h_label_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Labels bewertet, z. B. der Wärmepumpentarif für das Wärmepumpen-Label. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     tariffDefault: "Standard ({name})",
@@ -1032,11 +1038,11 @@ const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["history_years", "history"]] },
-  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
+  { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "standby_normal", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "standby_normal", "alert_exclude", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -1050,6 +1056,12 @@ const IDLE_W = 5;
 const LONG_RUN_W = 200; // a device that draws this much counts as running
 const LONG_RUN_MS = 4 * 3600 * 1000; // running this long is worth a notice
 const ALWAYS_RUN_MS = 20 * 3600 * 1000; // but not a device that never stopped (heat pump, pool pump)
+// Unusual consumption: the last UNUSUAL_HOURS full hours of a device were all above the highest hourly mean it reached
+// on the days before by this factor and at least this many watts (a fridge that runs far longer than usual).
+const UNUSUAL_HOURS = 3;
+const UNUSUAL_FACTOR = 1.3;
+const UNUSUAL_MIN_W = 20;
+const UNUSUAL_MIN_HOURS_REF = 48; // hourly values needed from the days before to know what is usual
 const FLOW_W = 20; // charging or discharging from this power on
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
@@ -1379,10 +1391,18 @@ class EnergyAssistantPanel extends HTMLElement {
         }
         run = (end - startK + 1) * step;
       }
+      // The mean of each of the last full hours (null where most of the hour has no values), oldest first.
+      const perHour = Math.round(3600000 / step);
+      const recent = Array.from({ length: UNUSUAL_HOURS }, (_, j) => {
+        const hi = n - perHour * (UNUSUAL_HOURS - 1 - j), lo = hi - perHour + 1;
+        const vals = [];
+        for (let k = Math.max(0, lo); k <= hi; k++) if (arr[k] != null && !Number.isNaN(arr[k])) vals.push(arr[k]);
+        return lo >= 0 && vals.length >= perHour / 2 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      });
       const known = arr.filter((v) => v != null && !Number.isNaN(v));
       const hoursToday = Math.max(0.0001, (t1 - midnight) / 3600000);
       devices.push({
-        id, name: this._deviceName(id), kwh, baseW: this._baseline(arr), run, nowW: arr[n],
+        id, name: this._deviceName(id), kwh, baseW: this._baseline(arr), run, recent, nowW: arr[n],
         spark: this._downsample(arr, 48), peak: known.length ? Math.max(0, ...known) : null, avgW: (kwh / hoursToday) * 1000,
       });
     }
@@ -1987,6 +2007,70 @@ class EnergyAssistantPanel extends HTMLElement {
     return mins.length % 2 ? mins[mid] : (mins[mid - 1] + mins[mid]) / 2;
   }
 
+  /**
+   * What is usual for each device: the highest hourly mean power it reached on the days before today (from the
+   * long-term statistics), so a wallbox that charges now and then is not unusual when it charges. A device without
+   * 48 hourly values has no reference yet and only gets the plain notice about running for hours.
+   */
+  async _loadDevRef() {
+    const ids = this._deviceIds();
+    if (!ids.length || this._devRefLoading || !this._hass) return;
+    this._devRefLoading = true;
+    try {
+      const end = new Date(), start = new Date(end.getTime() - 8 * 24 * 3600 * 1000);
+      const res = await this._hass.callWS({
+        type: "recorder/statistics_during_period",
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        statistic_ids: ids,
+        period: "hour",
+        types: ["mean"],
+        units: { power: "W" },
+      });
+      this._devRef = { max: this._devRefFrom(res || {}, end), at: Date.now() };
+    } catch (e) {
+      console.info("Energy Assistant: could not load the statistics of the devices for the notices", e);
+      this._devRef = { max: {}, at: Date.now() };
+    } finally {
+      this._devRefLoading = false;
+      this._render();
+    }
+  }
+
+  _devRefFrom(res, now = new Date()) {
+    const tz = this._tz();
+    const key = (t) => { const p = tzParts(t, tz); return `${p.y}-${p.m}-${p.d}`; };
+    const today = key(now instanceof Date ? now.getTime() : now);
+    const out = {};
+    for (const [id, rows] of Object.entries(res)) {
+      const vals = [];
+      for (const row of rows || []) {
+        if (row.mean == null || !Number.isFinite(row.mean)) continue;
+        const t = typeof row.start === "number" ? row.start : Date.parse(row.start);
+        if (key(t) !== today) vals.push(Math.max(0, row.mean));
+      }
+      if (vals.length < UNUSUAL_MIN_HOURS_REF) continue;
+      out[id] = Math.max(...vals);
+    }
+    return out;
+  }
+
+  _maybeLoadDevRef() {
+    if (!this._ready || this._devRefLoading || !this._deviceIds().length) return;
+    if (!this._devRef || Date.now() - this._devRef.at > 60 * 60 * 1000) this._loadDevRef();
+  }
+
+  /** Devices whose last full hours were all clearly above what is usual for them (not the ones without notices). */
+  _unusualDevices() {
+    const skip = new Set(this._cfg.alert_exclude || []);
+    const ref = this._devRef?.max || {};
+    return (this._usage?.devices || [])
+      .filter((d) => !skip.has(d.id) && ref[d.id] != null && d.recent?.length === UNUSUAL_HOURS && d.recent.every((v) => v != null && v >= Math.max(ref[d.id] * UNUSUAL_FACTOR, ref[d.id] + UNUSUAL_MIN_W)))
+      .map((d) => ({ ...d, avg: d.recent.reduce((a, b) => a + b, 0) / d.recent.length, ref: ref[d.id] }))
+      .sort((a, b) => b.avg - b.ref - (a.avg - a.ref))
+      .slice(0, 3);
+  }
+
   _maybeLoadBaseRef() {
     if (!this._ready || this._baseRefLoading || !this._cfg.house_power) return;
     if (!this._baseRef || Date.now() - this._baseRef.at > 60 * 60 * 1000) this._loadBaseRef();
@@ -2010,8 +2094,17 @@ class EnergyAssistantPanel extends HTMLElement {
       const ct = (price.value * 100).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       out.push({ level: "info", text: this._t("alNegPrice", { price: ct }) });
     }
+    const unusual = this._unusualDevices();
+    for (const d of unusual) {
+      const f = (w) => fmtPower(w).join(" ");
+      out.push({ level: "warn", text: this._t("alUnusual", { name: d.name, hours: UNUSUAL_HOURS, now: f(d.avg), ref: f(d.ref) }) });
+    }
+    // A device with a known pattern is judged by it alone (the wallbox may run for hours); the plain rule is only
+    // for devices without a pattern yet, and there is one notice per device.
+    const known = Object.keys(this._devRef?.max || {});
+    const quiet = new Set([...(this._cfg.alert_exclude || []), ...unusual.map((d) => d.id), ...known]);
     const running = (this._usage?.devices || [])
-      .filter((d) => d.run >= LONG_RUN_MS && d.run < ALWAYS_RUN_MS)
+      .filter((d) => !quiet.has(d.id) && d.run >= LONG_RUN_MS && d.run < ALWAYS_RUN_MS)
       .sort((a, b) => b.run - a.run)
       .slice(0, 3);
     for (const d of running) {
@@ -4552,7 +4645,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._maybeLoadDevices();
       if (this._balEnabled()) this._maybeLoadBalance();
     }
-    if (this._tab === "house") this._maybeLoadBaseRef();
+    if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); }
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;

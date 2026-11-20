@@ -150,7 +150,9 @@ A card **Notices** at the top of the Power tab appears when something needs atte
 
 - a **plant fault** reported by PV Assistant (with the plants),
 - a **negative electricity price** of a dynamic tariff in Tariffy (information: using power now pays),
-- a **device that has been running for hours** (at least 200 W for 4 hours, breaks up to 15 minutes do not count; devices that never stopped in the last 24 hours, such as a heat pump, are not reported),
+- a **device that uses more than usual**, without any setup: Energy Assistant compares every device with itself. If each of its last three full hours was clearly above the highest hourly mean it reached on the days before (at least 30 % and 20 W more, from the long-term statistics of the last 8 days), it is reported with its average and its usual maximum. A fridge or freezer that suddenly runs far longer than usual is caught this way, while a wallbox that regularly charges for hours is not, because that is its pattern. A device needs about two days of statistics (the power sensor needs the state class `measurement`) before it is judged,
+- a **device that has been running for hours** (at least 200 W for 4 hours, breaks up to 15 minutes do not count; devices that never stopped in the last 24 hours, such as a heat pump, are not reported). This plain rule only applies to devices that have no pattern yet; a device with a pattern is judged by the point above,
+- devices listed under **No notices for these devices** (settings, *Devices*) never trigger one of the two notices above,
 - a **high base load**: the base load of the last 24 hours is at least 1.5 times and 50 W above the usual one (the median over the days before, from the long-term statistics of the house power sensor; it needs a house power sensor and three full days).
 
 ### Time zone
