@@ -115,9 +115,12 @@ const STYLE = `
 .stackbadge i:nth-child(2){background:#60a5fa;width:30px}
 .stackbadge i:nth-child(3){background:#f7b733;width:34px}
 .stackbadge i:nth-child(4){background:#38bdf8;width:24px}
-.rbars{display:flex;align-items:flex-end;gap:6px;height:84px;margin-top:18px;border-bottom:1px solid var(--eb-line)}
-.rbars i{flex:1;min-width:2px;border-radius:6px 6px 0 0;opacity:.88}
-.rbars i:hover{opacity:1}
+.rbars{display:flex;gap:14px;margin-top:20px}
+.rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rcol{width:100%;height:96px;display:flex;align-items:flex-end;border-bottom:1px solid var(--eb-line)}
+.rcol i{display:block;width:100%;border-radius:8px 8px 0 0;opacity:.9}
+.rcol i:hover{opacity:1}
+.rbar span{font-size:12px;color:var(--eb-dim);white-space:nowrap}
 .resbig{font-size:36px;font-weight:800;line-height:1.1;color:var(--eb-text)}
 .resbig small{font-size:18px;font-weight:700;margin-left:3px;color:var(--eb-muted)}
 .reslab2{font-size:16px;color:var(--eb-muted);margin-top:2px}
@@ -131,7 +134,7 @@ const STYLE = `
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 28px 28px;background:rgba(255,255,255,.045);border-top:1px solid var(--eb-line);color:var(--eb-muted);font-size:15px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
-.reshero{grid-template-columns:minmax(260px,.7fr) minmax(0,1.6fr);align-items:stretch}
+.reshero{grid-template-columns:minmax(280px,.9fr) minmax(0,1.5fr);align-items:stretch;max-width:1180px;width:100%;margin:0 auto}
 .resillu{display:block;position:relative;z-index:2;margin-right:-64px;pointer-events:none}
 .resghost{position:absolute;left:0;right:76px;top:32px;bottom:44px;border-radius:26px;background:#1c212d;border:1px solid var(--eb-tile-border);opacity:.9;box-shadow:0 12px 30px rgba(0,0,0,.45)}
 .resghost::before{content:"";position:absolute;left:22px;top:20px;width:64px;height:16px;border-radius:4px;background:rgba(52,211,153,.35)}
@@ -347,12 +350,12 @@ const STRINGS = {
     f_battery_min_soc: "Minimum charge level (%)",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
     resTitle: "Your results",
-    resCost: "Electricity cost",
+    resCost: "Electricity cost:",
     resSaving: "Savings",
-    resYield_day: "Daily yield",
-    resYield_week: "Weekly yield",
-    resYield_month: "Monthly yield",
-    resYield_year: "Annual yield",
+    resYield_day: "Daily yield:",
+    resYield_week: "Weekly yield:",
+    resYield_month: "Monthly yield:",
+    resYield_year: "Annual yield:",
     resPer_day: "per day",
     resPer_week: "per week",
     resPer_month: "per month",
@@ -711,12 +714,12 @@ const STRINGS = {
     f_battery_min_soc: "Mindest-Ladestand (%)",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
     resTitle: "Ihre Ergebnisse",
-    resCost: "Stromkosten",
+    resCost: "Stromkosten:",
     resSaving: "Einsparung",
-    resYield_day: "Tagesertrag",
-    resYield_week: "Wochenertrag",
-    resYield_month: "Monatsertrag",
-    resYield_year: "Jahresertrag",
+    resYield_day: "Tagesertrag:",
+    resYield_week: "Wochenertrag:",
+    resYield_month: "Monatsertrag:",
+    resYield_year: "Jahresertrag:",
     resPer_day: "am Tag",
     resPer_week: "pro Woche",
     resPer_month: "pro Monat",
@@ -1125,7 +1128,7 @@ function cleanHistory(value, maxYear = Infinity) {
 const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
-  pig: `<svg viewBox="0 0 72 60" width="64" height="54" aria-hidden="true"><circle cx="34" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M34 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+  pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
   hero: `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><defs><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="200" cy="268" rx="205" ry="24" fill="#1d4a30"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><path d="M122 70l6 6-6 6-6-6z" fill="#f7b733"/><path d="M134 82l4 4-4 4-4-4z" fill="#ffd36b"/><rect x="82" y="182" width="86" height="76" fill="#363e51"/><path d="M82 198h86M82 214h86M82 230h86M82 246h86" stroke="#2a3141" stroke-width="2"/><rect x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/><rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/><circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/><circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/></svg>`,
 };
 
@@ -2747,13 +2750,29 @@ class EnergyAssistantPanel extends HTMLElement {
     };
     // Production: bars per bucket in four colors (by quarter of the period, like the picture of a calculator result)
     const colors = ["#4fd1c5", "#34d399", "#60a5fa", "#a3e635"];
-    const top = Math.max(...b.rows.map((r) => r.solar ?? 0), 0.001);
-    const n = b.rows.length;
-    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%;background:${colors[Math.min(3, Math.floor((i * 4) / n))]}" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [[colors[Math.min(3, Math.floor((i * 4) / n))], `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
+    const tz = this._tz();
+    const rows = b.rows, n = rows.length;
+    const size = n <= 7 ? 1 : Math.ceil(n / 4); // a week keeps its days, everything else is four bars
+    const groups = [];
+    for (let i = 0; i < n; i += size) {
+      const part = rows.slice(i, i + size), last = Math.min(n, i + size) - 1;
+      const kwh = part.reduce((a, r) => a + (r.solar ?? 0), 0);
+      let label;
+      if (size === 1) label = this._balTick(b.win, i);
+      else if (range === "year") label = `Q${groups.length + 1}`;
+      else if (range === "day") label = `${tzParts(b.win.edges[i], tz).h}–${tzParts(b.win.edges[last + 1], tz).h || 24}`;
+      else label = `${tzParts(b.win.edges[i], tz).d}–${tzParts(b.win.edges[last + 1] - 1, tz).d}`;
+      groups.push({ kwh, label, tip: size === 1 ? this._balRowLabel(b.win, i) : `${label} · ${this._balLabel(b.win)}` });
+    }
+    const top = Math.max(...groups.map((g) => g.kwh), 0.001);
+    const bars = groups.map((g, i) => {
+      const color = colors[i % colors.length];
+      return `<div class="rbar"><div class="rcol"><i style="height:${Math.max(3, Math.round((g.kwh / top) * 100))}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: g.tip, r: [[color, `${num(g.kwh, 1)} kWh`, this._t("bSolar")]] }))}"></i></div><span>${esc(g.label)}</span></div>`;
+    }).join("");
     // Self-consumption ring (blue = fed in, green = used) with the house in the middle
     const self = t.self != null ? Math.round(t.self) : null;
     const selfBlock = self != null ? `<div class="resself"><div class="resring">${this._donut([{ value: self, color: "#34d399" }, { value: 100 - self, color: "#60a5fa" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
-      <div><div class="resbig">${self}<small>%</small></div><div class="reslab2">${esc(this._t("bSelf"))}</div>${delta(t.self, prev?.self)}</div></div>` : "";
+      <div><div class="resbig">${self}<small>%</small></div><div class="reslab2">${esc(this._t("bSelf"))}</div></div></div>` : "";
     // Savings (Tariffy): self-used solar energy at the contract price plus the feed-in revenue
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
@@ -2761,7 +2780,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
       const [n2, sym] = this._money(saving(t), price.currency, 0);
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
-        <div class="resbig">${n2}<small>${esc(sym)}</small> <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div>${delta(saving(t), prev?.solar > 0 ? saving(prev) : null)}</div><span class="pig">${RES_ART.pig}</span></div>`;
+        <div class="resbig">${n2} ${esc(sym)} <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     }
     // Electric car
     const cons = this._cfg.ev_consumption;
@@ -2778,7 +2797,7 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
-          <div class="resnum">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>${delta(t.solar, prev?.solar)}
+          <div class="resnum">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
           <div class="rbars">${bars}</div></div>
         <div class="resr">${selfBlock}${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;

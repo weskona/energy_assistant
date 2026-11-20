@@ -4778,15 +4778,16 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   const p = resultsPanel({}, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } });
   const html = p._renderResults();
   assert.match(html, /<span class="eb-title">Your results<\/span>/);
-  assert.match(html, /<div class="reslab">Weekly yield<\/div>\s*<div class="resnum">30\.0<small>kWh/);
+  assert.match(html, /<div class="reslab">Weekly yield:<\/div>\s*<div class="resnum">30\.0<small>kWh/);
   assert.match(html, /class="donut"/); // the self-consumption ring with the house in the middle
   assert.match(html, /<div class="resbig">77<small>%/);
   assert.match(html, /class="resillu"/); // the illustration beside the card
-  // the bars come in the four colors of the picture
+  // the bars come in the four colors of the picture, a week keeps its seven days, each with its label
   assert.match(html, /class="rbars"/);
   assert.match(html, /background:#4fd1c5/);
+  assert.equal((html.match(/class="rbar"/g) || []).length, 7);
   // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR, shown in whole euros
-  assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">7<small>€<\/small> <span class="resper">per week/);
+  assert.match(html, /Electricity cost:<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">7 € <span class="resper">per week/);
   // no electric car: the sentence is about the self-sufficiency, with the figure in bold
   assert.match(html, /<div class="resfoot">You cover <b>78 %<\/b> of your electricity needs yourself\.<\/div>/);
 });
@@ -4827,4 +4828,22 @@ test("results: the energy of the wallboxes comes from the statistics with the ba
   p._int = {}; // without EV Assistant
   await p._loadBalance();
   assert.equal(p._bal.ev, null);
+});
+
+test("results: other periods are shown as four bars (quarters, weeks of the month, parts of the day)", () => {
+  const four = (range, n) => {
+    const p = resultsPanel();
+    p._usRange = range;
+    p._usOff = 0;
+    const win = p._balWindow(range, 0);
+    assert.equal(win.edges.length - 1 >= n - 1, true);
+    p._bal = { range, off: 0, win, at: Date.now(), failed: false, rows: Array.from({ length: win.edges.length - 1 }, (_, i) => ({ t: win.edges[i], solar: i + 1, imp: null, exp: null, cons: null })), totals: { solar: 100, self: 50 }, before: null };
+    return p._renderResults();
+  };
+  const year = four("year", 12);
+  assert.equal((year.match(/class="rbar"/g) || []).length, 4);
+  assert.match(year, /<span>Q1<\/span>[\s\S]*<span>Q4<\/span>/);
+  assert.equal((four("month", 28).match(/class="rbar"/g) || []).length, 4);
+  assert.equal((four("day", 24).match(/class="rbar"/g) || []).length, 4);
+  assert.match(four("day", 24), /<span>0–6<\/span>/);
 });
