@@ -4982,3 +4982,31 @@ test("results: the flow lines stand still, the width follows the share of the bi
   assert.match(html, /data-share="50"/);
   assert.match(html, /data-share="10"/);
 });
+
+test("results: a past period shows the charge level at its end, not the level of now", async () => {
+  const cfg = { ...ENERGY_CFG, battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] };
+  const p = balPanel(cfg, { "sensor.s1": { state: "11", attributes: {} }, "sensor.s2": { state: "11", attributes: {} } });
+  p._int = {};
+  p._usRange = "week";
+  p._usOff = -1;
+  const win = p._balWindow("week", -1);
+  const calls = [];
+  p._balFetch = async () => ({});
+  p._hass.callWS = async (m) => {
+    calls.push(m);
+    return { "sensor.s1": [{ start: win.end - 3 * 3600000, mean: 80 }, { start: win.end - 2 * 3600000, mean: 64.4 }], "sensor.s2": [] };
+  };
+  await p._loadBalance();
+  const req = calls.find((c) => c.type === "recorder/statistics_during_period");
+  assert.deepEqual(req.statistic_ids, ["sensor.s1", "sensor.s2"]);
+  assert.equal(Date.parse(req.end_time), win.end); // the end of the shown period
+  assert.deepEqual(p._bal.socHist, [64.4, null]); // the last value; none for a storage without statistics
+  const html = p._renderResults();
+  assert.match(html, />64%</);
+  assert.match(html, />–</); // no statistics: a dash
+  assert.doesNotMatch(html, />11%</); // not the level of now
+  // the running period shows the live level
+  p._usOff = 0;
+  p._bal = { ...p._bal, off: 0, socHist: null };
+  assert.match(p._renderResults(), />11%</);
+});

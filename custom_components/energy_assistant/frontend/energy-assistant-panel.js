@@ -53,6 +53,9 @@ const STYLE = `
 .bpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .bpick .segs{margin-top:0}
 .bpick .nav{display:flex;align-items:center;gap:8px;margin-left:auto}
+.eb-card.pickbar{padding:8px 16px;border-radius:16px}
+.pickbar .bpick{margin-top:0}
+.pickbar .seg{padding:3px 12px;line-height:1.25}
 .bpick .lab{min-width:11em;text-align:center;font-weight:600;font-size:14px}
 .seg[disabled]{opacity:.4;cursor:default}
 .stack{display:grid;gap:var(--eb-gap);grid-template-columns:minmax(0,1fr)}
@@ -1153,13 +1156,14 @@ function resBatteries(socs) {
   let out = "";
   list.forEach((soc, i) => {
     const x = x0 + i * (w + gap), cx = x + w / 2;
-    const color = soc >= 60 ? "#34d399" : soc >= 25 ? "#f7b733" : "#f87171";
-    const lit = soc > 0 ? Math.max(1, Math.round((soc / 100) * segs)) : 0;
+    const known = soc != null;
+    const color = !known ? "#6b7a99" : soc >= 60 ? "#34d399" : soc >= 25 ? "#f7b733" : "#f87171";
+    const lit = known && soc > 0 ? Math.max(1, Math.round((soc / 100) * segs)) : 0;
     // a home storage unit: housing on two feet, a dark display slot with LED segments, a bolt on top, a status light
     const sx = x + 5, sw = w - 10, sy = top + 14, sh = h - 29, sgap = 2;
     out += `<ellipse cx="${cx.toFixed(1)}" cy="${bottom + 3}" rx="${(w / 2 + 6).toFixed(1)}" ry="3.2" fill="#0d1a12" opacity=".65"/>`
       + `<rect x="${(x + 4).toFixed(1)}" y="${bottom - 1}" width="5" height="4" rx="1" fill="#252d42"/><rect x="${(x + w - 9).toFixed(1)}" y="${bottom - 1}" width="5" height="4" rx="1" fill="#252d42"/>`
-      + `<rect class="unit" data-soc="${Math.round(soc)}" x="${x.toFixed(1)}" y="${top}" width="${w}" height="${h}" rx="6" fill="#465273" stroke="#7a89ad" stroke-width="1.4"/>`
+      + `<rect class="unit" data-soc="${known ? Math.round(soc) : ""}" x="${x.toFixed(1)}" y="${top}" width="${w}" height="${h}" rx="6" fill="#465273" stroke="#7a89ad" stroke-width="1.4"/>`
       + `<rect x="${(x + 1.5).toFixed(1)}" y="${top + 1.5}" width="${w - 3}" height="9" rx="4.5" fill="#566488"/>`
       + `<path d="M${(cx + 1.2).toFixed(1)} ${top + 2.4}l-3.6 4.2h2.6l-1 3.6 3.6-4.4h-2.6z" fill="#ffd36b"/>`
       + `<rect x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" width="${sw}" height="${sh.toFixed(1)}" rx="2.5" fill="#10151f"/>`;
@@ -1172,7 +1176,7 @@ function resBatteries(socs) {
         : `<rect x="${(sx + 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${sw - 4}" height="${hh.toFixed(1)}" rx="1" fill="#252e42"/>`;
     }
     out += `<circle cx="${cx.toFixed(1)}" cy="${bottom - 9}" r="2.2" fill="${color}" style="color:${color}" class="glowb"/>`
-      + `<text x="${cx.toFixed(1)}" y="${bottom + 15}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-opacity=".55" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
+      + `<text x="${cx.toFixed(1)}" y="${bottom + 15}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-opacity=".55" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${known ? `${Math.round(soc)}%` : "–"}</text>`;
   });
   return out;
 }
@@ -2124,9 +2128,13 @@ class EnergyAssistantPanel extends HTMLElement {
    * (discharging) or full (charging). Null without a charge level.
    */
   /** The charge levels (0-100) of all storages: the main charge level sensor and the further ones. */
+  _storageIds() {
+    return [...new Set([...(this._cfg.battery_soc || []).slice(0, 1), ...(this._cfg.battery_soc_more || [])])];
+  }
+
+  /** The current charge levels (0-100) of the storages; a sensor without a value is left out. */
   _storageLevels() {
-    const ids = [...new Set([...(this._cfg.battery_soc || []).slice(0, 1), ...(this._cfg.battery_soc_more || [])])];
-    return ids.map((id) => this._num(id)).filter((v) => v != null).map((v) => Math.max(0, Math.min(100, v)));
+    return this._storageIds().map((id) => this._num(id)).filter((v) => v != null).map((v) => Math.max(0, Math.min(100, v)));
   }
 
   _storage(cur) {
@@ -2533,7 +2541,7 @@ class EnergyAssistantPanel extends HTMLElement {
       }
       // Several storages: the charge and discharge counters are matched to the storages in the order of the settings
       // (the first counter belongs to the first storage, ...), when there are as many counters as storages.
-      const nStores = this._storageLevels().length;
+      const nStores = this._storageIds().length;
       const sumOf = (id) => {
         const rows = cur?.[id];
         if (!rows?.length) return null;
@@ -2544,7 +2552,29 @@ class EnergyAssistantPanel extends HTMLElement {
       const units = nStores > 1 && (chgIds.length === nStores || disIds.length === nStores)
         ? Array.from({ length: nStores }, (_, i) => ({ chg: chgIds.length === nStores ? sumOf(chgIds[i]) : null, dis: disIds.length === nStores ? sumOf(disIds[i]) : null }))
         : null;
-      this._bal = { range, off, win, ...data, before, manual, ev, units, failed: cur == null, at: Date.now() };
+      // A past period shows the charge level at its end (long-term statistics), not the level of now.
+      let socHist = null;
+      const storeIds = this._storageIds();
+      if (off < 0 && storeIds.length) {
+        try {
+          const res = await this._hass.callWS({
+            type: "recorder/statistics_during_period",
+            start_time: new Date(win.end - 4 * 3600000).toISOString(),
+            end_time: new Date(win.end).toISOString(),
+            statistic_ids: storeIds,
+            period: "hour",
+            types: ["mean"],
+          });
+          socHist = storeIds.map((id) => {
+            const rows = res?.[id] || [];
+            const v = rows.length ? rows[rows.length - 1].mean : null;
+            return v != null && Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : null;
+          });
+        } catch (e) {
+          socHist = storeIds.map(() => null);
+        }
+      }
+      this._bal = { range, off, win, ...data, before, manual, ev, units, socHist, failed: cur == null, at: Date.now() };
     } finally {
       this._balLoading = false;
       this._render();
@@ -2704,7 +2734,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const win = this._balWindow(range, off);
-    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, win)}</div>`;
+    const picker = `<div class="eb-card pickbar">${this._rangePicker("u", range, off, win)}</div>`;
     const stack = (...cards) => `<div class="stack">${[picker, ...cards].join("")}</div>`;
     const note = (key) => `<div class="eb-card"><div class="empty">${esc(this._t(key))}</div></div>`;
     if (!(this._cfg.label_ids || []).length) return stack(note("devNoLabels"));
@@ -2806,7 +2836,7 @@ class EnergyAssistantPanel extends HTMLElement {
   _renderConsumption() {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    const picker = `<div class="eb-card">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
+    const picker = `<div class="eb-card pickbar">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
     const parts = [picker];
     if (this._balEnabled()) parts.push(this._renderResults(), this._renderBalance({ bare: true }));
     if (this._usageEnabled()) parts.push(this._renderUsage({ bare: true }));
@@ -2877,6 +2907,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!b || b.range !== range || b.off !== off || b.failed) return "";
     const lang = this._hass?.language || "en";
     const t = { ...b.totals, solar: b.totals.solar ?? 0 }, prev = b.before;
+    const levels = b.socHist || this._storageLevels(); // the level at the end of a past period, now for the running one
     const num = (v, d = 0) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
     const ico = (name, cls = "") => (globalThis.customElements?.get?.("ha-icon") ? `<ha-icon class="rico ${cls}" icon="${name}"></ha-icon>` : "");
     const delta = (cur, before) => {
@@ -2929,7 +2960,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero" style="--resx:${(424 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows(t, b.units))}</div>
+    return `<div class="reshero" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, this._resFlows(t, b.units))}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
