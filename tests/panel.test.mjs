@@ -4889,10 +4889,10 @@ test("results: with several storages the picture grows, so the card moves to the
   const one = batteryPanel({ battery_soc: ["sensor.s1"] }, { "sensor.s1": 50 })._renderResults();
   const three = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.s3"] }, { "sensor.s1": 50, "sensor.s2": 50, "sensor.s3": 50 })._renderResults();
   const none = resultsPanel()._renderResults();
-  assert.equal(widthOf(none), 1);
-  assert.equal(widthOf(one), 1); // one battery fits as it is
-  assert.ok(widthOf(three) > 1.1); // three need room
-  assert.match(three, /viewBox="0 0 4[5-9]\d 290"/);
+  assert.ok(Math.abs(widthOf(none) - 1.06) < 0.001); // a little room at the left for the power pole
+  assert.equal(widthOf(one), widthOf(none)); // one battery fits as it is
+  assert.ok(widthOf(three) > widthOf(none) + 0.1); // three need room
+  assert.match(three, /viewBox="-24 0 4[5-9]\d 290"/);
 });
 
 // ---- energy flow in the picture of the results card (kWh of the shown period)
