@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Results card without sun:** the results card was only there when the period had production, so it disappeared at night and on days without sun. It now appears as soon as a production counter is set up (*Energy counters*), with 0 kWh when nothing was produced.
+
 ## [0.33.0] - 2026-11-20
 
 ### Added

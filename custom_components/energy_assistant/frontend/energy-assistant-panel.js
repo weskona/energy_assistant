@@ -2851,14 +2851,16 @@ class EnergyAssistantPanel extends HTMLElement {
   /**
    * The results of the shown period as one friendly card: the production with the change to the period before and
    * bars, a ring with the self-consumption, the savings (needs Tariffy), what the electric car charged (EV Assistant,
-   * kilometres when the consumption of the car is set) and a sentence that sums it up. Empty without production.
+   * kilometres when the consumption of the car is set) and a sentence that sums it up. Empty without a production counter.
    */
   _renderResults() {
     const b = this._bal;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    if (!b || b.range !== range || b.off !== off || b.failed || !(b.totals.solar > 0)) return "";
+    // The card is there as soon as there is a production counter (also at night or on a day without sun: 0 kWh),
+    // or entered production, and not without any production.
+    if (!b || b.range !== range || b.off !== off || b.failed || !((this._cfg.energy_solar || []).length > 0 || b.totals.solar > 0)) return "";
     const lang = this._hass?.language || "en";
-    const t = b.totals, prev = b.before;
+    const t = { ...b.totals, solar: b.totals.solar ?? 0 }, prev = b.before;
     const num = (v, d = 0) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
     const ico = (name, cls = "") => (globalThis.customElements?.get?.("ha-icon") ? `<ha-icon class="rico ${cls}" icon="${name}"></ha-icon>` : "");
     const delta = (cur, before) => {
