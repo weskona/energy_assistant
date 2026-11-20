@@ -472,7 +472,7 @@ const STRINGS = {
       "No sensors configured. Open Settings → Devices & services → Energy Assistant.",
     menu: "Menu",
     solar: "Solar",
-    solarDirect: "Solar used directly",
+    solarDirect: "Solar direct",
     gridImport: "Grid import",
     gridExport: "Grid export",
     fromStorage: "From storage",
@@ -818,7 +818,7 @@ const STRINGS = {
       "Keine Sensoren konfiguriert. Unter Einstellungen → Geräte & Dienste → Energy Assistant auswählen.",
     menu: "Menü",
     solar: "PV",
-    solarDirect: "PV direkt verbraucht",
+    solarDirect: "PV direkt",
     gridImport: "Netzbezug",
     gridExport: "Einspeisung",
     fromStorage: "Vom Speicher",
@@ -4276,10 +4276,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const mix = this._mix(cur);
     const split = this._pvSplit(cur, cur.direct);
     const sharePv = split ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(split.map((p) => `${p.pct} % ${this._t(p.key)}`).join(" · "))}</div>` : "";
-    // Only values that say something: a flow of less than 1 W (or none) gets no tile, so a night without PV
-    // shows the grid import and the self-sufficiency instead of a wall of zeros.
+    // The tiles come from the configured sensors only, never from the current values: the card keeps its size
+    // and nothing appears or disappears during the day.
     const tile = (label, w, extra = "") => {
-      if (w == null || Math.abs(w) < 1) return "";
+      if (w == null) return "";
       const [v, u] = fmtPower(Math.abs(w));
       return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
     };

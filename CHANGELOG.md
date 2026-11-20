@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Smaller House card:** the tiles under the live power only show flows of at least 1 W, so a night without PV shows the grid import and the self-sufficiency instead of seven tiles with zeros; the tiles are a little smaller and denser. With production, feed-in or storage the tiles come back.
+- **Smaller House card:** the tiles under the live power are smaller and denser (two rows instead of three on a normal card). They always show the same set, which depends only on the configured sensors and never on the current values, so the card keeps its size and nothing flickers in or out during the day. The tile *PV direkt verbraucht* is called *PV direkt* (*Solar direct*) so it fits on one line.
 
 ### Fixed
 

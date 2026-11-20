@@ -4746,21 +4746,19 @@ test("notices: the last full hours of a device are measured from the history", (
   assert.equal(Math.round(d.recent[2]), 130);
 });
 
-test("house card: tiles only for flows that carry something, in a compact grid", () => {
-  const p = panel({ solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_discharge: ["bd"], house_power: "h" },
-    { pv: st(0), gi: st(1803), ge: st(0), bd: st(0), h: st(1803) });
-  p._ready = true;
-  p._hass.language = "en";
-  const html = p._renderHouse();
-  assert.match(html, /<div class="tiles compact">/);
-  assert.match(html, /Grid import<\/div><div class="eb-value">1[.,]?803/);
-  assert.match(html, /Self-sufficiency/);
-  for (const gone of ["Grid export", "From storage", "To storage", "Solar"]) assert.doesNotMatch(html, new RegExp(`${gone}</div><div class="eb-value">`));
-  assert.doesNotMatch(html, /Solar used directly/);
-  // with production the tiles come back
-  const day = panel({ solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], house_power: "h" },
-    { pv: st(3000), gi: st(0), ge: st(1200), h: st(1800) });
-  day._ready = true;
-  day._hass.language = "en";
-  assert.match(day._renderHouse(), /Grid export<\/div><div class="eb-value">1[.,]?2/);
+test("house card: the tiles depend on the configured sensors, not on the current values, in a compact grid", () => {
+  const cfg = { solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_discharge: ["bd"], house_power: "h" };
+  const mk = (states) => {
+    const p = panel(cfg, states);
+    p._ready = true;
+    p._hass.language = "en";
+    return p._renderHouse();
+  };
+  const night = mk({ pv: st(0), gi: st(1803), ge: st(0), bd: st(0), h: st(1803) });
+  const day = mk({ pv: st(3000), gi: st(0), ge: st(1200), bd: st(500), h: st(2300) });
+  assert.match(night, /<div class="tiles compact">/);
+  const tiles = (html) => [...html.matchAll(/<div class="eb-tile"><div class="eb-label">([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(tiles(night), tiles(day)); // the same tiles at night and during the day
+  assert.ok(tiles(night).includes("Grid export") && tiles(night).includes("Solar") && tiles(night).includes("From storage"));
+  assert.ok(!tiles(night).includes("To storage")); // no sensor for it
 });
