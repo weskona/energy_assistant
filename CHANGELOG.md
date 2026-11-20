@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Energy flow without motion:** the lines of the energy flow in the picture of the results card no longer move. They are solid lines with an arrow for the direction, and the line width follows the share of the flow (the biggest flow in the picture is the thickest, small ones are thin). The two wires of the grid now run further apart.
+
 ### Fixed
 
 - **Results card always there:** the results card was only shown when the period had production, so it disappeared at night and on days without sun. It is now always on top of the Consumption tab once the balance is loaded, with 0 kWh when nothing was produced (also without a production counter).
