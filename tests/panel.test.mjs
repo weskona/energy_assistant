@@ -4973,8 +4973,8 @@ test("results: the flow lines stand still, the width follows the share of the bi
   const p = flowPanel({ solar: 100, imp: 50, exp: 10, chg: null, dis: null });
   const html = p._renderResults();
   assert.doesNotMatch(html, /class="flow"[^>]*(stroke-dasharray|animation)/); // no motion (the ring has its dashes, the flow lines not)
-  assert.match(html, /marker-end="url\(#resArrow-pv\)"/);
-  assert.match(html, /<marker id="resArrow-in"/);
+  assert.match(html, /<polygon class="flowhead"[^>]*fill="#ff9800"/); // the arrow head of the sun flow
+  assert.equal((html.match(/class="flowhead"/g) || []).length, 3); // one head for each flow
   const width = (key) => Number(new RegExp(`stroke="${{ pv: "#ff9800", in: "#60a5fa", out: "#a78bfa" }[key]}" stroke-width="([\\d.]+)"`).exec(html)[1]);
   assert.ok(width("pv") > width("in") && width("in") > width("out")); // 100 % > 50 % > 10 %
   assert.equal(width("pv"), 6.2); // the biggest flow

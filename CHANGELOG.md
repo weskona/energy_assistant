@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Energy flow without motion:** the lines of the energy flow in the picture of the results card no longer move. They are solid lines with a slim, notched arrow head for the direction, and the line width follows the share of the flow (the biggest flow in the picture is the thickest, small ones are thin). The two wires of the grid now run further apart.
+- **Energy flow without motion:** the lines of the energy flow in the picture of the results card no longer move. They are solid bands with a clear triangular arrow head for the direction, and the line width follows the share of the flow (the biggest flow in the picture is the thickest, small ones are thin). The two wires of the grid now run further apart.
 
 ### Fixed
 
