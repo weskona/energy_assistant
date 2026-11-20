@@ -1136,7 +1136,7 @@ function cleanHistory(value, maxYear = Infinity) {
 // filled up to its charge level, the percentage below it.
 const RES_BAT_X = 258; // the batteries start right of the window
 function resBatterySize(n) {
-  const w = n === 1 ? 30 : n === 2 ? 26 : 22, gap = n === 1 ? 0 : n === 2 ? 20 : n === 3 ? 18 : 14;
+  const w = n === 1 ? 34 : n === 2 ? 30 : n === 3 ? 27 : 24, gap = n === 1 ? 0 : n === 2 ? 20 : n === 3 ? 18 : 14;
   return { w, gap, total: n * w + (n - 1) * gap };
 }
 /** How much wider than 400 the picture is, so the batteries stand left of the card that overlaps its right edge. */
@@ -1146,18 +1146,32 @@ function resExtra(socs) {
 }
 function resBatteries(socs) {
   const list = socs.slice(0, 4), n = list.length;
-  const { w, gap, total } = resBatterySize(n);
-  const x0 = RES_BAT_X, h = 58, bottom = 264, top = bottom - h;
+  const { w, gap } = resBatterySize(n);
+  const x0 = RES_BAT_X, h = 62, bottom = 262, top = bottom - h, segs = 6;
   const font = n <= 2 ? 10 : n === 3 ? 9.5 : 9;
   let out = "";
   list.forEach((soc, i) => {
-    const x = x0 + i * (w + gap), inner = h - 5, fill = (inner * soc) / 100;
+    const x = x0 + i * (w + gap), cx = x + w / 2;
     const color = soc >= 60 ? "#34d399" : soc >= 25 ? "#f7b733" : "#f87171";
-    out += `<ellipse cx="${(x + w / 2).toFixed(1)}" cy="${bottom + 1}" rx="${(w / 2 + 5).toFixed(1)}" ry="3.2" fill="#0d1a12" opacity=".65"/>`
-      + `<rect x="${(x + w / 2 - 4).toFixed(1)}" y="${top - 5}" width="8" height="5" rx="1.5" fill="#8fa3c4"/>`
-      + `<rect x="${x.toFixed(1)}" y="${top}" width="${w}" height="${h}" rx="5" fill="#161b29" stroke="#8fa3c4" stroke-width="2"/>`
-      + `<rect class="glowb" x="${(x + 2.5).toFixed(1)}" y="${(top + 2.5 + inner - fill).toFixed(1)}" width="${w - 5}" height="${fill.toFixed(1)}" rx="2.5" fill="${color}" style="color:${color}"/>`
-      + `<text x="${(x + w / 2).toFixed(1)}" y="${bottom + 13}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-width="2.4" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
+    const lit = soc > 0 ? Math.max(1, Math.round((soc / 100) * segs)) : 0;
+    // a home storage unit: housing on two feet, a dark display slot with LED segments, a bolt on top, a status light
+    const sx = x + 5, sw = w - 10, sy = top + 14, sh = h - 29, sgap = 2;
+    out += `<ellipse cx="${cx.toFixed(1)}" cy="${bottom + 3}" rx="${(w / 2 + 6).toFixed(1)}" ry="3.2" fill="#0d1a12" opacity=".65"/>`
+      + `<rect x="${(x + 4).toFixed(1)}" y="${bottom - 1}" width="5" height="4" rx="1" fill="#252d42"/><rect x="${(x + w - 9).toFixed(1)}" y="${bottom - 1}" width="5" height="4" rx="1" fill="#252d42"/>`
+      + `<rect class="unit" data-soc="${Math.round(soc)}" x="${x.toFixed(1)}" y="${top}" width="${w}" height="${h}" rx="6" fill="#465273" stroke="#7a89ad" stroke-width="1.4"/>`
+      + `<rect x="${(x + 1.5).toFixed(1)}" y="${top + 1.5}" width="${w - 3}" height="9" rx="4.5" fill="#566488"/>`
+      + `<path d="M${(cx + 1.2).toFixed(1)} ${top + 2.4}l-3.6 4.2h2.6l-1 3.6 3.6-4.4h-2.6z" fill="#ffd36b"/>`
+      + `<rect x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" width="${sw}" height="${sh.toFixed(1)}" rx="2.5" fill="#10151f"/>`;
+    for (let k = 0; k < segs; k++) {
+      const on = k >= segs - lit; // filled from the bottom
+      const hh = (sh - 4 - sgap * (segs - 1)) / segs;
+      const yy = sy + 2 + k * (hh + sgap);
+      out += on
+        ? `<rect class="glowb" x="${(sx + 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${sw - 4}" height="${hh.toFixed(1)}" rx="1" fill="${color}" style="color:${color}"/>`
+        : `<rect x="${(sx + 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${sw - 4}" height="${hh.toFixed(1)}" rx="1" fill="#252e42"/>`;
+    }
+    out += `<circle cx="${cx.toFixed(1)}" cy="${bottom - 9}" r="2.2" fill="${color}" style="color:${color}" class="glowb"/>`
+      + `<text x="${cx.toFixed(1)}" y="${bottom + 15}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-width="2.4" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
   });
   return out;
 }

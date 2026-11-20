@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Storages in the picture:** in the picture of the results card (where the door was) a battery for every storage stands, filled up to its charge level with the percentage below it (green from 60 %, amber from 25 %, red below). The first storage is the charge level sensor as before, the new setting *Further storages: charge level sensors* (*Solar and storage*) adds more; they stand apart in front of the house, and with several storages the picture grows so the card moves to the right; up to four batteries are drawn, without a storage the door stays. With several storages the Storage card of the Power tab shows the mean charge level.
+- **Storages in the picture:** in the picture of the results card (where the door was) a home storage unit for every storage stands (housing on two feet with a bolt, a display slot with six LED segments filled up to its charge level, a status light and the percentage below it; green from 60 %, amber from 25 %, red below). The first storage is the charge level sensor as before, the new setting *Further storages: charge level sensors* (*Solar and storage*) adds more; they stand apart in front of the house, and with several storages the picture grows so the card moves to the right; up to four batteries are drawn, without a storage the door stays. With several storages the Storage card of the Power tab shows the mean charge level.
 
 ### Added
 
