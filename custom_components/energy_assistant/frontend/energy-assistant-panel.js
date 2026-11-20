@@ -108,9 +108,10 @@ const STYLE = `
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
 .resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
 .reslab{font-size:20px;font-weight:700;color:var(--eb-text)}
-.resnum{display:flex;align-items:center;gap:10px;font-size:50px;font-weight:800;line-height:1.1;color:var(--eb-text);margin-top:6px}
-.resnum small{font-size:20px;font-weight:600;color:var(--eb-muted);margin-left:-4px}
-.stackbadge{display:flex;flex-direction:column;gap:3px;margin-left:8px}
+.resnum{display:flex;align-items:flex-start;gap:10px;font-size:50px;font-weight:800;line-height:1.1;color:var(--eb-text);margin-top:6px}
+.resnum small{font-size:20px;font-weight:600;color:var(--eb-muted)}
+.rn{display:flex;align-items:baseline;gap:8px;min-width:0}
+.stackbadge{display:flex;flex-direction:column;gap:4px;margin-left:auto;align-self:flex-start;margin-top:4px}
 .stackbadge i{display:block;height:7px;width:38px;border-radius:2px;background:#34d399}
 .stackbadge i:nth-child(2){background:#60a5fa;width:30px}
 .stackbadge i:nth-child(3){background:#f7b733;width:34px}
@@ -124,7 +125,8 @@ const STYLE = `
 .resbig{font-size:36px;font-weight:800;line-height:1.1;color:var(--eb-text)}
 .resbig small{font-size:18px;font-weight:700;margin-left:3px;color:var(--eb-muted)}
 .reslab2{font-size:16px;color:var(--eb-muted);margin-top:2px}
-.resper{font-size:14px;font-weight:500;color:var(--eb-muted)}
+.resper{font-size:14px;font-weight:500;color:var(--eb-muted);white-space:nowrap}
+.ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
 .resring{position:relative;flex:none;width:96px;height:96px}
 .resring .donut{width:96px;height:96px;display:block}
@@ -134,13 +136,13 @@ const STYLE = `
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 28px 28px;background:rgba(255,255,255,.045);border-top:1px solid var(--eb-line);color:var(--eb-muted);font-size:15px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
-.reshero{grid-template-columns:minmax(280px,.9fr) minmax(0,1.5fr);align-items:stretch;max-width:1180px;width:100%;margin:0 auto}
-.resillu{display:block;position:relative;z-index:2;margin-right:-64px;pointer-events:none}
-.resghost{position:absolute;left:0;right:76px;top:32px;bottom:44px;border-radius:26px;background:#1c212d;border:1px solid var(--eb-tile-border);opacity:.9;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+.reshero{grid-template-columns:minmax(300px,1fr) minmax(0,1.32fr);align-items:stretch;max-width:1020px;width:100%;margin:0 auto}
+.resillu{display:block;position:relative;z-index:2;margin-right:-96px;pointer-events:none}
+.resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:26px;background:#1c212d;border:1px solid var(--eb-tile-border);opacity:.9;box-shadow:0 12px 30px rgba(0,0,0,.45)}
 .resghost::before{content:"";position:absolute;left:22px;top:20px;width:64px;height:16px;border-radius:4px;background:rgba(52,211,153,.35)}
 .resghost::after{content:"";position:absolute;left:22px;top:52px;right:60px;height:46px;border-radius:6px;background:repeating-linear-gradient(rgba(255,255,255,.08) 0 7px,transparent 7px 17px)}
-.resillu svg{position:absolute;left:-10px;right:0;bottom:-6px;width:calc(100% + 10px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
-.resfoot{padding-left:92px}
+.resillu svg{position:absolute;left:-14px;right:0;bottom:-8px;width:calc(100% + 14px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.resfoot{padding-left:112px}
 }
 @media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px;border-radius:0 0 28px 28px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
@@ -2797,7 +2799,7 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
-          <div class="resnum">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+          <div class="resnum"><span class="rn">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
           <div class="rbars">${bars}</div></div>
         <div class="resr">${selfBlock}${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;

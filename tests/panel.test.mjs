@@ -4778,7 +4778,7 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   const p = resultsPanel({}, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } });
   const html = p._renderResults();
   assert.match(html, /<span class="eb-title">Your results<\/span>/);
-  assert.match(html, /<div class="reslab">Weekly yield:<\/div>\s*<div class="resnum">30\.0<small>kWh/);
+  assert.match(html, /<div class="reslab">Weekly yield:<\/div>\s*<div class="resnum"><span class="rn">30\.0<small>kWh/);
   assert.match(html, /class="donut"/); // the self-consumption ring with the house in the middle
   assert.match(html, /<div class="resbig">77<small>%/);
   assert.match(html, /class="resillu"/); // the illustration beside the card
