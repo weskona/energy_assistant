@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Charge level of the storage in the picture:** the percentage under a storage was always the level of now, also when you paged to another day, week, month or year. A past period now shows the charge level at its end (long-term statistics of the charge level sensor; a dash if there are none), the running period still the live level.
+
 ### Changed
 
 - **Slim period bar:** the card with the period picker (*Day / Week / Month / Year* and the arrows) in the Consumption and Devices tabs is much lower: little padding, smaller buttons, one slim row.
