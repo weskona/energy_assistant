@@ -138,8 +138,6 @@ const STYLE = `
 .reshero{grid-template-columns:minmax(300px,1fr) minmax(0,1.32fr);align-items:stretch;max-width:1020px;width:100%;margin:0 auto}
 .resillu{display:block;position:relative;z-index:2;margin-right:-96px;pointer-events:none}
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-.resghost::before{content:"";position:absolute;left:150px;top:20px;width:64px;height:16px;border-radius:4px;background:rgba(52,211,153,.35)}
-.resghost::after{content:"";position:absolute;left:22px;top:52px;right:60px;height:46px;border-radius:6px;background:repeating-linear-gradient(rgba(255,255,255,.08) 0 7px,transparent 7px 17px)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:-14px;right:0;bottom:-8px;width:calc(100% + 14px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
 .resillu .glows{filter:drop-shadow(0 0 10px rgba(255,190,70,.85))}
