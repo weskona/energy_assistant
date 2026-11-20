@@ -135,7 +135,7 @@ const STYLE = `
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
-.reshero{grid-template-columns:minmax(300px,1fr) minmax(0,1.32fr);align-items:stretch;max-width:1020px;width:100%;margin:0 auto}
+.reshero{grid-template-columns:clamp(300px,28vw,460px) minmax(0,1fr);align-items:stretch;width:100%}
 .resillu{display:block;position:relative;z-index:2;margin-right:-96px;pointer-events:none}
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
