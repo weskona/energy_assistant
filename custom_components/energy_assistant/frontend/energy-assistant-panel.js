@@ -131,13 +131,18 @@ const STYLE = `
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
 .ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid #e1e8f0}
 .ressave .pig{flex:none;display:flex}
-.resfoot{margin-top:20px;padding:14px 18px;border-radius:14px;background:#eef3f8;color:#25364f;font-size:15px}
+.resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 28px 28px;background:#e9f0f7;color:#25364f;font-size:15px}
 .resfoot b{color:#12203a}
 @media (min-width:960px){
-.reshero{grid-template-columns:minmax(240px,.62fr) minmax(0,1.6fr);align-items:stretch}
-.resillu{display:flex;align-items:flex-end;border-radius:28px;background:linear-gradient(165deg,#e6f0fb,#f8fbff);padding:24px 56px 8px 20px;margin-right:-44px;overflow:hidden;opacity:.98}
+.reshero{grid-template-columns:minmax(260px,.7fr) minmax(0,1.6fr);align-items:stretch}
+.resillu{display:block;position:relative;z-index:2;margin-right:-64px;pointer-events:none}
+.resghost{position:absolute;left:0;right:76px;top:32px;bottom:44px;border-radius:26px;background:#f3f6fa;opacity:.9;box-shadow:0 12px 30px rgba(10,25,60,.22)}
+.resghost::before{content:"";position:absolute;left:22px;top:20px;width:64px;height:16px;border-radius:4px;background:#bfe0a0}
+.resghost::after{content:"";position:absolute;left:22px;top:52px;right:60px;height:46px;border-radius:6px;background:repeating-linear-gradient(#dfe6ee 0 7px,transparent 7px 17px)}
+.resillu svg{position:absolute;left:-10px;right:0;bottom:-6px;width:calc(100% + 10px);height:auto;filter:drop-shadow(0 8px 14px rgba(10,25,60,.25))}
+.resfoot{padding-left:92px}
 }
-@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}}
+@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px;border-radius:0 0 28px 28px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -2772,7 +2777,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero"><div class="resillu" aria-hidden="true">${RES_ART.hero}</div>
+    return `<div class="reshero"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero}</div>
       <div class="eb-card res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
