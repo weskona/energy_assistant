@@ -140,9 +140,7 @@ const STYLE = `
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:0;right:0;bottom:-8px;width:100%;height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
-.resillu .flow{stroke-dasharray:3 6;stroke-linecap:round;animation:resflow 1s linear infinite;filter:drop-shadow(0 0 3px currentColor)}
-@keyframes resflow{to{stroke-dashoffset:-18}}
-@media (prefers-reduced-motion:reduce){.resillu .flow{animation:none}}
+.resillu .flow{filter:drop-shadow(0 0 3px rgba(255,255,255,.18))}
 .resillu .glowb{filter:drop-shadow(0 0 4px currentColor)}
 .resillu .glowr{filter:drop-shadow(0 0 5px rgba(255,80,80,.95))}
 .resillu .glows{filter:drop-shadow(0 0 10px rgba(255,190,70,.85))}
@@ -1179,12 +1177,15 @@ function resBatteries(socs) {
   return out;
 }
 
+// The two wires from the pole to the house run parallel, 7 units apart: import on the upper, feed-in on the lower one.
+const RES_WIRE = { in: ["36 115.5", "50.5 137.5", "64.5 150.5"], out: ["30 121", "44.5 143", "58.5 156"] };
 /** The power pole at the left of the house: the grid (import and feed-in), with the wire to the house. */
 function resPole() {
-  return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h30" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
+  return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h35" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
     + `<rect x="22" y="146" width="9" height="15" rx="2.5" fill="#55607a" stroke="#7a89ad" stroke-width="1"/>`
-    + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="31.5" cy="115" r="2.5" fill="#aab6cf"/>`
-    + `<path d="M31.5 115Q46 138 60 153" fill="none" stroke="#37405a" stroke-width="1.8"/><circle cx="27" cy="131" r="2.4" fill="#aab6cf"/><path d="M27 131Q52 148 82 163" fill="none" stroke="#37405a" stroke-width="1.8"/><path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
+    + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="36" cy="115.5" r="2.4" fill="#aab6cf"/><circle cx="30" cy="121" r="2.4" fill="#aab6cf"/>`
+    + `<path d="M${RES_WIRE.in[0]}Q${RES_WIRE.in[1]} ${RES_WIRE.in[2]}" fill="none" stroke="#37405a" stroke-width="1.4"/><path d="M${RES_WIRE.out[0]}Q${RES_WIRE.out[1]} ${RES_WIRE.out[2]}" fill="none" stroke="#37405a" stroke-width="1.4"/>`
+    + `<path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
 }
 
 const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
@@ -1195,29 +1196,44 @@ const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f0629
  */
 function resFlows(flows, socs) {
   if (!flows) return "";
+  // The line width follows the share of the flow: the biggest flow in the picture is 100 %.
+  const all = [flows.pv, flows.in, flows.out, flows.charge, flows.discharge, ...(flows.units || []).flatMap((u) => [u?.charge, u?.discharge])].filter(Boolean).map((f) => f.v);
+  const max = Math.max(...all, 0.0001);
+  const width = (f) => +(1.2 + 1.8 * (f.v / max)).toFixed(2);
   const label = (color, txt, tx, ty, anchor = "middle", size = 9) => `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="${size}" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
-  const path = (d, color, width = 3) => `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="${width}" style="color:${color}"/>`;
+  // A flow: a band of the width of its share and a triangular head at its end, turned along the line. `from` and `to`
+  // are the ends, `via` the control point of a curve (or null for a straight line).
+  const path = (from, via, to, key, f) => {
+    const w = width(f), color = RES_FLOW[key];
+    const dx = to[0] - (via ? via[0] : from[0]), dy = to[1] - (via ? via[1] : from[1]);
+    const len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+    const L = 4.5 + w * 1.4, H = 2.4 + w * 0.9; // head length and half width
+    const bx = to[0] - ux * L, by = to[1] - uy * L; // base of the head, where the line ends
+    const d = via ? `M${from[0]} ${from[1]}Q${via[0]} ${via[1]} ${bx.toFixed(1)} ${by.toFixed(1)}` : `M${from[0]} ${from[1]}L${bx.toFixed(1)} ${by.toFixed(1)}`;
+    const head = `${to[0]},${to[1]} ${(bx - uy * H).toFixed(1)},${(by + ux * H).toFixed(1)} ${(bx + uy * H).toFixed(1)},${(by - ux * H).toFixed(1)}`;
+    return `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-dasharray="4 3.2" stroke-linecap="butt" data-share="${Math.round((f.v / max) * 100)}"/><polygon class="flowhead" points="${head}" fill="${color}" stroke="${color}" stroke-width=".6" stroke-linejoin="round"/>`;
+  };
   let out = "";
-  if (flows.pv) out += path("M125 130V174", RES_FLOW.pv) + label(RES_FLOW.pv, flows.pv, 131, 156, "start");
+  if (flows.pv) out += path([125, 130], null, [125, 172], "pv", flows.pv) + label(RES_FLOW.pv, flows.pv.txt, 134, 156, "start");
   // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
-  if (flows.in) out += path("M31.5 115Q46 138 60 153", RES_FLOW.in, 2.4) + label(RES_FLOW.in, flows.in, 46, 112, "start", 8.5);
-  if (flows.out) out += path("M82 163Q52 148 27 131", RES_FLOW.out, 2.4) + label(RES_FLOW.out, flows.out, 56, 178, "middle", 8.5);
+  if (flows.in) out += path(RES_WIRE.in[0].split(" ").map(Number), RES_WIRE.in[1].split(" ").map(Number), RES_WIRE.in[2].split(" ").map(Number), "in", flows.in) + label(RES_FLOW.in, flows.in.txt, 50, 110, "start", 8.5);
+  if (flows.out) out += path(RES_WIRE.out[2].split(" ").map(Number), RES_WIRE.out[1].split(" ").map(Number), RES_WIRE.out[0].split(" ").map(Number), "out", flows.out) + label(RES_FLOW.out, flows.out.txt, 46, 176, "middle", 8.5);
   if (socs.length && (flows.charge || flows.discharge || flows.units)) {
-    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), fs = n <= 3 ? 8.5 : 7.5;
+    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), fs = n <= 3 ? 8.5 : 7.5, off = w >= 27 ? 8 : 7;
     for (let i = 0; i < n; i++) {
       const cx = RES_BAT_X + i * (w + gap) + w / 2, u = flows.units?.[i];
       const c = flows.units ? u?.charge : flows.charge, d = flows.units ? u?.discharge : flows.discharge;
-      if (c) out += path(`M${cx - 6} 160V190`, RES_FLOW.charge, 2.6);
-      if (d) out += path(`M${cx + 6} 190V160`, RES_FLOW.discharge, 2.6);
+      if (c) out += path([cx - off, 164], null, [cx - off, 192], "charge", c);
+      if (d) out += path([cx + off, 192], null, [cx + off, 164], "discharge", d);
       if (flows.units) { // every storage with its own values
-        if (c) out += label(RES_FLOW.charge, c, cx, 146, "middle", fs);
-        if (d) out += label(RES_FLOW.discharge, d, cx, c ? 157 : 146, "middle", fs);
+        if (c) out += label(RES_FLOW.charge, c.txt, cx, 146, "middle", fs);
+        if (d) out += label(RES_FLOW.discharge, d.txt, cx, c ? 157 : 146, "middle", fs);
       }
     }
     if (!flows.units) { // the totals of all storages above the group
       const mid = RES_BAT_X + (n * w + (n - 1) * gap) / 2;
-      if (flows.charge) out += label(RES_FLOW.charge, flows.charge, mid, 146, "middle", fs);
-      if (flows.discharge) out += label(RES_FLOW.discharge, flows.discharge, mid, flows.charge ? 157 : 146, "middle", fs);
+      if (flows.charge) out += label(RES_FLOW.charge, flows.charge.txt, mid, 146, "middle", fs);
+      if (flows.discharge) out += label(RES_FLOW.discharge, flows.discharge.txt, mid, flows.charge ? 157 : 146, "middle", fs);
     }
   }
   return out;
@@ -2851,14 +2867,16 @@ class EnergyAssistantPanel extends HTMLElement {
   /**
    * The results of the shown period as one friendly card: the production with the change to the period before and
    * bars, a ring with the self-consumption, the savings (needs Tariffy), what the electric car charged (EV Assistant,
-   * kilometres when the consumption of the car is set) and a sentence that sums it up. Empty without production.
+   * kilometres when the consumption of the car is set) and a sentence that sums it up. Empty while the balance is not loaded or failed.
    */
   _renderResults() {
     const b = this._bal;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
-    if (!b || b.range !== range || b.off !== off || b.failed || !(b.totals.solar > 0)) return "";
+    // The card is always there once the balance of the period is loaded (at night, on a day without sun, without a
+    // production counter: 0 kWh), only a failed request leaves it out.
+    if (!b || b.range !== range || b.off !== off || b.failed) return "";
     const lang = this._hass?.language || "en";
-    const t = b.totals, prev = b.before;
+    const t = { ...b.totals, solar: b.totals.solar ?? 0 }, prev = b.before;
     const num = (v, d = 0) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
     const ico = (name, cls = "") => (globalThis.customElements?.get?.("ha-icon") ? `<ha-icon class="rico ${cls}" icon="${name}"></ha-icon>` : "");
     const delta = (cur, before) => {
@@ -2929,9 +2947,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const out = {};
     for (const [key, src] of [["pv", "solar"], ["in", "imp"], ["out", "exp"], ["charge", "chg"], ["discharge", "dis"]]) {
       const v = totals[src];
-      if (v != null && Number.isFinite(v) && v >= 0.05) out[key] = txt(v);
+      if (v != null && Number.isFinite(v) && v >= 0.05) out[key] = { txt: txt(v), v };
     }
-    if (units) out.units = units.map((u) => ({ charge: u.chg != null && u.chg >= 0.05 ? txt(u.chg) : null, discharge: u.dis != null && u.dis >= 0.05 ? txt(u.dis) : null }));
+    const part = (v) => (v != null && Number.isFinite(v) && v >= 0.05 ? { txt: txt(v), v } : null);
+    if (units) out.units = units.map((u) => ({ charge: part(u.chg), discharge: part(u.dis) }));
     return Object.keys(out).length ? out : null;
   }
 

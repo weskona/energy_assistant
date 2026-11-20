@@ -4792,11 +4792,18 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   assert.match(html, /<div class="resfoot">You cover <b>78 %<\/b> of your electricity needs yourself\.<\/div>/);
 });
 
-test("results: no savings without a price, no card without production or while loading", () => {
+test("results: no savings without a price, the card also on a day without sun and without production counter, not while loading or failed", () => {
   const p = resultsPanel();
   assert.doesNotMatch(p._renderResults(), /Savings/);
-  p._bal.totals.solar = 0;
-  assert.equal(p._renderResults(), "");
+  p._bal.totals.solar = 0; // a day without sun: the card is still there (a production counter is set up)
+  assert.match(p._renderResults(), /<div class="resnum"><span class="rn">0[.,]0<small>kWh/);
+  const noPv = resultsPanel();
+  noPv._config = { ...noPv._config, energy_solar: [] }; // no production counter and no production: the card is still there
+  noPv._bal.totals.solar = null;
+  assert.match(noPv._renderResults(), /<div class="resnum"><span class="rn">0[.,]0<small>kWh/);
+  const failed = resultsPanel();
+  failed._bal.failed = true; // only a failed request leaves it out
+  assert.equal(failed._renderResults(), "");
   const q = resultsPanel();
   q._usRange = "month"; // the data is of another period
   assert.equal(q._renderResults(), "");
@@ -4960,4 +4967,18 @@ test("results: the counters are not matched when their number differs from the s
   p._balFetch = async () => ({});
   await p._loadBalance();
   assert.equal(p._bal.units, null); // the totals above the group stay
+});
+
+test("results: the flow lines stand still, the width follows the share of the biggest flow, an arrow shows the direction", () => {
+  const p = flowPanel({ solar: 100, imp: 50, exp: 10, chg: null, dis: null });
+  const html = p._renderResults();
+  assert.doesNotMatch(html, /animation|@keyframes/); // no motion, the lines are dashed but stand still
+  assert.match(html, /<polygon class="flowhead"[^>]*fill="#ff9800"/); // the arrow head of the sun flow
+  assert.equal((html.match(/class="flowhead"/g) || []).length, 3); // one head for each flow
+  const width = (key) => Number(new RegExp(`stroke="${{ pv: "#ff9800", in: "#60a5fa", out: "#a78bfa" }[key]}" stroke-width="([\\d.]+)"`).exec(html)[1]);
+  assert.ok(width("pv") > width("in") && width("in") > width("out")); // 100 % > 50 % > 10 %
+  assert.equal(width("pv"), 3); // the biggest flow, thin like the others
+  assert.match(html, /data-share="100"/);
+  assert.match(html, /data-share="50"/);
+  assert.match(html, /data-share="10"/);
 });
