@@ -4882,3 +4882,14 @@ test("results: storages without a value are left out, at most four are drawn, th
   const q = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] }, { "sensor.s1": 80, "sensor.s2": 40 });
   assert.equal(q._storage({}).soc, 60);
 });
+
+test("results: with several storages the picture grows, so the card moves to the right and the batteries stay clear of it", () => {
+  const widthOf = (html) => Number(/--resx:([\d.]+)/.exec(html)[1]);
+  const one = batteryPanel({ battery_soc: ["sensor.s1"] }, { "sensor.s1": 50 })._renderResults();
+  const three = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.s3"] }, { "sensor.s1": 50, "sensor.s2": 50, "sensor.s3": 50 })._renderResults();
+  const none = resultsPanel()._renderResults();
+  assert.equal(widthOf(none), 1);
+  assert.equal(widthOf(one), 1); // one battery fits as it is
+  assert.ok(widthOf(three) > 1.1); // three need room
+  assert.match(three, /viewBox="0 0 4[5-9]\d 290"/);
+});
