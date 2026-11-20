@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-20
+
 ### Added
 
 - **Unusual consumption notice:** a device is compared with its own pattern, without any setup. When each of its last three full hours was clearly above the highest hourly mean it reached on the days before (at least 30 % and 20 W more; long-term statistics of the last 8 days), the Notices card says so with the average and the usual maximum, for example a fridge or freezer that suddenly runs far longer than usual. A wallbox that regularly charges for hours is not reported, because that is its pattern. The plain notice about running for hours now only applies to devices without a pattern yet.
