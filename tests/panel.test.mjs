@@ -5025,3 +5025,44 @@ test("results: the energy flow to the electric car shows what the wallbox charge
   p._bal.ev = 0.01;
   assert.equal((p._renderResults().match(/class="flowhead"/g) || []).length, 1);
 });
+
+// ---- the picture of the Power tab (live power in W)
+
+function livePanel(cfg, states, int = {}) {
+  const p = panel({ house_power: "h", solar_power: ["pv"], grid_import: ["gi"], grid_export: ["ge"], battery_charge: ["bc"], battery_discharge: ["bd"], battery_soc: ["soc"], ...cfg }, { h: st(1400), pv: st(3200), gi: st(0), ge: st(1800), bc: st(900), bd: st(0), soc: st(50, "%"), ...states });
+  p._ready = true;
+  p._hass.language = "en";
+  p._int = int;
+  return p;
+}
+
+test("power tab: the picture shows the power of now in watts, below the notices and above the house card", () => {
+  const p = livePanel({}, { "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } } },
+    { tariffy: { price: "sensor.t_preis" }, ev_assistant: { vehicles: [{ name: "EV", live: "sensor.evlive" }] } });
+  p._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
+  const html = p._renderHouse();
+  assert.match(html, /<span class="eb-title">Right now<\/span>/);
+  assert.match(html, /<div class="reslab">Consumption now<\/div>/);
+  assert.match(html, /<span class="rn">1,400<small>W<\/small>/);
+  assert.ok(html.indexOf("Right now") < html.indexOf("Live consumption") || html.indexOf("Right now") < html.indexOf("eb-card--glow\">\n        <div class=\"row\"><span class=\"eb-title\">House"));
+  // flows of now: sun, feed-in, charging and the electric car, all in whole watts
+  const live = html.slice(html.indexOf('class="reshero fullrow"'), html.indexOf("Consumption now"));
+  assert.equal((live.match(/class="flowhead"/g) || []).length, 4);
+  assert.match(live, />3,200 W</);
+  assert.match(live, />1,800 W</);
+  assert.match(live, />900 W</);
+  assert.match(live, />7,400 W</);
+  assert.doesNotMatch(live, /kW/);
+  assert.match(html, /<div class="resdk"><b>7,400 W<\/b>/); // the car is charging
+  assert.match(html, /<div class="resfoot">Your electric car is charging at home with <b>7,400 W<\/b>\.<\/div>/);
+  assert.match(html, /<span class="resper">per hour<\/span>/); // what the sun saves per hour
+  assert.match(html, /class="unit" data-soc="50"/); // the storage with its live level
+});
+
+test("power tab: without a charging car the sentence is about the self-sufficiency, no flow below 20 W", () => {
+  const p = livePanel({}, { pv: st(10), ge: st(0), bc: st(0) });
+  const html = p._renderHouse();
+  assert.match(html, /<div class="resfoot">Right now you cover <b>100 %<\/b> of your electricity needs yourself\.<\/div>/);
+  assert.doesNotMatch(html, /class="flowhead"/); // nothing flows (10 W is below the limit)
+  assert.doesNotMatch(html, /class="resdrive"/); // no car box
+});

@@ -360,6 +360,13 @@ const STRINGS = {
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
+    liveTitle: "Right now",
+    liveHouse: "Consumption now",
+    liveFeed: "Feed-in",
+    resPerHour: "per hour",
+    liveCharging: "Charging",
+    liveFootEv: "Your electric car is charging at home with **{p}**.",
+    liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
     resTitle: "Your results",
     resCost: "Electricity cost",
     resSaving: "Savings",
@@ -725,6 +732,13 @@ const STRINGS = {
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
+    liveTitle: "Jetzt",
+    liveHouse: "Verbrauch jetzt",
+    liveFeed: "Einsp.",
+    resPerHour: "pro Stunde",
+    liveCharging: "Laden",
+    liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
+    liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
     resTitle: "Ihre Ergebnisse",
     resCost: "Stromkosten",
     resSaving: "Einsparung",
@@ -2973,6 +2987,69 @@ class EnergyAssistantPanel extends HTMLElement {
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
+  /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
+  _evLive() {
+    let total = 0, charging = false;
+    for (const v of this._int?.ev_assistant?.vehicles || []) {
+      const attrs = this._hass?.states?.[v.live]?.attributes || {};
+      const live = attrs.evcc_live || attrs.home_generic_live;
+      const kw = Number(live?.charge_power);
+      if (live && (live.charging === true || (Number.isFinite(kw) && kw > 0.05)) && Number.isFinite(kw)) {
+        total += kw * 1000;
+        charging = true;
+      }
+    }
+    return charging ? total : null;
+  }
+
+  /**
+   * The picture of the Power tab: the same house as in the results card of the Consumption tab, with the power of
+   * now (W) instead of the energy of a period: consumption, where it comes from, the self-sufficiency, what the
+   * sun saves per hour (Tariffy) and the electric car that charges. The flows show from FLOW_W on.
+   */
+  _renderLiveResults(cur) {
+    if (!cur || (cur.house == null && cur.solar == null && cur.gridIn == null)) return "";
+    const lang = this._hass?.language || "en";
+    const kw = (w) => `${Math.round(w).toLocaleString(lang)} W`; // power is always shown in whole watts
+    const on = (w) => w != null && Number.isFinite(w) && w >= FLOW_W;
+    const ev = this._evLive();
+    const flows = {};
+    for (const [key, w] of [["pv", cur.solar], ["in", cur.gridIn], ["out", cur.gridOut], ["charge", cur.charge], ["discharge", cur.discharge], ["ev", ev]]) {
+      if (on(w)) flows[key] = { txt: kw(w), v: w };
+    }
+    const levels = this._storageLevels();
+    // Where the power comes from: four bars, in the colors of the flows
+    const sources = [["solar", cur.solar, RES_FLOW.pv], ["grid", cur.gridIn, RES_FLOW.in], ["storage", cur.discharge, RES_FLOW.discharge], ["liveFeed", cur.gridOut, RES_FLOW.out]].filter(([, w]) => w != null);
+    const top = Math.max(...sources.map(([, w]) => w), 1);
+    const bars = sources.map(([label, w, color]) => `<div class="rbar"><div class="rcol"><i style="height:${Math.max(3, Math.round((w / top) * 100))}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i></div><span>${esc(this._t(label))}</span></div>`).join("");
+    const [val, unit] = fmtPower(cur.house);
+    const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
+    const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
+      <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
+    // What the sun saves per hour right now (Tariffy): the directly used power at the price plus the feed-in
+    const price = this._price(), feed = this._feedInTariff();
+    let savings = "";
+    if (price && cur.solar != null) {
+      const perHour = ((cur.direct || 0) / 1000) * price.value + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
+      const [n, sym] = this._money(perHour, price.currency, 2);
+      savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
+        <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
+    }
+    const drive = ev != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("liveCharging"))}</div><div class="resdk"><b>${esc(kw(ev))}</b></div></div></div>` : "";
+    let foot = "";
+    if (ev != null) foot = this._t("liveFootEv", { p: kw(ev) });
+    else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
+    const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows)}</div>
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span><span class="eb-chip">${this._t(cur.house == null ? "noData" : "live")}</span>${drive}</div>
+      <div class="resgrid">
+        <div class="resl"><div class="reslab">${esc(this._t("liveHouse"))}</div>
+          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+          <div class="rbars">${bars}</div></div>
+        <div class="resr">${ring}${savings}</div>
+      </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
+  }
+
   /** The flows of the picture from the totals of the shown period (kWh): { pv, in, out, charge, discharge, ev }, each { txt, v }, or null. */
   _resFlows(totals, units = null, ev = null) {
     if (!totals) return null;
@@ -4650,6 +4727,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const hist = this._history ? this._historyChart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
       ${this._renderAlerts()}
+      ${this._renderLiveResults(cur)}
       <div class="eb-card eb-card--glow">
         <div class="row"><span class="eb-title">${this._t("house")}</span>
           <span class="eb-chip">${cur.house == null ? this._t("noData") : this._t("live")}</span></div>
