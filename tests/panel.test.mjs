@@ -4894,3 +4894,39 @@ test("results: with several storages the picture grows, so the card moves to the
   assert.ok(widthOf(three) > 1.1); // three need room
   assert.match(three, /viewBox="0 0 4[5-9]\d 290"/);
 });
+
+// ---- energy flow in the picture of the results card
+
+function flowPanel(states, cfg) {
+  const p = resultsPanel(cfg);
+  for (const [id, v] of Object.entries(states)) p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: "W" } };
+  return p;
+}
+const FLOW_CFG = { solar_power: ["sensor.pv"], grid_import: ["sensor.gi"], grid_export: ["sensor.ge"], battery_charge: ["sensor.bc"], battery_discharge: ["sensor.bd"] };
+
+test("results: the power pole is always there, the flows follow the live values", () => {
+  const idle = flowPanel({ "sensor.pv": 0, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 0 }, FLOW_CFG);
+  assert.match(idle._renderResults(), /M18 270V104/); // the pole (grid)
+  assert.doesNotMatch(idle._renderResults(), /class="flow"/);
+  const exporting = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 1800, "sensor.bc": 900, "sensor.bd": 0 }, FLOW_CFG);
+  const html = exporting._renderResults();
+  assert.equal((html.match(/class="flow"/g) || []).length, 2); // sun into the house, feed-in to the pole (no storage drawn)
+  const withStore = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 1800, "sensor.bc": 900, "sensor.bd": 0, "sensor.soc": 50 }, { ...FLOW_CFG, battery_soc: ["sensor.soc"] });
+  assert.equal((withStore._renderResults().match(/class="flow"/g) || []).length, 3); // plus the line to the storage
+  assert.match(html, />3[.,]2 kW</);
+  assert.match(html, /M60 153Q46 138 31\.5 115/); // feed-in runs from the house to the pole
+  assert.match(html, /stroke="#a78bfa"/);
+  const importing = flowPanel({ "sensor.pv": 0, "sensor.gi": 1800, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 600, "sensor.soc": 50 }, { ...FLOW_CFG, battery_soc: ["sensor.soc"] });
+  const html2 = importing._renderResults();
+  assert.match(html2, /M31\.5 115Q46 138 60 153/); // import runs from the pole to the house
+  assert.match(html2, /stroke="#60a5fa"/);
+  assert.match(html2, />600 W</);
+});
+
+test("results: storage flow lines need a storage, and past periods show no live flow", () => {
+  const p = flowPanel({ "sensor.pv": 0, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 900, "sensor.bd": 0 }, FLOW_CFG);
+  assert.doesNotMatch(p._renderResults(), /class="flow"/); // no storage drawn, so no line to it
+  const q = flowPanel({ "sensor.pv": 3200, "sensor.gi": 0, "sensor.ge": 0, "sensor.bc": 0, "sensor.bd": 0 }, FLOW_CFG);
+  q._usOff = -1;
+  assert.equal(q._resFlows(), null);
+});

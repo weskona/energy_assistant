@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Energy flow and power pole in the picture:** a power pole stands left of the house, it is the grid. Moving dashes show the live energy flow in the picture of the results card: the sun into the house (production), the wire between the pole and the house (grid import in blue towards the house, feed-in in purple towards the pole) and the line to each storage (charging in pink, discharging in teal), each with its power. A flow only shows from 20 W on; the lines are live values, so they only show in the running period (not when you page back). With reduced motion set in the system the dashes stand still.
+
+### Added
+
 - **Storages in the picture:** in the picture of the results card (where the door was) a home storage unit for every storage stands (housing on two feet with a bolt, a display slot with six LED segments filled up to its charge level, a status light and the percentage below it; green from 60 %, amber from 25 %, red below). The first storage is the charge level sensor as before, the new setting *Further storages: charge level sensors* (*Solar and storage*) adds more; they stand apart in front of the house, and with several storages the picture grows so the card moves to the right; up to four batteries are drawn, without a storage the door stays. With several storages the Storage card of the Power tab shows the mean charge level.
 
 ### Added

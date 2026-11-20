@@ -140,6 +140,9 @@ const STYLE = `
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:-14px;right:0;bottom:-8px;width:calc(100% + 14px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.resillu .flow{stroke-dasharray:3 6;stroke-linecap:round;animation:resflow 1s linear infinite;filter:drop-shadow(0 0 3px currentColor)}
+@keyframes resflow{to{stroke-dashoffset:-18}}
+@media (prefers-reduced-motion:reduce){.resillu .flow{animation:none}}
 .resillu .glowb{filter:drop-shadow(0 0 4px currentColor)}
 .resillu .glowr{filter:drop-shadow(0 0 5px rgba(255,80,80,.95))}
 .resillu .glows{filter:drop-shadow(0 0 10px rgba(255,190,70,.85))}
@@ -1176,11 +1179,47 @@ function resBatteries(socs) {
   return out;
 }
 
+/** The power pole at the left of the house: the grid (import and feed-in), with the wire to the house. */
+function resPole() {
+  return `<path d="M18 270V104" stroke="#6a5640" stroke-width="5.5" stroke-linecap="round"/><path d="M3 118h30" stroke="#6a5640" stroke-width="4" stroke-linecap="round"/><path d="M7 133h22" stroke="#6a5640" stroke-width="3.2" stroke-linecap="round"/>`
+    + `<rect x="22" y="146" width="9" height="15" rx="2.5" fill="#55607a" stroke="#7a89ad" stroke-width="1"/>`
+    + `<circle cx="4.5" cy="115" r="2.5" fill="#aab6cf"/><circle cx="18" cy="101" r="2.5" fill="#aab6cf"/><circle cx="31.5" cy="115" r="2.5" fill="#aab6cf"/>`
+    + `<path d="M31.5 115Q46 138 60 153" fill="none" stroke="#37405a" stroke-width="1.8"/><path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
+}
+
+const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
+/**
+ * The energy flow of the picture as moving dashes (live values, see _resFlows): sun and modules into the house, the grid
+ * between the pole and the house (import to the house, feed-in to the pole) and the storages (charging from the
+ * house, discharging into the house). `flows` has the active ones with their text.
+ */
+function resFlows(flows, socs) {
+  if (!flows) return "";
+  const line = (d, color, txt, tx, ty, anchor = "middle") => `<path class="flow" d="${d}" fill="none" stroke="${color}" stroke-width="3" style="color:${color}"/>`
+    + `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="9" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
+  let out = "";
+  if (flows.pv) out += line("M125 130V174", RES_FLOW.pv, flows.pv.txt, 131, 156, "start");
+  if (flows.grid) {
+    const into = flows.grid.dir === "in";
+    out += line(into ? "M31.5 115Q46 138 60 153" : "M60 153Q46 138 31.5 115", RES_FLOW[flows.grid.dir], flows.grid.txt, 40, 178);
+  }
+  if (flows.store && socs.length) {
+    const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), charge = flows.store.dir === "charge";
+    for (let i = 0; i < n; i++) {
+      const cx = RES_BAT_X + i * (w + gap) + w / 2;
+      out += `<path class="flow" d="${charge ? `M${cx} 160V190` : `M${cx} 190V160`}" fill="none" stroke="${RES_FLOW[flows.store.dir]}" stroke-width="3" style="color:${RES_FLOW[flows.store.dir]}"/>`;
+    }
+    const c0 = RES_BAT_X + w / 2;
+    out += `<text x="${c0 + 6}" y="176" font-size="8.5" font-weight="700" fill="${RES_FLOW[flows.store.dir]}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${flows.store.txt}</text>`;
+  }
+  return out;
+}
+
 const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
   pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
-  hero: (socs = []) => `<svg viewBox="0 0 ${400 + resExtra(socs)} 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${200 + resExtra(socs) / 2}" cy="268" rx="${205 + resExtra(socs) / 2}" ry="24" fill="#1d4a30"/><ellipse cx="${215 + resExtra(socs) / 2}" cy="262" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g><rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="254" rx="36" ry="4.5" fill="#0d111b" opacity=".7"/><ellipse cx="101" cy="252" rx="8" ry="5" fill="#0f131c"/><ellipse cx="149" cy="252" rx="8" ry="5" fill="#0f131c"/><path d="M98 224l6-17h42l6 17z" fill="#4d628f"/><path d="M103 222l5-13h34l5 13z" fill="#1d2539"/><path d="M110 211h30" stroke="#3a4a6e" stroke-width="1.5"/><rect x="93" y="220" width="64" height="27" rx="7" fill="#5a73a6"/><rect x="93" y="220" width="64" height="5" rx="2.5" fill="#6c86ba" opacity=".8"/><rect class="glowr" x="97" y="227" width="56" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="95" y="243" width="60" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}</svg>`,
+  hero: (socs = [], flows = null) => `<svg viewBox="0 0 ${400 + resExtra(socs)} 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${200 + resExtra(socs) / 2}" cy="268" rx="${205 + resExtra(socs) / 2}" ry="24" fill="#1d4a30"/><ellipse cx="${215 + resExtra(socs) / 2}" cy="262" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/>${resPole()}<rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g><rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="254" rx="36" ry="4.5" fill="#0d111b" opacity=".7"/><ellipse cx="101" cy="252" rx="8" ry="5" fill="#0f131c"/><ellipse cx="149" cy="252" rx="8" ry="5" fill="#0f131c"/><path d="M98 224l6-17h42l6 17z" fill="#4d628f"/><path d="M103 222l5-13h34l5 13z" fill="#1d2539"/><path d="M110 211h30" stroke="#3a4a6e" stroke-width="1.5"/><rect x="93" y="220" width="64" height="27" rx="7" fill="#5a73a6"/><rect x="93" y="220" width="64" height="5" rx="2.5" fill="#6c86ba" opacity=".8"/><rect class="glowr" x="97" y="227" width="56" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="95" y="243" width="60" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}${resFlows(flows, socs)}</svg>`,
 };
 
 const SETTINGS_SECTIONS = [
@@ -2851,7 +2890,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero" style="--resx:${(400 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels())}</div>
+    return `<div class="reshero" style="--resx:${(400 + resExtra(this._storageLevels())) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels(), this._resFlows())}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
@@ -2859,6 +2898,23 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="rbars">${bars}</div></div>
         <div class="resr">${selfBlock}${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
+  }
+
+  /** The live flows for the picture (only in the running period): { pv, grid, store } with their texts, or null. */
+  _resFlows() {
+    if ((this._usOff ?? 0) !== 0) return null;
+    const c = this._current();
+    if (!c) return null;
+    const lang = this._hass?.language || "en";
+    const txt = (w) => (w >= 1000 ? `${(w / 1000).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kW` : `${Math.round(w)} W`);
+    const on = (w) => w != null && Number.isFinite(w) && w >= FLOW_W;
+    const out = {};
+    if (on(c.solar)) out.pv = { txt: txt(c.solar) };
+    if (on(c.gridIn)) out.grid = { dir: "in", txt: txt(c.gridIn) };
+    else if (on(c.gridOut)) out.grid = { dir: "out", txt: txt(c.gridOut) };
+    if (on(c.discharge)) out.store = { dir: "discharge", txt: txt(c.discharge) };
+    else if (on(c.charge)) out.store = { dir: "charge", txt: txt(c.charge) };
+    return Object.keys(out).length ? out : null;
   }
 
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
