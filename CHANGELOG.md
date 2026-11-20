@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-11-20
+
 ### Added
 
 - **The picture in the Power tab:** the Power tab starts with the same house as the results card of the Consumption tab, but with the power of now: the consumption in watts, where it comes from (sun, grid, storage, feed-in) as four bars, a ring with the self-sufficiency, what the sun saves per hour (with Tariffy) and the electric car with its charging power (EV Assistant, read only). The picture shows the flows of now in whole watts from 20 W on (sun, grid import and feed-in on two wires, charging and discharging of the storages, the car) and the live charge level of every storage. The notices stay on top, the existing cards follow below unchanged.
