@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Better car in the picture:** the electric car in the garage is redrawn from behind: a curved roof with a rear window, a full-width LED light bar that wraps around the corners, a license plate, a diffuser and wheels with tire and rim in their wheel arches (before they were flat dark ovals).
+
 ### Fixed
 
 - **Grass in the picture:** the green ground was wider than the drawing, so its rounded ends were cut off on the left and on the right. It now fits and ends round.
