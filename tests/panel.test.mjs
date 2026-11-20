@@ -4676,3 +4676,63 @@ test("balance: the change is green when it is good and red when it is bad, per t
   q._bal.before = { ...q._bal.before, cons: 10 };
   assert.match(q._renderBalance(), /Consumption<\/div><div class="eb-value">20\.0<small>kWh<\/small><\/div><div class="eb-label vs bad"/);
 });
+
+// ---- notices: unusual consumption of a device, judged by its own pattern
+
+const unusualDevices = () => [
+  { id: "sensor.fridge", name: "Kühlschrank", run: 0, nowW: 120, recent: [110, 120, 130] },
+  { id: "sensor.wallbox", name: "Wallbox", run: 6 * H, nowW: 1400, recent: [1400, 1400, 1400] },
+  { id: "sensor.heater", name: "Heizlüfter", run: 5 * H, nowW: 1500, recent: [1500, 1500, 1500] },
+  { id: "sensor.tv", name: "TV", run: 0, nowW: 60, recent: [100, 20, 100] }, // not all hours
+  { id: "sensor.new", name: "Neu", run: 5 * H, nowW: 300, recent: [300, 300, 300] }, // no pattern yet
+];
+
+test("notices: a device far above its own usual level for hours is reported, a regular long run is not", () => {
+  const p = alertPanel();
+  p._usage = { at: Date.now(), devices: unusualDevices() };
+  p._devRef = { at: Date.now(), max: { "sensor.fridge": 60, "sensor.wallbox": 1400, "sensor.heater": 0, "sensor.tv": 50 } };
+  const texts = p._alerts().map((a) => a.text);
+  // the fridge uses 120 W on average, usually 60 W at most; the heater never ran; the wallbox always charges like this
+  assert.ok(texts.some((t) => /^Kühlschrank has been using more than usual for 3 hours: on average 120 W \(usually up to 60 W\)$/.test(t)), texts.join("|"));
+  assert.ok(texts.some((t) => /^Heizlüfter has been using more than usual/.test(t)));
+  assert.ok(!texts.some((t) => /Wallbox/.test(t)));
+  assert.ok(!texts.some((t) => /^TV /.test(t)));
+  // the heater only gets the notice about unusual use; the device without a pattern keeps the plain rule
+  assert.equal(texts.filter((t) => /Heizlüfter/.test(t)).length, 1);
+  assert.ok(texts.some((t) => /^Neu has been running for 5 h 0 min/.test(t)));
+});
+
+test("notices: devices without notices are never reported", () => {
+  const p = alertPanel();
+  p._config = { ...p._config, alert_exclude: ["sensor.fridge", "sensor.new"] };
+  p._usage = { at: Date.now(), devices: unusualDevices() };
+  p._devRef = { at: Date.now(), max: { "sensor.fridge": 60, "sensor.heater": 0 } };
+  const texts = p._alerts().map((a) => a.text).join("|");
+  assert.doesNotMatch(texts, /Kühlschrank|Neu/);
+  assert.match(texts, /Heizlüfter/);
+});
+
+test("notices: the usual level is the highest hourly mean of the days before, with enough values", () => {
+  const p = alertPanel();
+  const now = Date.parse("2026-11-20T12:00:00Z");
+  const hours = (n, w) => Array.from({ length: n }, (_, i) => ({ start: now - (n - i + 12) * H, mean: w }));
+  const ref = p._devRefFrom({
+    "sensor.a": [...hours(100, 40), { start: now - 30 * H, mean: 90 }],
+    "sensor.b": hours(10, 40), // too little data
+    "sensor.c": [...hours(60, 20), { start: now - 1 * H, mean: 5000 }], // today does not count
+  }, new Date(now));
+  assert.equal(ref["sensor.a"], 90);
+  assert.equal(ref["sensor.b"], undefined);
+  assert.equal(ref["sensor.c"], 20);
+});
+
+test("notices: the last full hours of a device are measured from the history", () => {
+  const p = alertPanel();
+  const t1 = Date.now(), t0 = t1 - 24 * H;
+  const res = { "sensor.fridge": [{ lu: t0 / 1000, s: "50" }, { lu: (t1 - 2.5 * H) / 1000, s: "130" }] };
+  const d = p._usageCompute(res, ["sensor.fridge"], t0, t1).devices[0];
+  assert.equal(d.recent.length, 3);
+  assert.ok(Math.abs(d.recent[0] - 90) < 25); // the 130 W started in the middle of the first of the three hours
+  assert.equal(Math.round(d.recent[1]), 130);
+  assert.equal(Math.round(d.recent[2]), 130);
+});

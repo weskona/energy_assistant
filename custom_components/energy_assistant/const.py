@@ -17,6 +17,8 @@ CONF_DEVICE_POWER = "device_power"  # additional device sensors, one or more
 CONF_DEVICE_STANDBY = "device_standby"
 # Standby loads that are meant to run all the time (server, fridge): they are not counted as avoidable.
 CONF_STANDBY_NORMAL = "standby_normal"
+# Devices (power sensors) that never trigger a notice about long running or unusual consumption (wallbox, ...).
+CONF_ALERT_EXCLUDE = "alert_exclude"
 # Devices (power sensors) that get their own energy and cost sensors. Nothing is selected at first.
 CONF_DEVICE_IDS = "device_ids"
 # Tariffy price sensor per such device ({entity_id: entity_id}).
@@ -80,6 +82,7 @@ LIST_KEYS = (
     CONF_DEVICE_POWER,
     CONF_DEVICE_STANDBY,
     CONF_STANDBY_NORMAL,
+    CONF_ALERT_EXCLUDE,
     CONF_DEVICE_IDS,
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
