@@ -72,6 +72,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "device_tariffs": {},
         "history_years": {},
         "battery_soc": [],
+        "battery_soc_more": [],
         "battery_capacity": None,
         "battery_min_soc": None,
         "ev_consumption": None,

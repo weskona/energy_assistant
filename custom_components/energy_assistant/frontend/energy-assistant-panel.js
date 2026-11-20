@@ -140,6 +140,7 @@ const STYLE = `
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:-14px;right:0;bottom:-8px;width:calc(100% + 14px);height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.resillu .glowb{filter:drop-shadow(0 0 4px currentColor)}
 .resillu .glowr{filter:drop-shadow(0 0 5px rgba(255,80,80,.95))}
 .resillu .glows{filter:drop-shadow(0 0 10px rgba(255,190,70,.85))}
 .resillu .glowp{filter:drop-shadow(0 0 10px rgba(96,165,250,.75))}
@@ -350,6 +351,7 @@ const STRINGS = {
     alLongRun: "{name} has been running for {dur} ({power})",
     alBase: "The base load is high: {now} W, usually about {ref} W",
     f_battery_soc: "Storage charge level sensor (%)",
+    f_battery_soc_more: "Further storages: charge level sensors (%, one battery each in the results)",
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
@@ -714,6 +716,7 @@ const STRINGS = {
     alLongRun: "{name} läuft seit {dur} ({power})",
     alBase: "Die Grundlast ist hoch: {now} W, sonst etwa {ref} W",
     f_battery_soc: "Ladestand-Sensor des Speichers (%)",
+    f_battery_soc_more: "Weitere Speicher: Ladestand-Sensoren (%, je eine Batterie in den Ergebnissen)",
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
@@ -1129,22 +1132,39 @@ function cleanHistory(value, maxYear = Infinity) {
 }
 
 // Flat illustrations of the results card (inline, so they do not depend on an icon font).
+// Home batteries at the wall of the house (instead of the door): one for each storage, filled up to its charge level.
+function resBatteries(socs) {
+  const list = socs.slice(0, 4), n = list.length, gap = 5;
+  const w = Math.min(24, (48 - (n - 1) * gap) / n), total = n * w + (n - 1) * gap, x0 = 273 - total / 2;
+  const font = n <= 2 ? 8.5 : n === 3 ? 7.5 : 6.5;
+  let out = `<rect x="${(x0 - 6).toFixed(1)}" y="190" width="${(total + 12).toFixed(1)}" height="68" rx="5" fill="#2a3248"/>`;
+  list.forEach((soc, i) => {
+    const x = x0 + i * (w + gap), top = 200, h = 50, inner = h - 4, fill = (inner * soc) / 100;
+    const color = soc >= 60 ? "#34d399" : soc >= 25 ? "#f7b733" : "#f87171";
+    out += `<rect x="${(x + w / 2 - 3).toFixed(1)}" y="195.5" width="6" height="4.5" rx="1.2" fill="#8fa3c4"/>`
+      + `<rect x="${x.toFixed(1)}" y="${top}" width="${w.toFixed(1)}" height="${h}" rx="3.5" fill="#161b29" stroke="#8fa3c4" stroke-width="1.6"/>`
+      + `<rect class="glowb" x="${(x + 2).toFixed(1)}" y="${(top + 2 + inner - fill).toFixed(1)}" width="${(w - 4).toFixed(1)}" height="${fill.toFixed(1)}" rx="2" fill="${color}" style="color:${color}"/>`
+      + `<text x="${(x + w / 2).toFixed(1)}" y="${(top + h + 10).toFixed(1)}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-width="2.2" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
+  });
+  return out;
+}
+
 const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
   pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
-  hero: `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="200" cy="268" rx="205" ry="24" fill="#1d4a30"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g><rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="254" rx="36" ry="4.5" fill="#0d111b" opacity=".7"/><ellipse cx="101" cy="252" rx="8" ry="5" fill="#0f131c"/><ellipse cx="149" cy="252" rx="8" ry="5" fill="#0f131c"/><path d="M98 224l6-17h42l6 17z" fill="#4d628f"/><path d="M103 222l5-13h34l5 13z" fill="#1d2539"/><path d="M110 211h30" stroke="#3a4a6e" stroke-width="1.5"/><rect x="93" y="220" width="64" height="27" rx="7" fill="#5a73a6"/><rect x="93" y="220" width="64" height="5" rx="2.5" fill="#6c86ba" opacity=".8"/><rect class="glowr" x="97" y="227" width="56" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="95" y="243" width="60" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/><rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/><circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/><circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/></svg>`,
+  hero: (socs = []) => `<svg viewBox="0 0 400 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="200" cy="268" rx="205" ry="24" fill="#1d4a30"/><ellipse cx="215" cy="262" rx="150" ry="12" fill="#2b6a42"/><rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g><rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="254" rx="36" ry="4.5" fill="#0d111b" opacity=".7"/><ellipse cx="101" cy="252" rx="8" ry="5" fill="#0f131c"/><ellipse cx="149" cy="252" rx="8" ry="5" fill="#0f131c"/><path d="M98 224l6-17h42l6 17z" fill="#4d628f"/><path d="M103 222l5-13h34l5 13z" fill="#1d2539"/><path d="M110 211h30" stroke="#3a4a6e" stroke-width="1.5"/><rect x="93" y="220" width="64" height="27" rx="7" fill="#5a73a6"/><rect x="93" y="220" width="64" height="5" rx="2.5" fill="#6c86ba" opacity=".8"/><rect class="glowr" x="97" y="227" width="56" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="95" y="243" width="60" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/><circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/></svg>`,
 };
 
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
-  { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
+  { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_soc_more", "socs"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
   { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["history_years", "history"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "device_power", "device_standby", "standby_normal", "alert_exclude", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "battery_soc_more", "device_power", "device_standby", "standby_normal", "alert_exclude", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -2013,9 +2033,16 @@ class EnergyAssistantPanel extends HTMLElement {
    * and the current charging or discharging power: what is stored and usable, the mode and when it is empty
    * (discharging) or full (charging). Null without a charge level.
    */
+  /** The charge levels (0-100) of all storages: the main charge level sensor and the further ones. */
+  _storageLevels() {
+    const ids = [...new Set([...(this._cfg.battery_soc || []).slice(0, 1), ...(this._cfg.battery_soc_more || [])])];
+    return ids.map((id) => this._num(id)).filter((v) => v != null).map((v) => Math.max(0, Math.min(100, v)));
+  }
+
   _storage(cur) {
-    const soc = this._num(this._cfg.battery_soc?.[0]);
-    if (soc == null) return null;
+    const levels = this._storageLevels();
+    if (!levels.length) return null;
+    const soc = levels.reduce((a, b) => a + b, 0) / levels.length; // several storages: the mean level
     const level = Math.max(0, Math.min(100, soc));
     const cap = this._cfg.battery_capacity > 0 ? this._cfg.battery_capacity : null;
     const min = Math.max(0, Math.min(100, this._cfg.battery_min_soc ?? 0));
@@ -2797,7 +2824,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero}</div>
+    return `<div class="reshero"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(this._storageLevels())}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
@@ -3847,7 +3874,7 @@ class EnergyAssistantPanel extends HTMLElement {
       }
       const err = this._fieldError?.[key] ? `<div class="ferr">${esc(this._fieldError[key])}</div>` : "";
       const long = key === "device_exclude" || key === "device_ids"; // can be a long list: full width, scrolls when very long
-      const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : kind === "soc" ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
+      const input = ro ? "" : `<input type="text" data-add="${key}" data-mode="${kind}" ${kind === "text" ? "" : kind === "emulti" ? 'list="eb-energy"' : (kind === "soc" || kind === "socs") ? 'list="eb-soc"' : 'list="eb-sensors"'} placeholder="${esc(this._t(kind === "text" ? (key === "device_exclude_patterns" ? "addExcludePattern" : "addPattern") : "addSensor"))}" autocomplete="off">`;
       // The chips and the input share one box, so a list only grows as much as it has entries.
       return `<div class="fld${long ? " span" : ""}"><label>${esc(label)}</label>
         <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}</div>`;

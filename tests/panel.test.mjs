@@ -4847,3 +4847,38 @@ test("results: other periods are shown as four bars (quarters, weeks of the mont
   assert.equal((four("day", 24).match(/class="rbar"/g) || []).length, 4);
   assert.match(four("day", 24), /<span>0–6<\/span>/);
 });
+
+// ---- batteries of the storages in the picture of the results card
+
+function batteryPanel(cfg, levels) {
+  const p = resultsPanel(cfg);
+  for (const [id, v] of Object.entries(levels)) p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: "%" } };
+  return p;
+}
+
+test("results: a battery for every storage, filled up to its charge level, instead of the door", () => {
+  const none = resultsPanel();
+  assert.doesNotMatch(none._renderResults(), /class="glowb"/);
+  assert.match(none._renderResults(), /fill="#46506a"/); // the door stays without a storage
+  const one = batteryPanel({ battery_soc: ["sensor.s1"] }, { "sensor.s1": 78 });
+  const html1 = one._renderResults();
+  assert.equal((html1.match(/class="glowb"/g) || []).length, 1);
+  assert.match(html1, />78%</);
+  assert.doesNotMatch(html1, /fill="#46506a"/);
+  const three = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.s3"] }, { "sensor.s1": 78, "sensor.s2": 34, "sensor.s3": 12 });
+  const html3 = three._renderResults();
+  assert.equal((html3.match(/class="glowb"/g) || []).length, 3);
+  assert.match(html3, />34%</);
+  assert.match(html3, /fill="#34d399"[^>]*><\/rect>|fill="#34d399"/); // full green
+  assert.match(html3, /fill="#f7b733" style="color:#f7b733"/); // 34 % is amber
+  assert.match(html3, /fill="#f87171" style="color:#f87171"/); // 12 % is red
+});
+
+test("results: storages without a value are left out, at most four are drawn, the storage card uses the mean", () => {
+  const p = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2", "sensor.gone", "sensor.s3", "sensor.s4", "sensor.s5"] },
+    { "sensor.s1": 100, "sensor.s2": 50, "sensor.s3": 40, "sensor.s4": 30, "sensor.s5": 20 });
+  assert.deepEqual(p._storageLevels(), [100, 50, 40, 30, 20]);
+  assert.equal((p._renderResults().match(/class="glowb"/g) || []).length, 4);
+  const q = batteryPanel({ battery_soc: ["sensor.s1"], battery_soc_more: ["sensor.s2"] }, { "sensor.s1": 80, "sensor.s2": 40 });
+  assert.equal(q._storage({}).soc, 60);
+});
