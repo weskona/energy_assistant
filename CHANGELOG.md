@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Energy flow to the electric car:** the picture of the results card now shows what the wallbox of EV Assistant charged in the shown period (the same kWh as in the sentence below) as a green dashed line with an arrow from the house to the car in the garage. It needs EV Assistant and the statistics of the power sensor of its wallbox.
+
 ## [0.33.2] - 2026-11-20
 
 ### Changed

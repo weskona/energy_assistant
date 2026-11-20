@@ -1192,7 +1192,7 @@ function resPole() {
     + `<path d="M4.5 115Q-6 124 -12 120" fill="none" stroke="#37405a" stroke-width="1.8"/>`;
 }
 
-const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac" };
+const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f06292", discharge: "#4db6ac", ev: "#34d399" };
 /**
  * The energy flow of the picture as moving dashes, with the kWh of the shown period (see _resFlows): the sun into the
  * house, the grid between the pole and the house (import towards the house, feed-in towards the pole) and the
@@ -1201,7 +1201,7 @@ const RES_FLOW = { pv: "#ff9800", in: "#60a5fa", out: "#a78bfa", charge: "#f0629
 function resFlows(flows, socs) {
   if (!flows) return "";
   // The line width follows the share of the flow: the biggest flow in the picture is 100 %.
-  const all = [flows.pv, flows.in, flows.out, flows.charge, flows.discharge, ...(flows.units || []).flatMap((u) => [u?.charge, u?.discharge])].filter(Boolean).map((f) => f.v);
+  const all = [flows.pv, flows.in, flows.out, flows.ev, flows.charge, flows.discharge, ...(flows.units || []).flatMap((u) => [u?.charge, u?.discharge])].filter(Boolean).map((f) => f.v);
   const max = Math.max(...all, 0.0001);
   const width = (f) => +(1.2 + 1.8 * (f.v / max)).toFixed(2);
   const label = (color, txt, tx, ty, anchor = "middle", size = 9) => `<text x="${tx}" y="${ty}" text-anchor="${anchor}" font-size="${size}" font-weight="700" fill="${color}" stroke="#0d111b" stroke-opacity=".6" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${txt}</text>`;
@@ -1222,6 +1222,8 @@ function resFlows(flows, socs) {
   // two wires from the pole to the house: import runs towards the house, feed-in towards the pole
   if (flows.in) out += path(RES_WIRE.in[0].split(" ").map(Number), RES_WIRE.in[1].split(" ").map(Number), RES_WIRE.in[2].split(" ").map(Number), "in", flows.in) + label(RES_FLOW.in, flows.in.txt, 50, 110, "start", 8.5);
   if (flows.out) out += path(RES_WIRE.out[2].split(" ").map(Number), RES_WIRE.out[1].split(" ").map(Number), RES_WIRE.out[0].split(" ").map(Number), "out", flows.out) + label(RES_FLOW.out, flows.out.txt, 46, 176, "middle", 8.5);
+  // the electric car in the garage: what the wallbox charged, from the house to the car
+  if (flows.ev) out += path([196, 232], null, [160, 232], "ev", flows.ev) + label(RES_FLOW.ev, flows.ev.txt, 125, 201, "middle", 8.5);
   if (socs.length && (flows.charge || flows.discharge || flows.units)) {
     const n = Math.min(4, socs.length), { w, gap } = resBatterySize(n), fs = n <= 3 ? 8.5 : 7.5, off = w >= 27 ? 8 : 7;
     for (let i = 0; i < n; i++) {
@@ -2960,7 +2962,7 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (ev != null) foot = this._t("resFootEv", { kwh: num(ev, ev < 100 ? 1 : 0) });
     else if (t.autarky != null) foot = this._t("resFootSelf", { pct: Math.round(t.autarky) });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, this._resFlows(t, b.units))}</div>
+    return `<div class="reshero" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, this._resFlows(t, b.units, b.ev))}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}${drive}</div>
       <div class="resgrid">
         <div class="resl"><div class="reslab">${esc(this._t(`resYield_${range}`))}</div>
@@ -2970,8 +2972,8 @@ class EnergyAssistantPanel extends HTMLElement {
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
-  /** The flows of the picture from the totals of the shown period (kWh): { pv, in, out, charge, discharge } as texts, or null. */
-  _resFlows(totals, units = null) {
+  /** The flows of the picture from the totals of the shown period (kWh): { pv, in, out, charge, discharge, ev }, each { txt, v }, or null. */
+  _resFlows(totals, units = null, ev = null) {
     if (!totals) return null;
     const lang = this._hass?.language || "en";
     const txt = (v) => `${v.toLocaleString(lang, { minimumFractionDigits: v < 100 ? 1 : 0, maximumFractionDigits: v < 100 ? 1 : 0 })} kWh`;
@@ -2981,6 +2983,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (v != null && Number.isFinite(v) && v >= 0.05) out[key] = { txt: txt(v), v };
     }
     const part = (v) => (v != null && Number.isFinite(v) && v >= 0.05 ? { txt: txt(v), v } : null);
+    if (part(ev)) out.ev = part(ev);
     if (units) out.units = units.map((u) => ({ charge: part(u.chg), discharge: part(u.dis) }));
     return Object.keys(out).length ? out : null;
   }
