@@ -1147,7 +1147,7 @@ function resExtra(socs) {
 function resBatteries(socs) {
   const list = socs.slice(0, 4), n = list.length;
   const { w, gap } = resBatterySize(n);
-  const x0 = RES_BAT_X, h = 62, bottom = 262, top = bottom - h, segs = 6;
+  const x0 = RES_BAT_X, h = 62, bottom = 256, top = bottom - h, segs = 6; // bottom = the foot of the wall: the unit stands against the house
   const font = n <= 2 ? 10 : n === 3 ? 9.5 : 9;
   let out = "";
   list.forEach((soc, i) => {
@@ -1171,7 +1171,7 @@ function resBatteries(socs) {
         : `<rect x="${(sx + 2).toFixed(1)}" y="${yy.toFixed(1)}" width="${sw - 4}" height="${hh.toFixed(1)}" rx="1" fill="#252e42"/>`;
     }
     out += `<circle cx="${cx.toFixed(1)}" cy="${bottom - 9}" r="2.2" fill="${color}" style="color:${color}" class="glowb"/>`
-      + `<text x="${cx.toFixed(1)}" y="${bottom + 15}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-width="2.4" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
+      + `<text x="${cx.toFixed(1)}" y="${bottom + 15}" text-anchor="middle" font-size="${font}" font-weight="700" fill="#e8edf5" stroke="#0d111b" stroke-opacity=".55" stroke-width="1.1" paint-order="stroke" style="font-family:inherit">${Math.round(soc)}%</text>`;
   });
   return out;
 }
