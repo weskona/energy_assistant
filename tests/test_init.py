@@ -74,6 +74,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "battery_soc": [],
         "battery_capacity": None,
         "battery_min_soc": None,
+        "ev_consumption": None,
         "energy_solar": [],
         "energy_grid_import": [],
         "energy_grid_export": [],

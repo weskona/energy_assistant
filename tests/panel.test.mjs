@@ -4762,3 +4762,62 @@ test("house card: the tiles depend on the configured sensors, not on the current
   assert.ok(tiles(night).includes("Grid export") && tiles(night).includes("Solar") && tiles(night).includes("From storage"));
   assert.ok(!tiles(night).includes("To storage")); // no sensor for it
 });
+
+// ---- results card of the Consumption tab
+
+function resultsPanel(extraCfg = {}, int = {}) {
+  const p = loadedBalance();
+  p._config = { ...p._config, ...extraCfg };
+  p._int = int;
+  p._hass.states["sensor.t_preis"] = { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } };
+  p._hass.states["sensor.t_feed"] = { state: "0.08", attributes: {} };
+  return p;
+}
+
+test("results: production, self-consumption ring and the savings with Tariffy", () => {
+  const p = resultsPanel({}, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } });
+  const html = p._renderResults();
+  assert.match(html, /<span class="eb-title">Results<\/span>/);
+  assert.match(html, /Production<\/div>\s*<div class="eb-value big2">30\.0<small>kWh/);
+  assert.match(html, /class="donut"/); // the self-consumption ring
+  assert.match(html, /class="rbars"/);
+  // production 30, export 7: (30 - 7) * 0.30 + 7 * 0.08 = 7.46 EUR
+  assert.match(html, /Savings<\/div><div class="eb-value">7<small>€/); // shown in whole euros
+  assert.match(html, /Self-sufficiency/);
+});
+
+test("results: no savings without a price, no card without production or while loading", () => {
+  const p = resultsPanel();
+  assert.doesNotMatch(p._renderResults(), /Savings/);
+  p._bal.totals.solar = 0;
+  assert.equal(p._renderResults(), "");
+  const q = resultsPanel();
+  q._usRange = "month"; // the data is of another period
+  assert.equal(q._renderResults(), "");
+});
+
+test("results: the electric car shows kWh, and kilometres only with its consumption", () => {
+  const withKm = resultsPanel({ ev_consumption: 17.5 });
+  withKm._bal.ev = 285;
+  assert.match(withKm._renderResults(), /EV charged<\/div><div class="eb-value">285<small>kWh/);
+  assert.match(withKm._renderResults(), /Driven \(approx\.\)<\/div><div class="eb-value">1[.,]?629<small>km/);
+  const noKm = resultsPanel();
+  noKm._bal.ev = 285;
+  assert.doesNotMatch(noKm._renderResults(), /Driven/);
+  const none = resultsPanel({ ev_consumption: 17.5 });
+  none._bal.ev = null; // no EV Assistant or no statistics
+  assert.doesNotMatch(none._renderResults(), /EV charged/);
+});
+
+test("results: the energy of the wallboxes comes from the statistics with the balance", async () => {
+  const p = balPanel();
+  p._int = { ev_assistant: { vehicles: [{ name: "EV", wallbox_power: "sensor.wb" }] } };
+  p._usRange = "week";
+  p._statsKwh = async (ids) => { assert.deepEqual(ids, ["sensor.wb"]); return new Map([["sensor.wb", 12.5]]); };
+  p._hass.callWS = async () => ({});
+  await p._loadBalance();
+  assert.equal(p._bal.ev, 12.5);
+  p._int = {}; // without EV Assistant
+  await p._loadBalance();
+  assert.equal(p._bal.ev, null);
+});

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Results card:** on top of the Consumption tab (below the period picker) a card sums up the shown period: the production with the change to the period before and small bars per hour, day or month, a ring with the self-consumption, the self-sufficiency, the **savings** (self-used solar energy at the price of your Tariffy contract plus the feed-in revenue, in whole euros; only with Tariffy) and what the **electric car** charged (kWh from the statistics of the wallbox power sensor of EV Assistant, read only). With the new setting *Electric car: consumption* (kWh per 100 km, *Energy counters*) it also shows the approximate kilometres. The card only appears with production.
+
 ### Changed
 
 - **Smaller House card:** the tiles under the live power are smaller and denser (two rows instead of three on a normal card). They always show the same set, which depends only on the configured sensors and never on the current values, so the card keeps its size and nothing flickers in or out during the day. The tile *PV direkt verbraucht* is called *PV direkt* (*Solar direct*) so it fits on one line.

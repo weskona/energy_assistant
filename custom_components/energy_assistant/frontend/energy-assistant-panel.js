@@ -95,6 +95,16 @@ const STYLE = `
 .lc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lc .n{text-align:right;font-weight:600;white-space:nowrap}
 .lc.head .n{font-weight:500}
+.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;margin-top:12px;align-items:center}
+.resl .big2{font-size:40px;font-weight:800;line-height:1.1;margin-top:4px}
+.resl .big2 small{font-size:16px}
+.rbars{display:flex;align-items:flex-end;gap:2px;height:64px;margin-top:12px}
+.rbars i{flex:1;min-width:2px;background:var(--ea-prod);border-radius:2px 2px 0 0;opacity:.85}
+.resr{display:flex;align-items:center;gap:16px;min-width:0}
+.resring{flex:none;min-width:96px;text-align:center}
+.resring .donut{width:96px;height:96px;display:block}
+.resr .tiles{flex:1;margin-top:0;min-width:0}
+@media (max-width:640px){.res{grid-template-columns:minmax(0,1fr)}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -300,6 +310,12 @@ const STRINGS = {
     f_battery_soc: "Storage charge level sensor (%)",
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
+    f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
+    resTitle: "Results",
+    resSaving: "Savings",
+    resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
+    resEv: "EV charged",
+    resKm: "Driven (approx.)",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
     stCharging: "Charging",
@@ -646,6 +662,12 @@ const STRINGS = {
     f_battery_soc: "Ladestand-Sensor des Speichers (%)",
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
+    f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
+    resTitle: "Ergebnisse",
+    resSaving: "Ersparnis",
+    resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
+    resEv: "E-Auto geladen",
+    resKm: "Gefahren (ca.)",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
     stCharging: "Lädt",
@@ -1007,7 +1029,7 @@ function zonedTime(y, m, d, h, tz) {
   return guess - tzOffset(first, tz);
 }
 const BAL_CATS = [["solar", "energy_solar"], ["imp", "energy_grid_import"], ["exp", "energy_grid_export"], ["chg", "energy_battery_charge"], ["dis", "energy_battery_discharge"], ["house", "energy_house"]];
-const NUMBER_KEYS = ["battery_capacity", "battery_min_soc"];
+const NUMBER_KEYS = ["battery_capacity", "battery_min_soc", "ev_consumption"];
 const ENERGY_KEYS = ["energy_solar", "energy_grid_import", "energy_grid_export", "energy_battery_charge", "energy_battery_discharge", "energy_house"];
 /** What can be entered per year; the key is the total of the balance it replaces. */
 const HISTORY_KINDS = [["house", "cons", "histHouse"], ["solar", "solar", "histSolar"], ["import", "imp", "histImport"], ["export", "exp", "histExport"]];
@@ -1043,7 +1065,7 @@ function cleanHistory(value, maxYear = Infinity) {
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
-  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["history_years", "history"]] },
+  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["history_years", "history"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
@@ -2311,7 +2333,14 @@ class EnergyAssistantPanel extends HTMLElement {
           this._balManual(before, year - 1);
         }
       }
-      this._bal = { range, off, win, ...data, before, manual, failed: cur == null, at: Date.now() };
+      // What the wallboxes of EV Assistant charged in the period (long-term statistics of their power sensors).
+      let ev = null;
+      const wallboxes = [...new Set((this._int?.ev_assistant?.vehicles || []).map((v) => v.wallbox_power).filter(Boolean))];
+      if (wallboxes.length && cur != null) {
+        const m = await this._statsKwh(wallboxes, win, range);
+        if (m && m.size) ev = [...m.values()].reduce((a, b) => a + b, 0);
+      }
+      this._bal = { range, off, win, ...data, before, manual, ev, failed: cur == null, at: Date.now() };
     } finally {
       this._balLoading = false;
       this._render();
@@ -2575,7 +2604,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     const picker = `<div class="eb-card">${this._rangePicker("u", range, off, this._balWindow(range, off))}</div>`;
     const parts = [picker];
-    if (this._balEnabled()) parts.push(this._renderBalance({ bare: true }));
+    if (this._balEnabled()) parts.push(this._renderResults(), this._renderBalance({ bare: true }));
     if (this._usageEnabled()) parts.push(this._renderUsage({ bare: true }));
     return `<div class="stack">${parts.join("")}</div>`;
   }
@@ -2629,6 +2658,51 @@ class EnergyAssistantPanel extends HTMLElement {
       tiles.push(tile(this._t("bSaldo"), revenue - cost, prev?.imp != null && prev?.exp != null ? prev.exp * feed - prev.imp * price : null, true));
     }
     return card(`<div class="tiles">${tiles.join("")}</div><div class="hint">${esc(this._t("bPriceNote"))}</div>`);
+  }
+
+  /**
+   * The results of the shown period at a glance: production with the change to the period before and small bars,
+   * the self-consumption ring, the savings (needs Tariffy) and what the electric car charged (EV Assistant, with
+   * the kilometres when the consumption of the car is set). Empty without production.
+   */
+  _renderResults() {
+    const b = this._bal;
+    const range = this._usRange ?? "day", off = this._usOff ?? 0;
+    if (!b || b.range !== range || b.off !== off || b.failed || !(b.totals.solar > 0)) return "";
+    const lang = this._hass?.language || "en";
+    const t = b.totals, prev = b.before;
+    const num = (v, d = 0) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    const delta = (cur, before) => {
+      if (before == null || !(before > 0)) return "";
+      const pct = Math.round(((cur - before) / before) * 100);
+      return `<div class="eb-label vs${this._vsClass(pct, true)}" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._vsText(pct > 0 ? "▲" : pct < 0 ? "▼" : "•", Math.abs(pct), range, off))}</div>`;
+    };
+    const tile = (label, value, unit, extra = "", tip = "") => `<div class="eb-tile"${tip ? ` title="${esc(tip)}"` : ""}><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
+    const tiles = [];
+    if (t.autarky != null) tiles.push(tile(this._t("bAutarky"), Math.round(t.autarky), "%", delta(t.autarky, prev?.autarky)));
+    const price = this._price(), feed = this._feedInTariff();
+    if (price) {
+      const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
+      const [n, sym] = this._money(saving(t), price.currency, 0);
+      tiles.push(tile(this._t("resSaving"), n, sym, delta(saving(t), prev?.solar > 0 ? saving(prev) : null), this._t("resSavingTip")));
+    }
+    if (b.ev != null && b.ev > 0.05) {
+      tiles.push(tile(this._t("resEv"), num(b.ev, b.ev < 100 ? 1 : 0), "kWh"));
+      const cons = this._cfg.ev_consumption;
+      if (cons > 0) tiles.push(tile(this._t("resKm"), num((b.ev / cons) * 100), "km"));
+    }
+    const self = t.self != null ? Math.round(t.self) : null;
+    const ring = self != null ? this._donut([{ value: self, color: "var(--ea-prod)" }, { value: 100 - self, color: "var(--eb-tile-border)" }], String(self), "%") : "";
+    const top = Math.max(...b.rows.map((r) => r.solar ?? 0), 0.001);
+    const bars = b.rows.map((r, i) => `<i style="height:${Math.max(3, Math.round(((r.solar ?? 0) / top) * 100))}%" data-tipj="${esc(JSON.stringify({ t: this._balRowLabel(b.win, i), r: [["--ea-prod", `${num(r.solar ?? 0, 2)} kWh`, this._t("bSolar")]] }))}"></i>`).join("");
+    return `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("resTitle"))}</span>${this._balLoading ? `<span class="eb-label">…</span>` : ""}</div>
+      <div class="res">
+        <div class="resl"><div class="eb-label">${esc(this._t("bSolar"))}</div>
+          <div class="eb-value big2">${num(t.solar, t.solar < 100 ? 1 : 0)}<small>kWh</small></div>${delta(t.solar, prev?.solar)}
+          <div class="rbars" aria-hidden="true">${bars}</div></div>
+        <div class="resr">${ring ? `<div class="resring">${ring}<div class="eb-label">${esc(this._t("bSelf"))}</div></div>` : ""}
+          <div class="tiles compact">${tiles.join("")}</div></div>
+      </div></div>`;
   }
 
   /** The balance tab: range picker, totals with the change to the period before, costs and the bar chart. */
