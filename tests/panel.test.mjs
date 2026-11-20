@@ -5010,3 +5010,18 @@ test("results: a past period shows the charge level at its end, not the level of
   p._bal = { ...p._bal, off: 0, socHist: null };
   assert.match(p._renderResults(), />11%</);
 });
+
+test("results: the energy flow to the electric car shows what the wallbox charged, from the house into the garage", () => {
+  const p = flowPanel({ solar: 5.2, imp: null, exp: null, chg: null, dis: null });
+  p._bal.ev = 10.9;
+  const html = p._renderResults();
+  assert.match(html, /class="flow"[^>]*stroke="#34d399"/); // the line to the car
+  assert.match(html, />10[.,]9 kWh<\/text>/);
+  assert.match(html, /<polygon class="flowhead"[^>]*fill="#34d399"/);
+  assert.equal((html.match(/class="flowhead"/g) || []).length, 2); // sun and car
+  // without charged energy (or without a wallbox) there is no line
+  p._bal.ev = null;
+  assert.doesNotMatch(p._renderResults(), /stroke="#34d399"[^>]*data-share|data-share[^>]*stroke="#34d399"/);
+  p._bal.ev = 0.01;
+  assert.equal((p._renderResults().match(/class="flowhead"/g) || []).length, 1);
+});

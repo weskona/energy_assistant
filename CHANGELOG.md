@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-11-20
+
+### Added
+
+- **Energy flow to the electric car:** the picture of the results card now shows what the wallbox of EV Assistant charged in the shown period (the same kWh as in the sentence below) as a green dashed line with an arrow from the house to the car in the garage. It needs EV Assistant and the statistics of the power sensor of its wallbox.
+
+### Changed
+
+- **Better car in the picture:** the electric car in the garage keeps its rear view, but the wheels are no longer flat dark ovals: tall tires with a tread stand on the floor below the body, and the roof, rear window and body are a little rounder with a soft sheen.
+
+### Fixed
+
+- **Grass in the picture:** the green ground was wider than the drawing, so its rounded ends were cut off on the left and on the right. It now fits and ends round.
+
 ## [0.33.2] - 2026-11-20
 
 ### Changed
