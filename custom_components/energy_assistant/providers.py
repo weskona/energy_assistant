@@ -50,7 +50,15 @@ _TARIFFY_KEYS = (
 )
 
 
-def _tariffy_entities(hass: HomeAssistant) -> dict[str, dict[str, str]]:
+def _title(hass: HomeAssistant, entry_id: str | None, default: str = "") -> str:
+    """The title of a config entry (the contract, the vehicle ...)."""
+    config_entry = hass.config_entries.async_get_entry(entry_id) if entry_id else None
+    return config_entry.title if config_entry else default
+
+
+def _tariffy_entities(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, dict[str, str]]:
     """Tariffy sensors by contract (config entry) and translation key."""
     contracts: dict[str, dict[str, str]] = {}
     for entry in er.async_get(hass).entities.values():
@@ -60,6 +68,7 @@ def _tariffy_entities(hass: HomeAssistant) -> dict[str, dict[str, str]]:
             and not entry.disabled_by
             and entry.config_entry_id
             and entry.translation_key in _TARIFFY_KEYS
+            and entry.entity_id not in excluded
         ):
             contracts.setdefault(entry.config_entry_id, {})[entry.translation_key] = (
                 entry.entity_id
@@ -67,13 +76,15 @@ def _tariffy_entities(hass: HomeAssistant) -> dict[str, dict[str, str]]:
     return contracts
 
 
-def tariffy(hass: HomeAssistant) -> dict[str, Any] | None:
+def tariffy(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
     """Electricity price, feed-in tariff and the contract balance of Tariffy.
 
     The price is the unit price of the first electricity contract (its attribute `arbeitspreis_aktuell`
     carries the live price of a dynamic tariff). The feed-in tariff may belong to another contract.
     """
-    contracts = _tariffy_entities(hass)
+    contracts = _tariffy_entities(hass, excluded)
     price_contract: dict[str, str] | None = None
     for _entry_id, keys in sorted(contracts.items()):
         price = keys.get("arbeitspreis")
@@ -112,13 +123,10 @@ def tariffy(hass: HomeAssistant) -> dict[str, Any] | None:
     }
 
 
-def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
-    """Vehicles of EV Assistant with the entities that tell about home charging.
-
-    The sensor `home_kwh` carries the live data of the wallbox in its attributes (`evcc_live` with evcc,
-    otherwise `home_generic_live`; `charge_power` is in kW), the others the energy and cost of today and
-    the recommendation to charge before the PV production starts.
-    """
+def _ev_vehicles(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, dict[str, str]]:
+    """EV Assistant sensors by vehicle (config entry) and translation key."""
     vehicles: dict[str, dict[str, str]] = {}
     for entry in er.async_get(hass).entities.values():
         if (
@@ -126,28 +134,50 @@ def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
             and not entry.disabled_by
             and entry.config_entry_id
             and entry.translation_key in _EV_KEYS
+            and entry.entity_id not in excluded
         ):
             vehicles.setdefault(entry.config_entry_id, {})[entry.translation_key] = (
                 entry.entity_id
             )
+    return vehicles
+
+
+def _ev_wallbox_power(hass: HomeAssistant, entry_id: str) -> str | None:
+    """The power sensor of the wallbox EV Assistant was set up with (its `home_entity`), if it is a sensor."""
+    config_entry = hass.config_entries.async_get_entry(entry_id)
+    wallbox = (
+        {**config_entry.data, **config_entry.options}.get("home_entity")
+        if config_entry
+        else None
+    )
+    return (
+        wallbox if isinstance(wallbox, str) and wallbox.startswith("sensor.") else None
+    )
+
+
+def ev_assistant(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
+    """Vehicles of EV Assistant with the entities that tell about home charging.
+
+    The sensor `home_kwh` carries the live data of the wallbox in its attributes (`evcc_live` with evcc,
+    otherwise `home_generic_live`; `charge_power` is in kW), the others the energy and cost of today and
+    the recommendation to charge before the PV production starts.
+    """
+    vehicles = _ev_vehicles(hass, excluded)
     result = []
     for entry_id, keys in vehicles.items():
         if "home_kwh" not in keys and "kwh_day" not in keys:
             continue
-        config_entry = hass.config_entries.async_get_entry(entry_id)
-        wallbox = (
-            {**config_entry.data, **config_entry.options}.get("home_entity")
-            if config_entry
-            else None
-        )
+        wallbox = _ev_wallbox_power(hass, entry_id)
         result.append(
             {
-                "name": config_entry.title if config_entry else "EV",
+                "name": _title(hass, entry_id, "EV"),
                 # The power sensor of the wallbox that EV Assistant was set up with, so Energy Assistant
                 # does not list the same wallbox twice when it is one of the device sensors.
-                "wallbox_power": wallbox
-                if isinstance(wallbox, str) and wallbox.startswith("sensor.")
-                else None,
+                "wallbox_power": wallbox if wallbox not in excluded else None,
+                # The wallbox sensor was deselected: no wallbox row in the device list (the EV tab stays).
+                "wallbox_off": bool(wallbox) and wallbox in excluded,
                 "live": keys.get("home_kwh"),
                 "kwh_today": keys.get("kwh_day"),
                 "cost_today": keys.get("cost_day"),
@@ -158,7 +188,25 @@ def ev_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
     return {"vehicles": result} if result else None
 
 
-def pv_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
+def _pv_entities(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> list[tuple[str, str]]:
+    """(translation key, entity id) of the PV Assistant sensors, sorted by entity id."""
+    return [
+        (entry.translation_key, entry.entity_id)
+        for entry in sorted(
+            er.async_get(hass).entities.values(), key=lambda e: e.entity_id
+        )
+        if entry.platform == PV_ASSISTANT
+        and not entry.disabled_by
+        and entry.translation_key in _PV_KEYS
+        and entry.entity_id not in excluded
+    ]
+
+
+def pv_assistant(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
     """Day figures, forecast and plant fault of PV Assistant, as entity ids by translation key.
 
     The panel reads the live values from the states (the sensors carry the values of today and the
@@ -166,24 +214,18 @@ def pv_assistant(hass: HomeAssistant) -> dict[str, Any] | None:
     the attribute `plants`).
     """
     found: dict[str, str] = {}
-    for entry in sorted(
-        er.async_get(hass).entities.values(), key=lambda e: e.entity_id
-    ):
-        if (
-            entry.platform == PV_ASSISTANT
-            and not entry.disabled_by
-            and entry.translation_key in _PV_KEYS
-        ):
-            found.setdefault(entry.translation_key, entry.entity_id)
+    for key, entity_id in _pv_entities(hass, excluded):
+        found.setdefault(key, entity_id)
     return {"entities": found} if found else None
 
 
-def amortix(hass: HomeAssistant) -> dict[str, Any] | None:
-    """Savings and payback of Amortix: the overview if there is one, otherwise every entry.
+def _amortix_entries(hass: HomeAssistant) -> list[dict[str, Any]]:
+    """The Amortix entries that count, with all their sensors (no sensor is left out here).
 
     Amortix has no translation keys, but its unique ids are `<entry id>_<key>`; the keys are in German
     and do not depend on the language. Sensors of single devices carry a suffix and are not meant here.
-    The overview entry already combines all other entries, so it replaces them.
+    The overview entry already combines all other entries, so it replaces them: the choice is made on
+    the full set, so deselecting a sensor of the overview never brings the other entries back.
     """
     entries: dict[str, dict[str, str]] = {}
     for entry in er.async_get(hass).entities.values():
@@ -216,16 +258,92 @@ def amortix(hass: HomeAssistant) -> dict[str, Any] | None:
             }
         )
     overview = [e for e in found if e["mode"] == "overview"]
-    chosen = sorted(overview or found, key=lambda e: e["title"])
+    return sorted(overview or found, key=lambda e: e["title"])
+
+
+def amortix(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
+    """Savings and payback of Amortix: the overview if there is one, otherwise every entry."""
+    chosen = []
+    for entry in _amortix_entries(hass):
+        keys = {k: e for k, e in entry["entities"].items() if e not in excluded}
+        if "einsparung" in keys or "fortschritt" in keys:
+            chosen.append({**entry, "entities": keys})
     return {"entries": chosen} if chosen else None
 
 
-def available(hass: HomeAssistant) -> dict[str, Any]:
-    """Everything the sibling integrations offer right now (only what exists)."""
+def available(
+    hass: HomeAssistant, excluded: frozenset[str] = frozenset()
+) -> dict[str, Any]:
+    """Everything the sibling integrations offer right now (only what exists), without the deselected sensors."""
     found = {
-        "tariffy": tariffy(hass),
-        "ev_assistant": ev_assistant(hass),
-        "pv_assistant": pv_assistant(hass),
-        "amortix": amortix(hass),
+        "tariffy": tariffy(hass, excluded),
+        "ev_assistant": ev_assistant(hass, excluded),
+        "pv_assistant": pv_assistant(hass, excluded),
+        "amortix": amortix(hass, excluded),
     }
     return {name: data for name, data in found.items() if data}
+
+
+def sources(hass: HomeAssistant) -> list[dict[str, str]]:
+    """Every sensor Energy Assistant takes from the sibling integrations, for the list of sources.
+
+    Always the full set (also the deselected ones, so they can be selected again): `integration`, `group`
+    (contract, vehicle or entry; empty for PV Assistant), the `key` of the sensor and its `entity_id`.
+    Tariffy: the sensors of the electricity contracts, the feed-in tariff of any contract.
+    """
+    out: list[dict[str, str]] = []
+    for entry_id, keys in sorted(_tariffy_entities(hass).items()):
+        price = keys.get("arbeitspreis")
+        state = hass.states.get(price) if price else None
+        electricity = bool(state and state.attributes.get("sparte") in _ELECTRICITY)
+        for key in _TARIFFY_KEYS:
+            if key in keys and (electricity or key == "einspeiseverguetung"):
+                out.append(
+                    {
+                        "integration": TARIFFY,
+                        "group": _title(hass, entry_id),
+                        "key": key,
+                        "entity_id": keys[key],
+                    }
+                )
+    for entry_id, keys in sorted(_ev_vehicles(hass).items()):
+        if "home_kwh" not in keys and "kwh_day" not in keys:
+            continue
+        group = _title(hass, entry_id, "EV")
+        for key in _EV_KEYS:
+            if key in keys:
+                out.append(
+                    {
+                        "integration": EV_ASSISTANT,
+                        "group": group,
+                        "key": key,
+                        "entity_id": keys[key],
+                    }
+                )
+        if wallbox := _ev_wallbox_power(hass, entry_id):
+            out.append(
+                {
+                    "integration": EV_ASSISTANT,
+                    "group": group,
+                    "key": "wallbox_power",
+                    "entity_id": wallbox,
+                }
+            )
+    out.extend(
+        {"integration": PV_ASSISTANT, "group": "", "key": key, "entity_id": entity_id}
+        for key, entity_id in _pv_entities(hass)
+    )
+    for entry in _amortix_entries(hass):
+        for key in _AMORTIX_KEYS:
+            if key in entry["entities"]:
+                out.append(
+                    {
+                        "integration": AMORTIX,
+                        "group": entry["title"],
+                        "key": key,
+                        "entity_id": entry["entities"][key],
+                    }
+                )
+    return out

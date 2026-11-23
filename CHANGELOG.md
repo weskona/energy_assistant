@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-11-23
+
+### Changed
+
+- **Panel file is fetched again after every change:** the address of the panel file now carries a short hash of its content next to the version (`?v=0.35.0-1a2b3c4d`), so the browser no longer keeps an old copy when the panel changed without a new version.
+
+### Added
+
+- **List of sources:** the Settings tab has a new card *Sources from other integrations*. It lists every sensor that Energy Assistant takes from Tariffy, EV Assistant, PV Assistant and Amortix, grouped by integration (and contract, vehicle or entry), with the current value and what it is used for. A sensor you untick (and save) is no longer used; it stays in the list so you can tick it again. This is the way to get rid of the *Wallbox* row that EV Assistant adds to the device list when the same wallbox is already one of your device sensors under another sensor. The choice is stored in the new setting `source_exclude`; everything is used by default. The `energy_assistant/integrations` command now also answers with `sources` (the full list, also the deselected ones) and leaves the deselected sensors out of the rest of its answer.
+
 ## [0.35.0] - 2026-11-20
 
 ### Added
