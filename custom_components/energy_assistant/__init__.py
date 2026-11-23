@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -34,6 +35,13 @@ def _version() -> str:
     return manifest["version"]
 
 
+def _cache_bust() -> str:
+    """Version plus a short hash of the panel file: the browser asks for the file again whenever it changed,
+    also between two releases (the version alone stays the same while a change is tried out)."""
+    digest = hashlib.sha256((_FRONTEND_DIR / "energy-assistant-panel.js").read_bytes())
+    return f"{_version()}-{digest.hexdigest()[:8]}"
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Register the panel."""
     data = hass.data.setdefault(DOMAIN, {})
@@ -51,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         webcomponent_name="energy-assistant-panel",
         frontend_url_path=PANEL_URL_PATH,
-        module_url=f"{STATIC_URL}/energy-assistant-panel.js?v={_version()}",
+        module_url=f"{STATIC_URL}/energy-assistant-panel.js?v={_cache_bust()}",
         sidebar_title="Energy Assistant",
         sidebar_icon="mdi:lightning-bolt-circle",
         require_admin=False,

@@ -78,6 +78,10 @@ ENERGY_KEYS = (
     CONF_ENERGY_HOUSE,
 )
 
+# Sensors of the sibling integrations (Tariffy, EV Assistant, PV Assistant, Amortix) that Energy Assistant
+# does not take over (deselected in the list of sources). Everything is used by default.
+CONF_SOURCE_EXCLUDE = "source_exclude"
+
 LIST_KEYS = (
     CONF_GRID_POWER,
     CONF_BATTERY_POWER,
@@ -97,6 +101,7 @@ LIST_KEYS = (
     CONF_DEVICE_PATTERNS,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,
+    CONF_SOURCE_EXCLUDE,
     *ENERGY_KEYS,
 )
 # List keys that hold text patterns instead of entity ids.

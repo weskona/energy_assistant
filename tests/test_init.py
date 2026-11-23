@@ -64,6 +64,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "device_patterns": ["*_power"],
         "device_exclude": ["sensor.skip_power"],
         "device_exclude_patterns": ["alpha_ess_*"],
+        "source_exclude": [],
         "label_ids": ["klima", "licht"],
         "area_ids": ["kueche"],
         "device_names": {"sensor.oven": "Ofen"},

@@ -60,6 +60,26 @@ async def test_update_config_stores_options_and_keeps_other_values(
     assert entry.options["invert_battery"] is True
 
 
+async def test_update_config_stores_the_deselected_sources(
+    hass, hass_ws_client, entry
+) -> None:
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "energy_assistant/update_config",
+            "config": {"source_exclude": ["sensor.warp_home_kwh"]},
+        }
+    )
+    msg = await client.receive_json()
+    assert msg["success"]
+    assert msg["result"]["source_exclude"] == ["sensor.warp_home_kwh"]
+    assert entry.options["source_exclude"] == ["sensor.warp_home_kwh"]
+    await client.send_json_auto_id(
+        {"type": "energy_assistant/update_config", "config": {"source_exclude": []}}
+    )
+    assert (await client.receive_json())["result"]["source_exclude"] == []
+
+
 async def test_update_config_can_clear_a_list(hass, hass_ws_client, entry) -> None:
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(

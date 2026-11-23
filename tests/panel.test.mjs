@@ -2187,6 +2187,13 @@ test("ev rows: an excluded wallbox sensor stays out, also the virtual row", () =
   assert.deepEqual(evDevicePanel({ cfg: { device_exclude_patterns: ["*wallbox*"] } })._devices().map((d) => d.name), ["Herd"]);
 });
 
+test("ev rows: a wallbox deselected in the list of sources has no row, no live sensor has none either", () => {
+  const off = [{ name: "ID.3", live: "sensor.ev_home", wallbox_power: null, wallbox_off: true }];
+  assert.deepEqual(evDevicePanel({ vehicles: off })._devices().map((d) => d.name), ["Herd"]);
+  const noLive = [{ name: "ID.3", live: null, wallbox_power: null }];
+  assert.deepEqual(evDevicePanel({ vehicles: noLive })._devices().map((d) => d.name), ["Herd"]);
+});
+
 test("ev rows: no row without live data, an idle wallbox shows as idle, the row works without configured devices", () => {
   assert.deepEqual(evDevicePanel({ live: {} })._devices().map((d) => d.name), ["Herd"]);
   const idle = evDevicePanel({ live: { charge_power: 0, charging: false } });
@@ -5065,4 +5072,79 @@ test("power tab: without a charging car the sentence is about the self-sufficien
   assert.match(html, /<div class="resfoot">Right now you cover <b>100 %<\/b> of your electricity needs yourself\.<\/div>/);
   assert.doesNotMatch(html, /class="flowhead"/); // nothing flows (10 W is below the limit)
   assert.doesNotMatch(html, /class="resdrive"/); // no car box
+});
+
+// -- list of sources of the sibling integrations -------------------------------------------------------------
+
+const SOURCES = [
+  { integration: "tariffy", group: "Strom", key: "arbeitspreis", entity_id: "sensor.strom_arbeitspreis" },
+  { integration: "ev_assistant", group: "eRifter", key: "home_kwh", entity_id: "sensor.erifter_heimladen" },
+  { integration: "ev_assistant", group: "eRifter", key: "wallbox_power", entity_id: "sensor.warp_power" },
+  { integration: "pv_assistant", group: "", key: "production_today", entity_id: "sensor.pv_erzeugung" },
+  { integration: "amortix", group: "Balkon", key: "einsparung", entity_id: "sensor.balkon_einsparung" },
+];
+const SOURCE_STATES = {
+  "sensor.strom_arbeitspreis": { state: "0.3", attributes: { unit_of_measurement: "EUR/kWh" } },
+  "sensor.erifter_heimladen": { state: "12.5", attributes: { unit_of_measurement: "kWh" } },
+};
+
+function sourcePanel(config = {}, { admin = true, sources = SOURCES } = {}) {
+  const p = settingsPanel({ grid_import: ["a"], ...config }, { admin, states: SOURCE_STATES });
+  p._int = { sources };
+  return p;
+}
+
+test("sources: every sensor is listed with its integration, group, value and is used at first", () => {
+  const html = sourcePanel()._renderSources(false);
+  for (const text of ["Tariffy", "EV Assistant", "PV Assistant", "Amortix", "eRifter", "Balkon"]) assert.ok(html.includes(text), text);
+  assert.match(html, /Electricity price/);
+  assert.match(html, /sensor\.warp_power/);
+  assert.match(html, /0\.3 EUR\/kWh/);
+  assert.equal((html.match(/data-source=/g) || []).length, SOURCES.length);
+  assert.equal((html.match(/data-source="[^"]+" checked/g) || []).length, SOURCES.length);
+  assert.doesNotMatch(html, /class="srow off"/);
+});
+
+test("sources: a deselected sensor is shown as not used, and is still listed", () => {
+  const html = sourcePanel({ source_exclude: ["sensor.erifter_heimladen"] })._renderSources(false);
+  assert.match(html, /class="srow off" title="sensor\.erifter_heimladen"/);
+  assert.doesNotMatch(html, /data-source="sensor\.erifter_heimladen" checked/);
+  assert.match(html, /not used/);
+  assert.equal((html.match(/data-source="[^"]+" checked/g) || []).length, SOURCES.length - 1);
+});
+
+test("sources: unticking and ticking change the draft and make the form dirty", () => {
+  const p = sourcePanel();
+  p._edited = () => {};
+  p._onChange({ target: { dataset: { source: "sensor.warp_power" }, checked: false } });
+  assert.deepEqual(p._draft.source_exclude, ["sensor.warp_power"]);
+  assert.equal(p._isDirty(), true);
+  p._onChange({ target: { dataset: { source: "sensor.warp_power" }, checked: true } });
+  assert.deepEqual(p._draft.source_exclude, []);
+  assert.equal(p._isDirty(), false);
+});
+
+test("sources: nothing to list without the sibling integrations, and readers cannot change it", () => {
+  assert.match(sourcePanel({}, { sources: [] })._renderSources(false), /No sensors of Tariffy/);
+  assert.match(sourcePanel()._renderSources(true), /data-source="sensor\.warp_power" checked\s+disabled/);
+  const p = sourcePanel({}, { admin: false });
+  p._edited = () => {};
+  p._onChange({ target: { dataset: { source: "sensor.warp_power" }, checked: false } });
+  assert.deepEqual(p._draft.source_exclude, []);
+});
+
+test("sources: the section is part of the settings and entity ids are escaped", () => {
+  const html = sourcePanel({}, { sources: [{ ...SOURCES[0], entity_id: 'sensor.x"y' }] })._renderSettings();
+  assert.match(html, /Sources from other integrations/);
+  assert.match(html, /data-source="sensor\.x&quot;y"/);
+});
+
+test("sources: every key has an English and a German text", () => {
+  const keys = ["arbeitspreis", "einspeiseverguetung", "kosten_bisher", "guthaben_bisher", "prognose_real", "home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended", "wallbox_power", "production_today", "feed_in_today", "self_consumption_rate_today", "autarky_today", "benefit_today", "forecast_reached_today", "expected_feed_in_tomorrow", "best_window_tomorrow", "storage_usable", "storage_empty_at", "string_fault", "einsparung", "investition", "fortschritt", "verbleibend", "tagesschnitt", "resttage", "datum"];
+  const en = sourcePanel(), de = sourcePanel();
+  de._hass.language = "de";
+  for (const k of keys) {
+    assert.notEqual(en._t(`src_${k}`), `src_${k}`, k);
+    assert.notEqual(de._t(`src_${k}`), `src_${k}`, k);
+  }
 });

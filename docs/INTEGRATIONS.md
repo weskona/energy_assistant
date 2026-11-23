@@ -20,6 +20,10 @@ only) to offer its energy counters for the balance (Consumption tab), and the lo
   Energy Assistant either.
 - **Nothing is configured twice.** The sensors are found automatically; PV Assistant additionally offers its sensors
   once, with a button (settings) or a question (config flow). A tab only exists when its integration was found.
+- **Every sensor can be deselected.** The card *Sources from other integrations* (settings) lists everything that is
+  read (`providers.sources()`) and stores the unticked sensors in `source_exclude`. The providers leave them out
+  (`available(hass, excluded)`), the full list stays visible. A deselected sensor of the overview entry of Amortix does
+  not bring the single entries back, and the wallbox power sensor of EV Assistant (`home_entity`) can be deselected too.
 - **No fixed entity ids.** The sensors are found in the entity registry, so renaming an entity does not matter.
 
 ## What is read exactly

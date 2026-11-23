@@ -8,6 +8,7 @@ from custom_components.energy_assistant.providers import (
     available,
     ev_assistant,
     pv_assistant,
+    sources,
     tariffy,
 )
 from custom_components.energy_assistant.websocket import async_register
@@ -94,7 +95,7 @@ async def test_websocket_answers_with_the_entities_or_nothing(
     async_register(hass)
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "energy_assistant/integrations"})
-    assert (await client.receive_json())["result"] == {}
+    assert (await client.receive_json())["result"] == {"sources": []}
     ids = _contract(hass, "strom")
     await client.send_json_auto_id({"type": "energy_assistant/integrations"})
     msg = await client.receive_json()
@@ -139,6 +140,7 @@ async def test_ev_assistant_vehicle_gives_live_sensor_and_today(hass) -> None:
             {
                 "name": "id3",
                 "wallbox_power": None,
+                "wallbox_off": False,
                 "live": ids["home_kwh"],
                 "kwh_today": ids["kwh_day"],
                 "cost_today": ids["cost_day"],
@@ -312,3 +314,105 @@ async def test_every_electricity_contract_is_offered_as_a_price(hass) -> None:
         house["arbeitspreis"],
         heat["arbeitspreis"],
     }
+
+
+# -- list of sources: what Energy Assistant takes, and what the user deselected ---------------------------
+
+
+async def test_a_deselected_tariffy_sensor_is_not_taken(hass) -> None:
+    house = _contract(hass, "haus", keys=("arbeitspreis", "kosten_bisher"))
+    heat = _contract(hass, "waermepumpe", keys=("arbeitspreis",))
+    offer = tariffy(hass, frozenset({house["kosten_bisher"]}))
+    assert offer["cost_so_far"] is None
+    # without the price of the first contract the next electricity contract is the price
+    offer = tariffy(hass, frozenset({house["arbeitspreis"]}))
+    assert offer["price"] == heat["arbeitspreis"]
+    assert [p["entity"] for p in offer["prices"]] == [heat["arbeitspreis"]]
+    assert (
+        tariffy(hass, frozenset({house["arbeitspreis"], heat["arbeitspreis"]})) is None
+    )
+    assert "tariffy" not in available(
+        hass, frozenset({house["arbeitspreis"], heat["arbeitspreis"]})
+    )
+
+
+async def test_a_deselected_ev_sensor_hides_only_that_part(hass) -> None:
+    ids = _ev_vehicle(hass, "id3", data={"home_entity": "sensor.warp_power"})
+    only_live = ev_assistant(hass, frozenset({ids["home_kwh"]}))["vehicles"][0]
+    assert only_live["live"] is None  # no wallbox row in the device list
+    assert only_live["kwh_today"] == ids["kwh_day"]  # the car stays in the EV tab
+    no_wallbox = ev_assistant(hass, frozenset({"sensor.warp_power"}))["vehicles"][0]
+    assert no_wallbox["wallbox_power"] is None
+    assert no_wallbox["wallbox_off"] is True  # the panel shows no wallbox row then
+    assert only_live["wallbox_off"] is False
+    assert no_wallbox["live"] == ids["home_kwh"]
+    gone = frozenset({ids["home_kwh"], ids["kwh_day"]})
+    assert ev_assistant(hass, gone) is None
+
+
+async def test_a_deselected_pv_sensor_falls_back_to_the_next_one(hass) -> None:
+    first = MockConfigEntry(domain="pv_assistant", title="PV")
+    first.add_to_hass(hass)
+    prod = _pv_sensor(hass, first, "production_today")
+    other = MockConfigEntry(domain="pv_assistant", title="PV2")
+    other.add_to_hass(hass)
+    prod2 = _pv_sensor(hass, other, "production_today")
+    assert pv_assistant(hass)["entities"]["production_today"] == min(prod, prod2)
+    both = pv_assistant(hass, frozenset({prod, prod2}))
+    assert both is None
+
+
+async def test_deselecting_in_the_overview_does_not_bring_the_single_entries_back(
+    hass,
+) -> None:
+    _amortix_entry(hass, "balkon", "direct")
+    overview = _amortix_entry(
+        hass, "uebersicht", "overview", keys=("einsparung", "fortschritt", "datum")
+    )
+    offer = amortix(hass, frozenset({overview["datum"]}))
+    assert [e["title"] for e in offer["entries"]] == ["uebersicht"]
+    assert set(offer["entries"][0]["entities"]) == {"einsparung", "fortschritt"}
+    gone = frozenset({overview["einsparung"], overview["fortschritt"]})
+    assert amortix(hass, gone) is None
+
+
+async def test_the_list_of_sources_names_every_sensor_with_its_origin(hass) -> None:
+    assert sources(hass) == []
+    ids = _contract(hass, "strom", keys=("arbeitspreis", "kosten_bisher"))
+    gas = _contract(hass, "gas", sparte="gas", keys=("arbeitspreis",))
+    evs = _ev_vehicle(hass, "id3", data={"home_entity": "sensor.warp_power"})
+    pv_entry = MockConfigEntry(domain="pv_assistant", title="PV")
+    pv_entry.add_to_hass(hass)
+    pv = _pv_sensor(hass, pv_entry, "production_today")
+    amo = _amortix_entry(hass, "balkon", "direct")
+    found = {
+        (s["integration"], s["group"], s["key"]): s["entity_id"] for s in sources(hass)
+    }
+    assert found[("tariffy", "strom", "arbeitspreis")] == ids["arbeitspreis"]
+    assert found[("tariffy", "strom", "kosten_bisher")] == ids["kosten_bisher"]
+    assert ("tariffy", "gas", "arbeitspreis") not in found  # a gas price is not used
+    assert gas["arbeitspreis"] not in found.values()
+    assert found[("ev_assistant", "id3", "home_kwh")] == evs["home_kwh"]
+    assert found[("ev_assistant", "id3", "wallbox_power")] == "sensor.warp_power"
+    assert found[("pv_assistant", "", "production_today")] == pv
+    assert found[("amortix", "balkon", "einsparung")] == amo["einsparung"]
+
+
+async def test_websocket_lists_the_sources_also_when_deselected(
+    hass, hass_ws_client
+) -> None:
+    ids = _contract(hass, "strom", keys=("arbeitspreis", "kosten_bisher"))
+    entry = MockConfigEntry(
+        domain="energy_assistant",
+        data={"grid_power": ["sensor.netz"]},
+        options={"source_exclude": [ids["kosten_bisher"]]},
+    )
+    entry.add_to_hass(hass)
+    async_register(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "energy_assistant/integrations"})
+    result = (await client.receive_json())["result"]
+    assert result["tariffy"]["cost_so_far"] is None  # not taken over
+    assert ids["kosten_bisher"] in {
+        s["entity_id"] for s in result["sources"]
+    }  # but listed
