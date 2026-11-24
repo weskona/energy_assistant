@@ -2762,7 +2762,8 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!m.cats.length) return stack(note("devNoData"));
     const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: v < 100 ? 1 : 0, maximumFractionDigits: v < 100 ? 1 : 0 });
     const pct = (v, of) => (of > 0 ? Math.round((v / of) * 100) : 0);
-    const items = [...m.cats.map((c) => ({ name: c.name, value: c.total, color: c.color, icon: c.icon, tint: c.tint }))];
+    // The smallest first, "not assigned" always last.
+    const items = m.cats.map((c) => ({ name: c.name, value: c.total, color: c.color, icon: c.icon, tint: c.tint })).sort((a, b) => a.value - b.value);
     if (m.unassigned > 0.005) items.push({ name: this._t("devUnassigned"), value: m.unassigned, color: "var(--eb-dim)", icon: null });
     const bar = items.map((i) => `<i style="flex:${i.value} 1 0;background:${i.color}" title="${esc(`${i.name}: ${kwh(i.value)} kWh`)}"></i>`).join("");
     const legend = items
@@ -2779,12 +2780,12 @@ class EnergyAssistantPanel extends HTMLElement {
     return stack(top, `<div class="cats2">${cards}</div>`);
   }
 
-  /** Stacked bars per bucket: every category on top of the other, "not assigned" last. */
+  /** Stacked bars per bucket: the smallest category at the bottom, "not assigned" on top; the tooltip lists the biggest first. */
   _devChart(m, items) {
     const lang = this._hass?.language || "en";
     const win = m.win, n = m.n;
-    const layers = [...m.cats.map((c) => ({ name: c.name, color: c.color, values: c.buckets }))];
-    if (m.unBuckets && m.unassigned > 0.005) layers.push({ name: this._t("devUnassigned"), color: "var(--eb-dim)", values: m.unBuckets });
+    const layers = [...m.cats].sort((a, b) => a.total - b.total).map((c) => ({ name: c.name, color: c.color, values: c.buckets }));
+    if (m.unBuckets && m.unassigned > 0.005) layers.push({ name: this._t("devUnassigned"), color: "var(--eb-dim)", values: m.unBuckets, last: true });
     const totals = Array.from({ length: n }, (_, k) => layers.reduce((a, l) => a + l.values[k], 0));
     const max = Math.max(...totals, 0.1);
     // The drawing has the real width of its box (see _wireDevChart), so the text stays readable on a phone.
@@ -2807,7 +2808,8 @@ class EnergyAssistantPanel extends HTMLElement {
       }
       const label = this._balTick(win, k);
       if (label && k % every === 0) svg += `<text class="htick" x="${f1(M.l + k * slot + slot / 2)}" y="${H - 5}" text-anchor="middle">${esc(label)}</text>`;
-      const rows = layers.filter((l) => l.values[k] > 0.0005).map((l) => [l.color, `${num(l.values[k])} kWh`, l.name]);
+      // biggest on top, smallest at the bottom, "not assigned" at the very end
+      const rows = layers.filter((l) => l.values[k] > 0.0005).sort((a, b) => (a.last ? 1 : 0) - (b.last ? 1 : 0) || b.values[k] - a.values[k]).map((l) => [l.color, `${num(l.values[k])} kWh`, l.name]);
       const tip = { t: `${this._balRowLabel(win, k)} · ${num(totals[k])} kWh`, r: rows };
       svg += `<rect class="bslot" x="${f1(M.l + k * slot)}" y="${M.t}" width="${f1(slot)}" height="${ph}" data-tipj="${esc(JSON.stringify(tip))}"/>`;
     }

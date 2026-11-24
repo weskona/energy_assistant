@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Devices tab sorted by size:** the ring, the bar and the legend of the categories run from the smallest to the biggest, the stacked bars have the smallest category at the bottom, and the tooltip of a bar lists the biggest category first and the smallest last. *Not assigned* is always the last one, in the legend and in the tooltip.
+
 ## [0.35.0] - 2026-11-20
 
 ### Added

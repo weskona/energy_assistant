@@ -5066,3 +5066,22 @@ test("power tab: without a charging car the sentence is about the self-sufficien
   assert.doesNotMatch(html, /class="flowhead"/); // nothing flows (10 W is below the limit)
   assert.doesNotMatch(html, /class="resdrive"/); // no car box
 });
+
+test("devices tab: the ring, bar and legend run from small to big, the tooltip from big to small, not assigned last in both", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: 1 })), totals: {} };
+  const html = p._renderDevicesTab();
+  const legend = html.slice(html.indexOf('class="dlegend"'), html.indexOf("</div></div></div>", html.indexOf('class="dlegend"')));
+  const at = (name) => legend.indexOf(`<span class="ln">${name}</span>`);
+  assert.ok(at("Licht") > -1 && at("Licht") < at("Klima")); // the smaller one first
+  assert.ok(at("Klima") < at("not assigned")); // not assigned at the end, although it is bigger than Licht
+  // the tooltip: biggest first, not assigned at the very end
+  const tip = JSON.parse(html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.deepEqual(tip.r.map(([, , name]) => name), ["Klima", "Licht", "not assigned"]);
+});
