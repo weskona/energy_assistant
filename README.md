@@ -146,6 +146,8 @@ With a **charge level sensor** (percent) in the settings (section *Solar and sto
 
 **Picture of the Power tab:** the Power tab starts with the house of the results card, but with the power of now (whole watts): the consumption, where it comes from (sun, grid, storage, feed-in), the self-sufficiency as a ring, what the sun saves per hour (Tariffy), and the electric car with its charging power (EV Assistant). The lines show the flows of now from 20 W on, the storages show their live charge level. The notices stay on top, the cards below are unchanged.
 
+**Cost of the wallbox:** a wallbox does not always cost the grid price, when the car is charged with solar surplus the sun delivers part of it for free. With EV Assistant (and evcc in it) Energy Assistant takes the cost of the wallbox from its sensor *Home charging cost*: that is what the home charging really cost, with the price of every charging session. It is used for the row of the wallbox in the Consumption tab (the *Cost* of the opened row, for the shown period) and for the wallbox row of *Cost per device* in the Costs tab (day, week, month, year). It needs the wallbox power sensor of EV Assistant to be a device of Energy Assistant (in the list or with its own sensors). Without the sensor the cost is the energy at the grid price as before. The house totals (grid cost, savings) already count only what really came from the grid, so they are right; the cost sensors of devices, labels and areas that contain the wallbox still use the grid price.
+
 ### Notices
 
 A card **Notices** at the top of the Power tab appears when something needs attention, otherwise it is not there:

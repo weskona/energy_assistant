@@ -47,7 +47,9 @@ and `pv_assistant.py` have to follow.
 
 **EV Assistant** (`ev_assistant`)
 - Sensors by translation key: `home_kwh` (attributes `evcc_live` or `home_generic_live` with `charge_power` in kW,
-  `charging`, `connected`, `vehicle_soc`, `session_solar_pct`, and `solaranteil_pct`), `kwh_day`, `cost_day`,
+  `charging`, `connected`, `vehicle_soc`, `session_solar_pct`, and `solaranteil_pct`), `home_cost` (cumulative cost of
+  the home charging with the real price of every session, the cost of a period is the difference of two values),
+  `kwh_day`, `cost_day`,
   binary sensor `charge_before_pv_recommended`.
 - Config entry: `home_entity` (the power sensor of the wallbox, so it is not listed twice).
 

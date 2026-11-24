@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cost of the wallbox:** a wallbox was priced with the kWh of its power sensor at the grid price, also when the car was charged with solar surplus. With EV Assistant the cost of the wallbox now comes from its sensor *Home charging cost* (`home_cost`: the real price of every charging session, the solar share is free): in the Consumption tab the wallbox row shows it as *Cost (EV Assistant, with the solar share)* for the shown period, and in the Costs tab the wallbox row of *Cost per device* shows it for day, week, month and year. The cost of a period is the difference of the cumulative value at its end and its start (long-term statistics, the live value for the running period). Without that sensor the grid price is used as before. The cost sensors that Energy Assistant creates for a device, label or area still price the wallbox at the grid price; the totals of the house (grid cost, savings) were right already.
+
 ## [0.37.0] - 2026-11-24
 
 ### Changed

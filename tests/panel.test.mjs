@@ -5208,7 +5208,7 @@ test("sources: the section is part of the settings and entity ids are escaped", 
 });
 
 test("sources: every key has an English and a German text", () => {
-  const keys = ["arbeitspreis", "einspeiseverguetung", "kosten_bisher", "guthaben_bisher", "prognose_real", "home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended", "wallbox_power", "production_today", "feed_in_today", "self_consumption_rate_today", "autarky_today", "benefit_today", "forecast_reached_today", "expected_feed_in_tomorrow", "best_window_tomorrow", "storage_usable", "storage_empty_at", "string_fault", "einsparung", "investition", "fortschritt", "verbleibend", "tagesschnitt", "resttage", "datum"];
+  const keys = ["arbeitspreis", "einspeiseverguetung", "kosten_bisher", "guthaben_bisher", "prognose_real", "home_kwh", "home_cost", "kwh_day", "cost_day", "charge_before_pv_recommended", "wallbox_power", "production_today", "feed_in_today", "self_consumption_rate_today", "autarky_today", "benefit_today", "forecast_reached_today", "expected_feed_in_tomorrow", "best_window_tomorrow", "storage_usable", "storage_empty_at", "string_fault", "einsparung", "investition", "fortschritt", "verbleibend", "tagesschnitt", "resttage", "datum"];
   const en = sourcePanel(), de = sourcePanel();
   de._hass.language = "de";
   for (const k of keys) {
@@ -5245,4 +5245,94 @@ test("devices tab: the ring of a category runs clockwise from the smallest to th
   assert.ok(arcs[0].len < arcs[1].len && arcs[1].len < arcs[2].len); // clockwise from the top: small, middle, big
   const names = [...html.matchAll(/class="cn" title="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(names, ["Big", "Mid", "Small"]); // the list: the biggest first
+});
+
+
+// ---- the cost of a wallbox: what EV Assistant says, not the kWh of its sensor at the grid price
+
+function evCostPanel() {
+  const p = usageWithLines({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } } });
+  p._int = { tariffy: { price: "sensor.t_preis" }, ev_assistant: { vehicles: [{ name: "EV", live: "sensor.ev_live", wallbox_power: "sensor.c", home_cost: "sensor.ev_home_cost" }] } };
+  p._hass.states["sensor.ev_home_cost"] = { state: "152.5", attributes: { unit_of_measurement: "EUR" } };
+  return p;
+}
+
+test("wallbox cost: the cost of a period is the difference of the cumulative home cost, the live value for the running period", async () => {
+  const p = evCostPanel();
+  const win = p._balWindow("week", -1);
+  let request = null;
+  const day = 86400000;
+  p._hass.callWS = async (m) => {
+    request = m;
+    return { "sensor.ev_home_cost": [
+      { start: win.start - day, max: 100, min: 99 }, // the last value before the period: the start
+      { start: win.start, max: 104, min: 100 },
+      { start: win.start + 6 * day, max: 112, min: 110 }, // the last one inside: the end
+    ] };
+  };
+  assert.equal(await p._evCostPeriod("sensor.ev_home_cost", win, "week"), 12); // 112 - 100
+  assert.equal(request.type, "recorder/statistics_during_period");
+  assert.deepEqual(request.statistic_ids, ["sensor.ev_home_cost"]);
+  assert.equal(request.period, "day");
+  // the running period: the live value is the end
+  const now = p._balWindow("week", 0);
+  p._hass.callWS = async () => ({ "sensor.ev_home_cost": [{ start: now.start - day, max: 140, min: 139 }] });
+  assert.equal(await p._evCostPeriod("sensor.ev_home_cost", now, "week"), 12.5); // 152.5 - 140
+  // without any value there is no cost
+  p._hass.callWS = async () => ({});
+  assert.equal(await p._evCostPeriod("sensor.ev_home_cost", win, "week"), null);
+});
+
+test("wallbox cost: the row of the wallbox in the Consumption tab shows the cost of EV Assistant, other devices stay at the grid price", () => {
+  const p = evCostPanel();
+  p._render = () => {};
+  p._open = new Set(["usage:top:sensor.c", "usage:top:sensor.a"]);
+  p._evCosts = new Map([["sensor.ev_home_cost|day|0", { v: 0.42, at: Date.now() }]]);
+  const html = p._renderUsage();
+  const detail = (id) => { const i = html.indexOf(`data-open="usage:top:${id}"`); return html.slice(i, html.indexOf("</div></div>", html.indexOf('class="subs"', i))); };
+  const wallbox = detail("sensor.c");
+  assert.match(wallbox, /Cost \(EV Assistant, with the solar share\)<\/span><b>[^<]*0[.,]42[^<]*<\/b>/); // not 2.5 kWh x 0.30 = 0.75
+  assert.doesNotMatch(wallbox, /0[.,]75/);
+  assert.match(detail("sensor.a"), /Cost<\/span><b>[^<]*0[.,]45[^<]*<\/b>/); // 1.5 kWh x 0.30 for a normal device
+  // while the value is not loaded the grid price stays
+  p._evCosts = new Map();
+  assert.match(p._renderUsage(), /0[.,]75/);
+});
+
+test("wallbox cost: the Costs tab shows the cost of EV Assistant for the wallbox, the cost sensors for the others", () => {
+  const p = evCostPanel();
+  p._cfg.device_ids = ["sensor.c", "sensor.a"];
+  p._cfg.device_names = {};
+  p._hass.states["sensor.c_day"] = { state: "9.99", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.a_day"] = { state: "0.33", attributes: { unit_of_measurement: "EUR" } };
+  p._deviceEnergy = { "sensor.c": { cost_day: "sensor.c_day" }, "sensor.a": { cost_day: "sensor.a_day" } };
+  p._evCosts = new Map([["sensor.ev_home_cost|day|0", { v: 1.25, at: Date.now() }], ["sensor.ev_home_cost|year|0", { v: 310, at: Date.now() }]]);
+  const html = p._renderGroupCosts("device");
+  assert.match(html, /1[.,]25[^<]*€/); // the wallbox today
+  assert.match(html, /310[^<]*€/); // and this year
+  assert.doesNotMatch(html, /9[.,]99/); // not the grid price figure of the cost sensor
+  assert.match(html, /0[.,]33[^<]*€/); // the other device
+});
+
+test("wallbox cost: the values are loaded for the shown period, in the Costs tab for the four running ones, at most every five minutes", async () => {
+  const p = evCostPanel();
+  p._render = () => {};
+  const calls = [];
+  p._evCostPeriod = async (id, win, range) => { calls.push(range); return 1; };
+  p._tab = "usage";
+  p._usRange = "month";
+  p._usOff = -1;
+  await p._maybeLoadEvCost();
+  assert.deepEqual(calls, ["month"]);
+  assert.equal(p._evCostOf("sensor.c", "month", -1), 1);
+  await p._maybeLoadEvCost(); // fresh: no new request
+  assert.deepEqual(calls, ["month"]);
+  p._tab = "costs";
+  await p._maybeLoadEvCost();
+  assert.deepEqual(calls, ["month", "day", "week", "month", "year"]);
+  // no EV Assistant or no cost sensor: nothing to load
+  const q = evCostPanel();
+  q._int = { ev_assistant: { vehicles: [{ name: "EV", live: "x", wallbox_power: "sensor.c", home_cost: null }] } };
+  q._evCostPeriod = async () => { throw new Error("must not be called"); };
+  await q._maybeLoadEvCost();
 });

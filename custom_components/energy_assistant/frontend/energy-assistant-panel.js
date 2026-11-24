@@ -356,6 +356,8 @@ const STRINGS = {
     uTodayKwh: "{kwh} kWh today",
     uFactEnergy: "Energy",
     uFactCost: "Cost",
+    uFactCostEv: "Cost (EV Assistant, with the solar share)",
+    src_home_cost: "Cost of the home charging (cumulative, with the real price of every charging session)",
     uFactAvg: "Average power",
     uFactPeak: "Peak",
     uFactBase: "Always on",
@@ -770,6 +772,8 @@ const STRINGS = {
     uTodayKwh: "{kwh} kWh heute",
     uFactEnergy: "Energie",
     uFactCost: "Kosten",
+    uFactCostEv: "Kosten (EV Assistant, mit PV-Anteil)",
+    src_home_cost: "Kosten des Heimladens (kumuliert, mit dem echten Preis jeder Ladesitzung)",
     uFactAvg: "Durchschnittsleistung",
     uFactPeak: "Spitze",
     uFactBase: "Dauerlast",
@@ -1902,6 +1906,70 @@ class EnergyAssistantPanel extends HTMLElement {
    * The consumption tab: the base load of the house (what never goes away) with its yearly cost, the
    * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
    */
+  /**
+   * What the home charging of a wallbox cost in a period, from EV Assistant (the real price of every charging session,
+   * the solar share is free), not the kWh of its sensor at the grid price. `home_cost` is cumulative, so the cost is the
+   * difference between its value at the end and at the start of the period (long-term statistics, for the running
+   * period the live value). Null without such a value.
+   */
+  async _evCostPeriod(entityId, win, range) {
+    const now = Date.now();
+    const live = win.end > now;
+    const lead = 3 * 86400000; // the last value before the period is the start
+    const res = await this._hass.callWS({
+      type: "recorder/statistics_during_period",
+      start_time: new Date(win.start - lead).toISOString(),
+      end_time: new Date(Math.min(win.end, now)).toISOString(),
+      statistic_ids: [entityId],
+      period: range === "day" ? "hour" : "day",
+      types: ["max", "min"],
+    });
+    const rows = (res?.[entityId] || []).map((r) => ({ t: typeof r.start === "number" ? r.start : Date.parse(r.start), max: r.max, min: r.min })).filter((r) => Number.isFinite(r.t));
+    const before = rows.filter((r) => r.t < win.start), inside = rows.filter((r) => r.t >= win.start);
+    const base = before.length ? before[before.length - 1].max : inside.length ? inside[0].min : null;
+    const state = parseFloat(this._hass?.states?.[entityId]?.state);
+    const end = live && Number.isFinite(state) ? state : inside.length ? inside[inside.length - 1].max : base;
+    if (!Number.isFinite(base) || !Number.isFinite(end)) return null;
+    return Math.max(0, end - base);
+  }
+
+  /** The EV Assistant vehicle whose wallbox power sensor is this device (with a cost sensor), or null. */
+  _evVehicleOf(deviceId) {
+    return (this._int?.ev_assistant?.vehicles || []).find((v) => v.wallbox_power && v.wallbox_power === deviceId && v.home_cost) || null;
+  }
+
+  /** The cost of a wallbox device from EV Assistant for a period, or null while it is not loaded or without a source. */
+  _evCostOf(deviceId, range, off) {
+    const v = this._evVehicleOf(deviceId);
+    return v ? this._evCosts?.get(`${v.home_cost}|${range}|${off}`)?.v ?? null : null;
+  }
+
+  /** Loads what the periods in view need (the shown period, in the Costs tab the four running ones), at most every 5 minutes. */
+  async _maybeLoadEvCost() {
+    if (!this._ready || this._evCostLoading || !this._hass) return;
+    const sources = [...new Set((this._int?.ev_assistant?.vehicles || []).filter((v) => v.wallbox_power && v.home_cost).map((v) => v.home_cost))];
+    if (!sources.length) return;
+    const wanted = this._tab === "costs" ? ["day", "week", "month", "year"].map((r) => [r, 0]) : [[this._usRange ?? "day", this._usOff ?? 0]];
+    this._evCosts = this._evCosts || new Map();
+    const todo = [];
+    for (const id of sources) for (const [r, o] of wanted) {
+      const hit = this._evCosts.get(`${id}|${r}|${o}`);
+      if (!hit || Date.now() - hit.at > 5 * 60 * 1000) todo.push([id, r, o]);
+    }
+    if (!todo.length) return;
+    this._evCostLoading = true;
+    try {
+      for (const [id, r, o] of todo) {
+        let v = null;
+        try { v = await this._evCostPeriod(id, this._balWindow(r, o), r); } catch (e) { console.info("Energy Assistant: could not load the cost of the home charging", e); }
+        this._evCosts.set(`${id}|${r}|${o}`, { v, at: Date.now() });
+      }
+    } finally {
+      this._evCostLoading = false;
+      this._render();
+    }
+  }
+
   _renderUsage({ bare = false } = {}) {
     // bare: the cards only, the period picker and the stack come from the consumption tab
     const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
@@ -1959,7 +2027,9 @@ class EnergyAssistantPanel extends HTMLElement {
     const total = u.devices.reduce((a, d) => a + d.kwh, 0);
     const facts = (d) => {
       const f = [[this._t("uFactEnergy"), `${num(d.kwh, 2)} kWh`]];
-      if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * price)]);
+      const evCost = this._evCostOf(d.id, range, off); // a wallbox: what EV Assistant says it cost, not the kWh at the grid price
+      if (evCost != null) f.push([this._t("uFactCostEv"), money(evCost)]);
+      else if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * price)]);
       if (d.avgW != null) f.push([this._t("uFactAvg"), fmtPower(d.avgW).join(" ")]);
       if (d.peak != null) f.push([this._t("uFactPeak"), fmtPower(d.peak).join(" ")]);
       if (d.baseW != null && d.baseW >= 2) f.push([this._t("uFactBase"), fmtPower(d.baseW).join(" ")]);
@@ -1988,7 +2058,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const topFold = fold(top, this._usTopExpanded, "data-ustoptoggle");
     const alwaysFold = fold(always, this._usAlwaysExpanded, "data-usalwaystoggle");
     const topRows = topFold.shown.map((d) => {
-      const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
+      const evCost = this._evCostOf(d.id, range, off);
+      const cost = evCost != null ? money(evCost) : !Number.isNaN(price) ? money(d.kwh * price) : "";
       return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, total > 0 ? (d.kwh / total) * 100 : 0, cost); // bar = share of the whole period
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
@@ -3545,6 +3616,9 @@ class EnergyAssistantPanel extends HTMLElement {
         const values = periods.map(([p]) => {
           const state = this._hass?.states?.[sensors?.[id]?.[`cost_${p}`]];
           const v = state ? parseFloat(state.state) : NaN;
+          // A wallbox: what EV Assistant says the home charging cost (the solar share is free), not the grid price
+          const ev = kind === "device" ? this._evCostOf(id, p, 0) : null;
+          if (ev != null) return { v: ev, unit: this._hass?.states?.[this._evVehicleOf(id).home_cost]?.attributes?.unit_of_measurement || "EUR" };
           return { v: Number.isFinite(v) ? v : null, unit: state?.attributes?.unit_of_measurement || "EUR" };
         });
         const cells = values.map((x) => (x.v == null ? "–" : this._money(x.v, x.unit).join(" ")));
@@ -5319,6 +5393,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
     if ((this._tab === "usage" || (this._tab === "costs" && this._int?.tariffy)) && this._balEnabled()) this._maybeLoadBalance();
+    if (this._tab === "usage" || this._tab === "costs") this._maybeLoadEvCost();
     if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadGroupUsage();
