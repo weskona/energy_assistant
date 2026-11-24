@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-25
+
 ### Changed
 
 - **Cost sensors count the solar share:** the cost sensors of devices, labels and areas priced every kWh at the grid price, also when the power came from the own solar plant. Now the unit price of every step depends on what the grid delivers of the consumption at that moment (the share, like the self-sufficiency of the panel: grid import / consumption, power that charges the storage from the grid is not consumption): `grid price x share + feed-in tariff x (1 - share)`. With a self-sufficiency of 100 % a kWh therefore only costs the feed-in tariff that is lost by using it, with no feed-in tariff of Tariffy it costs nothing, with no grid power the full price. Still step by step, so nothing that was counted changes. When the share cannot be told (no grid sensor, unusable readings, no consumption) the grid price stays: a missing value never makes it cheaper. The cost sensors show the price they use as attributes `unit_price` and `grid_share`. The new setting *Price every kWh at the grid price (ignore the solar share)* (*Energy counters*) switches back to the old behaviour. The *Cost* of the device rows in the Consumption tab uses the share of the shown period from the balance.
