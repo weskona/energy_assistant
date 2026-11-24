@@ -2438,29 +2438,75 @@ test("balance: consumption, self-consumption and self-sufficiency", () => {
   assert.equal(p._balCompute({ imp: set(zero, 0, 5) }, win).totals.self, null);
 });
 
-test("balance: the statistics are asked for with the counters, the period and kWh", async () => {
+test("balance: the statistics are asked for with the counters, the period and kWh, a day in half hours", async () => {
   const p = balPanel();
   const calls = [];
   p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
   p._tab = "balance";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 2); // this period and the one before
+  // this day in 5-minute statistics (added up to half hours), the day before in hours, and as there is nothing in the
+  // 5-minute statistics (older than the recorder keeps them) the day again in hours
+  assert.equal(calls.length, 3);
   const first = calls[0];
   assert.equal(first.type, "recorder/statistics_during_period");
-  assert.equal(first.period, "hour");
+  assert.equal(first.period, "5minute");
   assert.deepEqual(first.types, ["change"]);
   assert.deepEqual(first.units, { energy: "kWh" });
   assert.deepEqual([...first.statistic_ids].sort(), ["sensor.balkon_e", "sensor.chg_e", "sensor.dis_e", "sensor.exp_e", "sensor.imp_e", "sensor.pv_e"]);
+  assert.equal(calls[1].period, "hour");
+  assert.equal(calls[2].period, "hour");
   assert.equal(p._bal.range, "day");
+  assert.equal(p._bal.win.bucket, "hour"); // the fallback
   p._maybeLoadBalance(); // fresh data: no new request
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   p._usRange = "month";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 4);
-  assert.equal(calls[2].period, "day");
+  assert.equal(calls.length, 5);
+  assert.equal(calls[3].period, "day");
+});
+
+test("balance: a day is shown in half hours when the 5-minute statistics have data", async () => {
+  const p = balPanel();
+  p._usRange = "day";
+  p._usOff = 0;
+  const half = p._balWindow("day", 0, { half: true });
+  assert.equal(half.bucket, "half");
+  assert.equal(half.period, "5minute");
+  assert.ok([46, 48, 50].includes(half.edges.length - 1)); // 48 half hours, 46 or 50 on the days of the clock change
+  assert.equal(half.edges[1] - half.edges[0], 1800000);
+  assert.equal(p._balWindow("day", 0).edges.length - 1 >= 23, true); // the default window stays hourly
+  // five-minute rows are added up to their half hour
+  const rows = (v) => [0, 1, 2, 3, 4, 5, 6].map((k) => ({ start: half.edges[0] + k * 300000, change: v }));
+  p._balFetch = async (w) => (w.bucket === "half" ? { "sensor.imp_e": rows(0.1) } : {});
+  await p._loadBalance();
+  assert.equal(p._bal.win.bucket, "half");
+  assert.ok(Math.abs(p._bal.rows[0].imp - 0.6) < 1e-9); // 6 rows (00:00-00:25) in the first half hour
+  assert.ok(Math.abs(p._bal.rows[1].imp - 0.1) < 1e-9); // the seventh in the second
+  // the labels of the axis: every three hours, on the full hour only
+  assert.equal(p._balTick(half, 0), p._balTick(p._balWindow("day", 0), 0));
+  assert.equal(p._balTick(half, 1), ""); // half past
+  assert.equal(p._balTick(half, 2), ""); // 01:00 is not a label
+  assert.notEqual(p._balTick(half, 6), ""); // 03:00
+});
+
+test("devices tab: a balance in half hours is added up to hours for the part that is not assigned", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  const half = p._balWindow("day", 0, { half: true });
+  p._bal = { range: "day", off: 0, failed: false, win: half, rows: Array.from({ length: half.edges.length - 1 }, () => ({ cons: 0.5 })), totals: {} };
+  if (half.edges.length - 1 === 48) {
+    const m = p._devModel();
+    assert.equal(m.house, 24); // 48 half hours of 0.5 kWh
+    assert.ok(m.unassigned >= 0);
+  }
 });
 
 test("balance: a failing request says there is no data instead of breaking", async () => {
@@ -2538,20 +2584,42 @@ test("balance: the picker marks the range, 'next' is off for the current period 
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
 });
 
-test("balance: the bar chart has a bar per bucket and series, a styled tooltip and the table with the sum", () => {
+test("balance: the consumption as a white line over bars of its sources, a styled tooltip and the table with the sum", () => {
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Energy per period<\/span>/);
-  assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // two days with production
-  // the tooltip is drawn by the panel from the data of the slot: a title and one row per series
+  // week data: consumption 10 and 17 kWh (solar + import + storage - feed-in - charging), the sources are stacked
+  assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // solar used directly on two days
+  assert.equal((html.match(/fill="var\(--ea-grid\)"/g) || []).length, 2); // grid import
+  assert.equal((html.match(/fill="var\(--ea-bout\)"/g) || []).length, 1); // from the storage on one day
+  assert.doesNotMatch(html, /fill="var\(--ea-feed\)"/); // feed-in is not consumption: no bar
+  assert.match(html, /<polyline points="[^"]+" fill="none" stroke="var\(--eb-text\)"/); // the white line
+  assert.equal((html.match(/<circle cx="[^"]*" cy="[^"]*" r="2\.3" fill="var\(--eb-text\)"/g) || []).length, 2); // a dot for each day with data
+  // the tooltip is drawn by the panel from the data of the slot: a title and one row per value
   const slot = html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/);
   assert.ok(slot);
   const tip = JSON.parse(slot[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   assert.ok(tip.t.length > 0);
-  assert.ok(tip.r.some(([color, value, name]) => color === "--ea-prod" && /^\d+[.,]\d{2} kWh$|^–$/.test(value) && name === "Production"));
+  assert.deepEqual(tip.r.map(([, , name]) => name), ["Consumption", "Solar direct", "From storage", "Grid import", "Feed-in", "To storage"]);
+  assert.equal(tip.r[0][0], "--eb-text");
+  assert.match(tip.r[0][1], /^10[.,]00 kWh$/);
+  assert.match(tip.r[1][1], /^5[.,]00 kWh$/); // 10 - 4 import - 1 storage
   assert.doesNotMatch(html, /<title>/); // no plain browser tooltip any more
   assert.match(html, /<summary>Show as table<\/summary>/);
-  assert.match(html, /<th>Sum<\/th><td>30[.,]00<\/td>/);
+  assert.match(html, /<th>Sum<\/th><td>27[.,]00<\/td>/); // the consumption of the two days
   assert.equal((html.match(/<tr><th>/g) || []).length, 1 + 7 + 1); // the header, seven days and the sum row
+  // the legend names the line and the sources
+  assert.match(html, /<span><i style="background:var\(--eb-text\);width:14px[^>]*><\/i>Consumption<\/span>/);
+  assert.match(html, /<span><i style="background:var\(--ea-prod\)"><\/i>Solar direct<\/span>/);
+});
+
+test("balance: without a consumption the grouped bars stay", () => {
+  const p = balPanel({ energy_solar: ["sensor.pv_e"] });
+  const win = p._balWindow("week", 0);
+  p._usRange = "week";
+  p._bal = { range: "week", off: 0, win, at: Date.now(), failed: false, ...p._balCompute({ solar: [5, 6, null, null, null, null, null] }, win), before: null };
+  const html = p._renderBalance();
+  assert.doesNotMatch(html, /<polyline/);
+  assert.match(html, /fill="var\(--ea-prod\)"/); // the production bars of the old chart
 });
 
 test("balance: a period without any energy says so, the table state is kept", () => {
@@ -5147,4 +5215,34 @@ test("sources: every key has an English and a German text", () => {
     assert.notEqual(en._t(`src_${k}`), `src_${k}`, k);
     assert.notEqual(de._t(`src_${k}`), `src_${k}`, k);
   }
+});
+
+test("devices tab: the ring, bar and legend run from small to big, the tooltip from big to small, not assigned last in both", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: 1 })), totals: {} };
+  const html = p._renderDevicesTab();
+  const legend = html.slice(html.indexOf('class="dlegend"'), html.indexOf("</div></div></div>", html.indexOf('class="dlegend"')));
+  const at = (name) => legend.indexOf(`<span class="ln">${name}</span>`);
+  assert.ok(at("Licht") > -1 && at("Licht") < at("Klima")); // the smaller one first
+  assert.ok(at("Klima") < at("not assigned")); // not assigned at the end, although it is bigger than Licht
+  // the tooltip: biggest first, not assigned at the very end
+  const tip = JSON.parse(html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+  assert.deepEqual(tip.r.map(([, , name]) => name), ["Klima", "Licht", "not assigned"]);
+});
+
+test("devices tab: the ring of a category runs clockwise from the smallest to the biggest device, the list keeps the biggest first", () => {
+  const p = devicesTabPanel();
+  const c = { id: "x", name: "X", icon: null, tint: null, color: "#fff", total: 6, buckets: [6], devices: [{ id: "a", name: "Big", kwh: 3 }, { id: "b", name: "Mid", kwh: 2 }, { id: "c", name: "Small", kwh: 1 }] };
+  const html = p._devCategoryCard(c, 10, (v) => String(v), (v) => Math.round(v));
+  const arcs = [...html.matchAll(/<circle [^>]*stroke="([^"]+)"[^>]*stroke-dasharray="([\d.]+) /g)].map((m) => ({ color: m[1], len: Number(m[2]) }));
+  assert.equal(arcs.length, 3);
+  assert.ok(arcs[0].len < arcs[1].len && arcs[1].len < arcs[2].len); // clockwise from the top: small, middle, big
+  const names = [...html.matchAll(/class="cn" title="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(names, ["Big", "Mid", "Small"]); // the list: the biggest first
 });
