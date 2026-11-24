@@ -144,6 +144,7 @@ async def test_ev_assistant_vehicle_gives_live_sensor_and_today(hass) -> None:
                 "live": ids["home_kwh"],
                 "kwh_today": ids["kwh_day"],
                 "cost_today": ids["cost_day"],
+                "home_cost": None,
                 "recommend": ids["charge_before_pv_recommended"],
             }
         ]
@@ -416,3 +417,22 @@ async def test_websocket_lists_the_sources_also_when_deselected(
     assert ids["kosten_bisher"] in {
         s["entity_id"] for s in result["sources"]
     }  # but listed
+
+
+async def test_ev_assistant_gives_the_real_cost_of_the_home_charging(hass) -> None:
+    ids = _ev_vehicle(
+        hass,
+        "id3",
+        keys=("home_kwh", "home_cost", "kwh_day", "cost_day"),
+        data={"home_entity": "sensor.warp_power"},
+    )
+    vehicle = ev_assistant(hass)["vehicles"][0]
+    assert vehicle["home_cost"] == ids["home_cost"]
+    assert vehicle["wallbox_power"] == "sensor.warp_power"
+    found = {
+        (s["integration"], s["group"], s["key"]): s["entity_id"] for s in sources(hass)
+    }
+    assert found[("ev_assistant", "id3", "home_cost")] == ids["home_cost"]
+    # deselected: the key disappears from the vehicle
+    gone = ev_assistant(hass, frozenset({ids["home_cost"]}))["vehicles"][0]
+    assert gone["home_cost"] is None

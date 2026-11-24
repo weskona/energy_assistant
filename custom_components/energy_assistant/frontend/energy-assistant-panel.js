@@ -356,6 +356,8 @@ const STRINGS = {
     uTodayKwh: "{kwh} kWh today",
     uFactEnergy: "Energy",
     uFactCost: "Cost",
+    uFactCostEv: "Cost (EV Assistant, with the solar share)",
+    src_home_cost: "Cost of the home charging (cumulative, with the real price of every charging session)",
     uFactAvg: "Average power",
     uFactPeak: "Peak",
     uFactBase: "Always on",
@@ -369,6 +371,8 @@ const STRINGS = {
     f_battery_soc_more: "Further storages: charge level sensors (%, one battery each in the results)",
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
+    f_cost_grid_only: "Price every kWh at the grid price (ignore the solar share)",
+    h_cost_mix: "The cost sensors of devices, labels and areas price a kWh by what the grid delivers at that moment: own solar power only costs the feed-in tariff that is lost by using it (with 100 % self-sufficiency that is all), grid power costs the price of the contract. Tick this to price everything at the grid price as before.",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
     liveTitle: "Right now",
     liveHouse: "Consumption now",
@@ -770,6 +774,8 @@ const STRINGS = {
     uTodayKwh: "{kwh} kWh heute",
     uFactEnergy: "Energie",
     uFactCost: "Kosten",
+    uFactCostEv: "Kosten (EV Assistant, mit PV-Anteil)",
+    src_home_cost: "Kosten des Heimladens (kumuliert, mit dem echten Preis jeder Ladesitzung)",
     uFactAvg: "Durchschnittsleistung",
     uFactPeak: "Spitze",
     uFactBase: "Dauerlast",
@@ -783,6 +789,8 @@ const STRINGS = {
     f_battery_soc_more: "Weitere Speicher: Ladestand-Sensoren (%, je eine Batterie in den Ergebnissen)",
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
+    f_cost_grid_only: "Jede kWh zum Netzpreis rechnen (Solaranteil ignorieren)",
+    h_cost_mix: "Die Kostensensoren von Geräten, Labels und Bereichen bewerten eine kWh nach dem, was das Netz in dem Moment liefert: eigener Solarstrom kostet nur die Einspeisevergütung, die durch das Verbrauchen entgeht (bei 100 % Autarkie ist das alles), Netzstrom kostet den Preis des Vertrags. Hake das an, um wie bisher alles zum Netzpreis zu rechnen.",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
     liveTitle: "Jetzt",
     liveHouse: "Verbrauch jetzt",
@@ -1364,7 +1372,7 @@ const RES_ART = {
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_soc_more", "socs"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
-  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["history_years", "history"]] },
+  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["cost_grid_only", "bool"], ["h_cost_mix", "note"], ["history_years", "history"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
@@ -1419,7 +1427,7 @@ const compilePatterns = (patterns) => {
     return list.some((p) => p.re.test(p.full ? entityId : short));
   };
 };
-const BOOL_KEYS = ["invert_grid", "invert_battery"];
+const BOOL_KEYS = ["invert_grid", "invert_battery", "cost_grid_only"];
 
 // Power is always shown in watts (also above 1000 W), whatever unit the sensors report.
 const fmtPower = (w) => {
@@ -1525,6 +1533,20 @@ class EnergyAssistantPanel extends HTMLElement {
     if (Number.isNaN(value)) return null;
     const unit = String(state.attributes?.unit_of_measurement || "EUR/kWh");
     return { value, currency: unit.split("/")[0] || "EUR" };
+  }
+
+  /**
+   * The price of a kWh of a device in the shown period: the grid price for the share the grid delivered of the
+   * consumption of the period (grid import / consumption of the balance), the feed-in tariff that is lost for the rest.
+   * The grid price when the balance is not there, with the setting that prices everything at the grid price, or
+   * when no price is known.
+   */
+  _mixPrice(price, range, off) {
+    if (Number.isNaN(price) || this._cfg.cost_grid_only) return price;
+    const b = this._bal, t = b?.totals;
+    if (!b || b.failed || b.range !== range || b.off !== off || !(t?.cons > 0) || t.imp == null) return price;
+    const share = Math.max(0, Math.min(1, t.imp / t.cons));
+    return price * share + (this._feedInTariff() ?? 0) * (1 - share);
   }
 
   _feedInTariff() {
@@ -1902,6 +1924,70 @@ class EnergyAssistantPanel extends HTMLElement {
    * The consumption tab: the base load of the house (what never goes away) with its yearly cost, the
    * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
    */
+  /**
+   * What the home charging of a wallbox cost in a period, from EV Assistant (the real price of every charging session,
+   * the solar share is free), not the kWh of its sensor at the grid price. `home_cost` is cumulative, so the cost is the
+   * difference between its value at the end and at the start of the period (long-term statistics, for the running
+   * period the live value). Null without such a value.
+   */
+  async _evCostPeriod(entityId, win, range) {
+    const now = Date.now();
+    const live = win.end > now;
+    const lead = 3 * 86400000; // the last value before the period is the start
+    const res = await this._hass.callWS({
+      type: "recorder/statistics_during_period",
+      start_time: new Date(win.start - lead).toISOString(),
+      end_time: new Date(Math.min(win.end, now)).toISOString(),
+      statistic_ids: [entityId],
+      period: range === "day" ? "hour" : "day",
+      types: ["max", "min"],
+    });
+    const rows = (res?.[entityId] || []).map((r) => ({ t: typeof r.start === "number" ? r.start : Date.parse(r.start), max: r.max, min: r.min })).filter((r) => Number.isFinite(r.t));
+    const before = rows.filter((r) => r.t < win.start), inside = rows.filter((r) => r.t >= win.start);
+    const base = before.length ? before[before.length - 1].max : inside.length ? inside[0].min : null;
+    const state = parseFloat(this._hass?.states?.[entityId]?.state);
+    const end = live && Number.isFinite(state) ? state : inside.length ? inside[inside.length - 1].max : base;
+    if (!Number.isFinite(base) || !Number.isFinite(end)) return null;
+    return Math.max(0, end - base);
+  }
+
+  /** The EV Assistant vehicle whose wallbox power sensor is this device (with a cost sensor), or null. */
+  _evVehicleOf(deviceId) {
+    return (this._int?.ev_assistant?.vehicles || []).find((v) => v.wallbox_power && v.wallbox_power === deviceId && v.home_cost) || null;
+  }
+
+  /** The cost of a wallbox device from EV Assistant for a period, or null while it is not loaded or without a source. */
+  _evCostOf(deviceId, range, off) {
+    const v = this._evVehicleOf(deviceId);
+    return v ? this._evCosts?.get(`${v.home_cost}|${range}|${off}`)?.v ?? null : null;
+  }
+
+  /** Loads what the periods in view need (the shown period, in the Costs tab the four running ones), at most every 5 minutes. */
+  async _maybeLoadEvCost() {
+    if (!this._ready || this._evCostLoading || !this._hass) return;
+    const sources = [...new Set((this._int?.ev_assistant?.vehicles || []).filter((v) => v.wallbox_power && v.home_cost).map((v) => v.home_cost))];
+    if (!sources.length) return;
+    const wanted = this._tab === "costs" ? ["day", "week", "month", "year"].map((r) => [r, 0]) : [[this._usRange ?? "day", this._usOff ?? 0]];
+    this._evCosts = this._evCosts || new Map();
+    const todo = [];
+    for (const id of sources) for (const [r, o] of wanted) {
+      const hit = this._evCosts.get(`${id}|${r}|${o}`);
+      if (!hit || Date.now() - hit.at > 5 * 60 * 1000) todo.push([id, r, o]);
+    }
+    if (!todo.length) return;
+    this._evCostLoading = true;
+    try {
+      for (const [id, r, o] of todo) {
+        let v = null;
+        try { v = await this._evCostPeriod(id, this._balWindow(r, o), r); } catch (e) { console.info("Energy Assistant: could not load the cost of the home charging", e); }
+        this._evCosts.set(`${id}|${r}|${o}`, { v, at: Date.now() });
+      }
+    } finally {
+      this._evCostLoading = false;
+      this._render();
+    }
+  }
+
   _renderUsage({ bare = false } = {}) {
     // bare: the cards only, the period picker and the stack come from the consumption tab
     const wrap = (html) => (bare ? html : `<div class="stack">${html}</div>`);
@@ -1919,6 +2005,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = priceState ? parseFloat(priceState.state) : NaN;
     const currency = String(priceState?.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
     const money = (v) => this._money(v, currency).join(" ");
+    const unitPrice = this._mixPrice(price, range, off); // what a kWh of a device costs in this period (solar share)
     const num = (v, d) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
     const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
     const sub = (text) => `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(text)}</div>`;
@@ -1959,7 +2046,9 @@ class EnergyAssistantPanel extends HTMLElement {
     const total = u.devices.reduce((a, d) => a + d.kwh, 0);
     const facts = (d) => {
       const f = [[this._t("uFactEnergy"), `${num(d.kwh, 2)} kWh`]];
-      if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * price)]);
+      const evCost = this._evCostOf(d.id, range, off); // a wallbox: what EV Assistant says it cost, not the kWh at the grid price
+      if (evCost != null) f.push([this._t("uFactCostEv"), money(evCost)]);
+      else if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * unitPrice)]);
       if (d.avgW != null) f.push([this._t("uFactAvg"), fmtPower(d.avgW).join(" ")]);
       if (d.peak != null) f.push([this._t("uFactPeak"), fmtPower(d.peak).join(" ")]);
       if (d.baseW != null && d.baseW >= 2) f.push([this._t("uFactBase"), fmtPower(d.baseW).join(" ")]);
@@ -1988,7 +2077,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const topFold = fold(top, this._usTopExpanded, "data-ustoptoggle");
     const alwaysFold = fold(always, this._usAlwaysExpanded, "data-usalwaystoggle");
     const topRows = topFold.shown.map((d) => {
-      const cost = !Number.isNaN(price) ? money(d.kwh * price) : "";
+      const evCost = this._evCostOf(d.id, range, off);
+      const cost = evCost != null ? money(evCost) : !Number.isNaN(price) ? money(d.kwh * unitPrice) : "";
       return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, total > 0 ? (d.kwh / total) * 100 : 0, cost); // bar = share of the whole period
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>
@@ -3545,6 +3635,9 @@ class EnergyAssistantPanel extends HTMLElement {
         const values = periods.map(([p]) => {
           const state = this._hass?.states?.[sensors?.[id]?.[`cost_${p}`]];
           const v = state ? parseFloat(state.state) : NaN;
+          // A wallbox: what EV Assistant says the home charging cost (the solar share is free), not the grid price
+          const ev = kind === "device" ? this._evCostOf(id, p, 0) : null;
+          if (ev != null) return { v: ev, unit: this._hass?.states?.[this._evVehicleOf(id).home_cost]?.attributes?.unit_of_measurement || "EUR" };
           return { v: Number.isFinite(v) ? v : null, unit: state?.attributes?.unit_of_measurement || "EUR" };
         });
         const cells = values.map((x) => (x.v == null ? "–" : this._money(x.v, x.unit).join(" ")));
@@ -5319,6 +5412,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (this._editName) return;
     // Only redraw when the content changes (avoids flicker).
     if ((this._tab === "usage" || (this._tab === "costs" && this._int?.tariffy)) && this._balEnabled()) this._maybeLoadBalance();
+    if (this._tab === "usage" || this._tab === "costs") this._maybeLoadEvCost();
     if ((this._tab === "usage" || this._tab === "house") && this._usageEnabled()) this._maybeLoadUsage();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadUsageView();
     if (this._tab === "usage" && this._usageEnabled()) this._maybeLoadGroupUsage();

@@ -128,7 +128,10 @@ SINGLE_KEYS = (
     CONF_BATTERY_GRID_CHARGE,
     CONF_BATTERY_SOC,
 )
-BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY)
+# Price every kWh of a device, label or area at the grid price, also when it came from the own solar plant (the cost
+# sensors otherwise price solar power with the feed-in tariff that is lost by using it).
+CONF_COST_GRID_ONLY = "cost_grid_only"
+BOOL_KEYS = (CONF_INVERT_GRID, CONF_INVERT_BATTERY, CONF_COST_GRID_ONLY)
 # Sensors of the energy balance: they never count as device, area or label member.
 SYSTEM_KEYS = (
     CONF_HOUSE_POWER,

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-11-25
+
+### Changed
+
+- **Cost sensors count the solar share:** the cost sensors of devices, labels and areas priced every kWh at the grid price, also when the power came from the own solar plant. Now the unit price of every step depends on what the grid delivers of the consumption at that moment (the share, like the self-sufficiency of the panel: grid import / consumption, power that charges the storage from the grid is not consumption): `grid price x share + feed-in tariff x (1 - share)`. With a self-sufficiency of 100 % a kWh therefore only costs the feed-in tariff that is lost by using it, with no feed-in tariff of Tariffy it costs nothing, with no grid power the full price. Still step by step, so nothing that was counted changes. When the share cannot be told (no grid sensor, unusable readings, no consumption) the grid price stays: a missing value never makes it cheaper. The cost sensors show the price they use as attributes `unit_price` and `grid_share`. The new setting *Price every kWh at the grid price (ignore the solar share)* (*Energy counters*) switches back to the old behaviour. The *Cost* of the device rows in the Consumption tab uses the share of the shown period from the balance.
+
+### Fixed
+
+- **Cost of the wallbox:** a wallbox was priced with the kWh of its power sensor at the grid price, also when the car was charged with solar surplus. With EV Assistant the cost of the wallbox now comes from its sensor *Home charging cost* (`home_cost`: the real price of every charging session, the solar share is free): in the Consumption tab the wallbox row shows it as *Cost (EV Assistant, with the solar share)* for the shown period, and in the Costs tab the wallbox row of *Cost per device* shows it for day, week, month and year. The cost of a period is the difference of the cumulative value at its end and its start (long-term statistics, the live value for the running period). Without that sensor the grid price is used as before. The totals of the house (grid cost, savings) were right already. The cost sensors of devices, labels and areas now also take the solar share into account (see the entry below), the wallbox included.
+
 ## [0.37.0] - 2026-11-24
 
 ### Changed

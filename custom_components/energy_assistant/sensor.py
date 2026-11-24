@@ -4,7 +4,9 @@ The sensors are created for the labels and areas that are selected in the settin
 per label or area) and removed when one is deselected, without reloading the entry. The energy is the
 power of the sensors that carry the label or sit in the area (like the cards of the panel), integrated over time. The cost is
 added up step by step with the price of Tariffy that is valid at that moment, so a change of the unit
-price never changes what was already counted. The periods follow the time zone of Home Assistant.
+price never changes what was already counted. Own solar power is not priced at the grid price: the
+unit price of a moment is the price of the grid weighted with the share the grid delivers of the
+consumption, plus the feed-in tariff (what is lost by using it) for the rest (see mix.py). The periods follow the time zone of Home Assistant.
 """
 
 from __future__ import annotations
@@ -38,11 +40,13 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_COST_GRID_ONLY,
     CONF_DEVICE_EXCLUDE,
     CONF_DEVICE_EXCLUDE_PATTERNS,
     DOMAIN,
     SYSTEM_KEYS,
 )
+from .mix import grid_share, watched
 from .providers import tariffy
 from .settings import (
     as_list,
@@ -50,6 +54,7 @@ from .settings import (
     clean_ids,
     clean_label_tariffs,
     clean_names,
+    normalize,
 )
 
 PERIODS = ("day", "week", "month", "year")
@@ -162,6 +167,13 @@ class GroupEnergy:
         self.costs = dict.fromkeys(PERIODS, 0.0)
         self.price: float | None = None  # last known unit price per kWh
         self.currency: str | None = None
+        # What the grid delivers of the consumption (0 to 1) and the feed-in tariff: together they make the unit
+        # price of a moment. Unknown means the grid price, as before.
+        self.share: float | None = None
+        self.feed_in: float | None = None
+        self.grid_only = False  # setting: price everything at the grid price
+        self._mix_watched: tuple[str, ...] = ()
+        self._unsub_mix: Callable[[], None] | None = None
         self._price_entity: str | None = None
         self._unsub_price: Callable[[], None] | None = None
         self.starts = {p: period_start(self.last, p) for p in PERIODS}
@@ -218,6 +230,59 @@ class GroupEnergy:
             and (self.hass.states.get(entity_id) is None)
         ):
             self.price = None  # the chosen contract is gone: no cost rather than the wrong tariff
+
+    def _options(self) -> dict[str, Any]:
+        return normalize({**self.entry.data, **self.entry.options})
+
+    def _feed_in_entity(self) -> str | None:
+        offer = tariffy(self.hass)
+        return offer.get("feed_in") if offer else None
+
+    def _read_feed_in(self) -> float | None:
+        """The feed-in tariff of Tariffy per kWh; None when there is none or it cannot be read."""
+        entity_id = self._feed_in_entity()
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if state is None:
+            return None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return None
+        return value if _finite(value) and 0 <= value <= MAX_PRICE else None
+
+    def unit_price(self) -> float | None:
+        """The price of a kWh now: the grid price for the share the grid delivers, the feed-in tariff (what is lost by
+        using the own solar power instead of feeding it in) for the rest. Without a feed-in tariff the own power
+        costs nothing. An unknown share (no usable sensors) never lowers the price: it stays the grid price,
+        as does the setting that prices everything at the grid price."""
+        if self.price is None:
+            return None
+        if self.share is None or self.grid_only:
+            return self.price
+        return self.price * self.share + (self.feed_in or 0.0) * (1.0 - self.share)
+
+    def _refresh_mix(self) -> None:
+        """Take the share the grid delivers and the feed-in tariff, and watch the sensors they depend on."""
+        options = self._options()
+        wanted = tuple(watched(options))
+        feed_entity = self._feed_in_entity()
+        if feed_entity:
+            wanted = tuple(sorted({*wanted, feed_entity}))
+        if wanted != self._mix_watched:
+            if self._unsub_mix:
+                self._unsub_mix()
+                self._unsub_mix = None
+            self._mix_watched = wanted
+            if wanted:
+                self._unsub_mix = async_track_state_change_event(
+                    self.hass, list(wanted), self._on_mix
+                )
+        self.grid_only = bool(options.get(CONF_COST_GRID_ONLY))
+        self.share = grid_share(self.hass, options)
+        if feed_entity is None:
+            self.feed_in = None  # no feed-in tariff: the own solar power costs nothing
+        elif (found := self._read_feed_in()) is not None:
+            self.feed_in = found  # a bad reading keeps the last good one
 
     def _find_members(self) -> set[str]:
         """Power sensors (W or kW) of the entity registry that carry the label or sit in the area."""
@@ -300,6 +365,7 @@ class GroupEnergy:
         MAX_GAP (Home Assistant was stopped or blocked): the power during a pause is unknown.
         """
         gap = now - self.last
+        unit = self.unit_price()  # the price that was valid during the interval
         total_kw = sum(self.powers.values())
         if gap <= timedelta(0) or gap > MAX_GAP:
             total_kw = 0.0
@@ -313,10 +379,8 @@ class GroupEnergy:
             if now > since:
                 kwh = total_kw * (now - since).total_seconds() / 3600
                 self.values[period] += kwh
-                if (
-                    self.price is not None
-                ):  # the price that was valid during the interval
-                    self.costs[period] += kwh * self.price
+                if unit is not None:
+                    self.costs[period] += kwh * unit
         self.last = now
 
     @callback
@@ -331,6 +395,13 @@ class GroupEnergy:
         """The settings changed (maybe the tariff of the label): close the interval, then switch."""
         self._integrate(dt_util.now())
         self._refresh_price()
+        self._refresh_mix()
+
+    @callback
+    def _on_mix(self, _event: Event) -> None:
+        """The balance of the house changed: close the interval with the old share, then take the new one."""
+        self._integrate(dt_util.now())
+        self._refresh_mix()
 
     @callback
     def _on_price(self, _event: Event) -> None:
@@ -343,6 +414,7 @@ class GroupEnergy:
         self._integrate(dt_util.now())
         self._refresh_members()
         self._refresh_price()
+        self._refresh_mix()
         for sensor in self._sensors:
             sensor.refresh_name()
             sensor.async_write_ha_state()
@@ -379,6 +451,7 @@ class GroupEnergy:
         self.last = dt_util.now()
         self._refresh_members()
         self._refresh_price()
+        self._refresh_mix()
         self._unsubs.append(async_track_time_interval(self.hass, self._tick, _TICK))
 
     @callback
@@ -392,6 +465,10 @@ class GroupEnergy:
         if self._unsub_price:
             self._unsub_price()
             self._unsub_price = None
+        if self._unsub_mix:
+            self._unsub_mix()
+            self._unsub_mix = None
+        self._mix_watched = ()
 
 
 class LabelEnergySensor(SensorEntity, RestoreEntity):
@@ -490,7 +567,15 @@ class LabelCostSensor(LabelEnergySensor):
         return {
             f"{self._tracker.kind}_id": self._tracker.group_id,
             "period_start": self._tracker.starts[self._period].isoformat(),
-            "price": self._tracker.price,  # the unit price per kWh that is used now
+            "price": self._tracker.price,  # the grid price per kWh now
+            # what a kWh costs now: the grid price weighted with the share the grid delivers, the feed-in tariff
+            # for the rest
+            "unit_price": None
+            if (unit := self._tracker.unit_price()) is None
+            else round(unit, 4),
+            "grid_share": None
+            if self._tracker.share is None
+            else round(self._tracker.share, 3),
         }
 
 

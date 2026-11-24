@@ -39,7 +39,13 @@ _PV_KEYS = (
     "storage_empty_at",
     "string_fault",
 )
-_EV_KEYS = ("home_kwh", "kwh_day", "cost_day", "charge_before_pv_recommended")
+_EV_KEYS = (
+    "home_kwh",
+    "home_cost",
+    "kwh_day",
+    "cost_day",
+    "charge_before_pv_recommended",
+)
 _ELECTRICITY = ("electricity", "strom", "electricity_ht_nt")
 _TARIFFY_KEYS = (
     "arbeitspreis",
@@ -161,8 +167,9 @@ def ev_assistant(
     """Vehicles of EV Assistant with the entities that tell about home charging.
 
     The sensor `home_kwh` carries the live data of the wallbox in its attributes (`evcc_live` with evcc,
-    otherwise `home_generic_live`; `charge_power` is in kW), the others the energy and cost of today and
-    the recommendation to charge before the PV production starts.
+    otherwise `home_generic_live`; `charge_power` is in kW), `home_cost` the cumulative cost of the home charging
+    (with the real price of every charging session), the others the energy and cost of today and the
+    recommendation to charge before the PV production starts.
     """
     vehicles = _ev_vehicles(hass, excluded)
     result = []
@@ -181,6 +188,9 @@ def ev_assistant(
                 "live": keys.get("home_kwh"),
                 "kwh_today": keys.get("kwh_day"),
                 "cost_today": keys.get("cost_day"),
+                # What the home charging really cost, with the price of every session (the solar share is free):
+                # cumulative, so the cost of a period is the difference of two values.
+                "home_cost": keys.get("home_cost"),
                 "recommend": keys.get("charge_before_pv_recommended"),
             }
         )
