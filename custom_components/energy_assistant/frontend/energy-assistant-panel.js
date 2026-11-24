@@ -511,6 +511,7 @@ const STRINGS = {
     bExport: "Feed-in",
     bCharge: "To storage",
     bDischarge: "From storage",
+    bDirect: "Solar direct",
     bHouse: "Consumption",
     bAutarky: "Self-sufficiency",
     bSelf: "Self-consumption",
@@ -924,6 +925,7 @@ const STRINGS = {
     bExport: "Einspeisung",
     bCharge: "In Speicher",
     bDischarge: "Aus Speicher",
+    bDirect: "PV direkt",
     bHouse: "Verbrauch",
     bAutarky: "Autarkie",
     bSelf: "Eigenverbrauch",
@@ -3221,6 +3223,96 @@ class EnergyAssistantPanel extends HTMLElement {
 
   /** Grouped bars per bucket (production, consumption, import, export) with a title tooltip and the table. */
   _balanceChart(b) {
+    // With a consumption (counter of the house or derived) the house is shown with all its sources
+    if (b.rows.some((r) => r.cons != null)) return this._balanceStack(b);
+    return this._balanceBars(b);
+  }
+
+  /**
+   * The consumption of the house with all its sources: per bucket one bar of the sources (solar used directly, from the
+   * storage, from the grid) and the consumption as a white line over it. Feed-in and charging of the storage are not
+   * consumption, they only show in the tooltip and the table.
+   */
+  _balanceStack(b) {
+    const lang = this._hass?.language || "en";
+    const rows = b.rows, win = b.win, n = rows.length;
+    const hasSolar = rows.some((r) => r.solar != null);
+    // Solar used directly is what the grid and the storage did not deliver (= production - feed-in - charging)
+    const parts = rows.map((r) => {
+      const imp = r.imp ?? 0, dis = r.dis ?? 0;
+      return { cons: r.cons, imp, dis, direct: hasSolar && r.cons != null ? Math.max(0, r.cons - imp - dis) : 0, exp: r.exp, chg: r.chg, solar: r.solar };
+    });
+    const defs = [
+      { key: "direct", name: this._t("bDirect"), color: "--ea-prod", on: hasSolar },
+      { key: "dis", name: this._t("bDischarge"), color: "--ea-bout", on: rows.some((r) => r.dis != null) },
+      { key: "imp", name: this._t("bImport"), color: "--ea-grid", on: rows.some((r) => r.imp != null) },
+    ].filter((d) => d.on);
+    const stackOf = (q) => defs.reduce((a, d) => a + q[d.key], 0);
+    const title = `<div class="row"><span class="eb-title">${esc(this._t("balChart"))}</span><span class="eb-label">kWh</span></div>`;
+    const peak = Math.max(...parts.map((q) => Math.max(q.cons ?? 0, stackOf(q))), 0);
+    if (!(peak > 0)) return `<div class="eb-card">${title}<div class="empty">${this._t("bNoData")}</div></div>`;
+    this._balW = this._balW || 900;
+    const W = Math.max(280, Math.round(this._balW)), H = 260;
+    const M = { l: 52, r: 8, t: 10, b: 24 };
+    const pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const ticks = this._niceTicks(0, Math.max(peak, 0.1));
+    const hi = ticks[ticks.length - 1];
+    const slot = pw / n, barW = Math.max(2, slot * 0.62);
+    const y = (v) => M.t + (1 - v / hi) * ph;
+    const f1 = (v) => v.toFixed(1);
+    const num = (v, d = 2) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
+    let svg = "";
+    for (const v of ticks) {
+      svg += `<line x1="${M.l}" x2="${M.l + pw}" y1="${f1(y(v))}" y2="${f1(y(v))}" class="${v === 0 ? "haxis" : "hgrid"}"/>`;
+      svg += `<text class="htick" x="${M.l - 6}" y="${f1(y(v) + 4)}" text-anchor="end">${v.toLocaleString(lang, { maximumFractionDigits: 2 })}</text>`;
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+    const points = [];
+    parts.forEach((q, i) => {
+      const x0 = M.l + i * slot + (slot - barW) / 2, cx = M.l + i * slot + slot / 2;
+      let base = 0;
+      for (const d of defs) { // the first source at the bottom
+        const v = q[d.key];
+        if (v > 0.0005) svg += `<rect x="${f1(x0)}" y="${f1(y(base + v))}" width="${f1(barW)}" height="${f1(y(base) - y(base + v))}" fill="var(${d.color})"/>`;
+        base += v;
+      }
+      if (q.cons != null) points.push([cx, y(q.cons)]);
+      const label = this._balTick(win, i);
+      if (label && i % every === 0) svg += `<text class="htick" x="${f1(cx)}" y="${H - 6}" text-anchor="middle">${esc(label)}</text>`;
+    });
+    if (points.length) { // the consumption: a white line over the bars
+      svg += `<polyline points="${points.map(([px, py]) => `${f1(px)},${f1(py)}`).join(" ")}" fill="none" stroke="var(--eb-text)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      if (n <= 31) svg += points.map(([px, py]) => `<circle cx="${f1(px)}" cy="${f1(py)}" r="2.3" fill="var(--eb-text)"/>`).join("");
+    }
+    parts.forEach((q, i) => {
+      const x0 = M.l + i * slot;
+      const rowsTip = [["--eb-text", q.cons == null ? "–" : `${num(q.cons)} kWh`, this._t("bHouse")]];
+      for (const d of defs) if (q[d.key] > 0.0005) rowsTip.push([d.color, `${num(q[d.key])} kWh`, d.name]);
+      if (q.exp > 0.0005) rowsTip.push(["--ea-feed", `${num(q.exp)} kWh`, this._t("bExport")]);
+      if (q.chg > 0.0005) rowsTip.push(["--ea-bin", `${num(q.chg)} kWh`, this._t("bCharge")]);
+      // The tooltip is drawn by the panel (see _wireTips), in the style of the history chart.
+      const tip = { t: this._balRowLabel(win, i), r: rowsTip };
+      svg += `<rect class="bslot" x="${f1(x0)}" y="${M.t}" width="${f1(slot)}" height="${ph}" data-tipj="${esc(JSON.stringify(tip))}"/>`;
+    });
+    const legend = `<span><i style="background:var(--eb-text);width:14px;height:3px;border-radius:2px"></i>${esc(this._t("bHouse"))}</span>`
+      + defs.map((d) => `<span><i style="background:var(${d.color})"></i>${esc(d.name)}</span>`).join("");
+    // The table: the consumption, its sources and what is not consumption
+    const cols = [
+      { key: "cons", name: this._t("bHouse") },
+      ...defs.map((d) => ({ key: d.key, name: d.name })),
+      ...[["exp", "bExport"], ["chg", "bCharge"], ["solar", "bSolar"]].filter(([k]) => rows.some((r) => r[k] != null)).map(([k, l]) => ({ key: k, name: this._t(l) })),
+    ];
+    const cell = (q, k) => (q[k] == null ? "–" : num(q[k]));
+    const sumRow = `<tr><th>${esc(this._t("bSum"))}</th>${cols.map((c) => `<td>${num(parts.reduce((a, q) => a + (q[c.key] ?? 0), 0))}</td>`).join("")}</tr>`;
+    const table = parts.map((q, i) => `<tr><th>${esc(this._balRowLabel(win, i))}</th>${cols.map((c) => `<td>${cell(q, c.key)}</td>`).join("")}</tr>`).join("");
+    return `<div class="eb-card">${title}<div class="hchart"><div class="legend">${legend}</div>
+      <div class="chartwrap bwrap"><svg class="hsvg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(this._t("balChart"))}">${svg}</svg></div>
+      <details class="tableview"${this._balTableOpen ? " open" : ""}><summary>${esc(this._t("hTable"))}</summary>
+        <table><tr><th>${esc(this._t("bTime"))}</th>${cols.map((c) => `<th>${esc(c.name)} (kWh)</th>`).join("")}</tr>${table}${sumRow}</table></details></div></div>`;
+  }
+
+  /** Grouped bars per bucket (production, consumption, import, export): for setups without a consumption. */
+  _balanceBars(b) {
     const lang = this._hass?.language || "en";
     const rows = b.rows, win = b.win;
     const defs = [
@@ -5394,7 +5486,7 @@ class EnergyAssistantPanel extends HTMLElement {
           const line = document.createElement("div");
           line.className = "tr";
           const key = document.createElement("i");
-          key.style.background = `var(${color})`;
+          key.style.background = String(color).startsWith("--") ? `var(${color})` : color; // a variable name or a color
           const val = document.createElement("b");
           val.textContent = value;
           const label = document.createElement("span");

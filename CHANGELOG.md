@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Consumption of the house with all its sources:** the chart *Energy per period* of the Consumption tab now shows the consumption as a white line over bars of its sources: solar used directly, from the storage and from the grid, so the bar reaches the line. Feed-in and charging of the storage are not consumption, they stay in the tooltip and in the table. The table has the consumption first, then its sources, feed-in, charging and production. Without a consumption the grouped bars stay as before.
+
+### Fixed
+
+- **Colored dots in the tooltips:** the tooltips of the Devices tab and of the results card showed no colored dot in front of the values; they do now.
+
+### Changed
+
 - **Devices tab sorted by size:** the ring, the bar and the legend of the categories run from the smallest to the biggest, the stacked bars have the smallest category at the bottom, and the tooltip of a bar lists the biggest category first and the smallest last. *Not assigned* is always the last one, in the legend and in the tooltip. The ring of every category card also runs clockwise from the smallest to the biggest device (the list next to it keeps the biggest first).
 
 ## [0.36.0] - 2026-11-23

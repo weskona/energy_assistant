@@ -2538,20 +2538,42 @@ test("balance: the picker marks the range, 'next' is off for the current period 
   assert.match(p._balLabel(p._balWindow("year", 0)), /^\d{4}$/);
 });
 
-test("balance: the bar chart has a bar per bucket and series, a styled tooltip and the table with the sum", () => {
+test("balance: the consumption as a white line over bars of its sources, a styled tooltip and the table with the sum", () => {
   const html = loadedBalance()._renderBalance();
   assert.match(html, /<span class="eb-title">Energy per period<\/span>/);
-  assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // two days with production
-  // the tooltip is drawn by the panel from the data of the slot: a title and one row per series
+  // week data: consumption 10 and 17 kWh (solar + import + storage - feed-in - charging), the sources are stacked
+  assert.equal((html.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="var\(--ea-prod\)"/g) || []).length, 2); // solar used directly on two days
+  assert.equal((html.match(/fill="var\(--ea-grid\)"/g) || []).length, 2); // grid import
+  assert.equal((html.match(/fill="var\(--ea-bout\)"/g) || []).length, 1); // from the storage on one day
+  assert.doesNotMatch(html, /fill="var\(--ea-feed\)"/); // feed-in is not consumption: no bar
+  assert.match(html, /<polyline points="[^"]+" fill="none" stroke="var\(--eb-text\)"/); // the white line
+  assert.equal((html.match(/<circle cx="[^"]*" cy="[^"]*" r="2\.3" fill="var\(--eb-text\)"/g) || []).length, 2); // a dot for each day with data
+  // the tooltip is drawn by the panel from the data of the slot: a title and one row per value
   const slot = html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/);
   assert.ok(slot);
   const tip = JSON.parse(slot[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   assert.ok(tip.t.length > 0);
-  assert.ok(tip.r.some(([color, value, name]) => color === "--ea-prod" && /^\d+[.,]\d{2} kWh$|^–$/.test(value) && name === "Production"));
+  assert.deepEqual(tip.r.map(([, , name]) => name), ["Consumption", "Solar direct", "From storage", "Grid import", "Feed-in", "To storage"]);
+  assert.equal(tip.r[0][0], "--eb-text");
+  assert.match(tip.r[0][1], /^10[.,]00 kWh$/);
+  assert.match(tip.r[1][1], /^5[.,]00 kWh$/); // 10 - 4 import - 1 storage
   assert.doesNotMatch(html, /<title>/); // no plain browser tooltip any more
   assert.match(html, /<summary>Show as table<\/summary>/);
-  assert.match(html, /<th>Sum<\/th><td>30[.,]00<\/td>/);
+  assert.match(html, /<th>Sum<\/th><td>27[.,]00<\/td>/); // the consumption of the two days
   assert.equal((html.match(/<tr><th>/g) || []).length, 1 + 7 + 1); // the header, seven days and the sum row
+  // the legend names the line and the sources
+  assert.match(html, /<span><i style="background:var\(--eb-text\);width:14px[^>]*><\/i>Consumption<\/span>/);
+  assert.match(html, /<span><i style="background:var\(--ea-prod\)"><\/i>Solar direct<\/span>/);
+});
+
+test("balance: without a consumption the grouped bars stay", () => {
+  const p = balPanel({ energy_solar: ["sensor.pv_e"] });
+  const win = p._balWindow("week", 0);
+  p._usRange = "week";
+  p._bal = { range: "week", off: 0, win, at: Date.now(), failed: false, ...p._balCompute({ solar: [5, 6, null, null, null, null, null] }, win), before: null };
+  const html = p._renderBalance();
+  assert.doesNotMatch(html, /<polyline/);
+  assert.match(html, /fill="var\(--ea-prod\)"/); // the production bars of the old chart
 });
 
 test("balance: a period without any energy says so, the table state is kept", () => {
