@@ -22,4 +22,6 @@ These apply to every sensor that adds values up over time, such as the label ene
 9. **Unload callbacks return nothing.** Anything passed to `entry.async_on_unload` must return `None` (a lambda that returns a list makes the unload fail).
 10. **Selections are opt-in.** Nothing is preselected so a new installation creates no sensors, and the settings show a counter of what a selection creates. There is no cap on the number of devices (the user decided against the former limit of 20). A source that disappears never deletes sensors on its own; only deselecting does.
 
+11. **The unit price follows the solar share.** The price of a step is `grid price * share + feed-in * (1 - share)` (`mix.py`, `GroupEnergy.unit_price`), where the share is what the grid delivers of the consumption at that moment. Close the interval with the old share before taking the new one, like the price. An unknown share (no grid sensor, bad readings, no consumption) means the grid price, never a lower one by guessing; the feed-in tariff is checked like every price and the last good one stays; no feed-in tariff means the own power costs nothing. The setting `cost_grid_only` switches it off.
+
 Limits live as constants at the top of `sensor.py`; reuse them or add new ones there.

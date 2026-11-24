@@ -5336,3 +5336,34 @@ test("wallbox cost: the values are loaded for the shown period, in the Costs tab
   q._evCostPeriod = async () => { throw new Error("must not be called"); };
   await q._maybeLoadEvCost();
 });
+
+// ---- the price of a kWh of a device follows what the grid delivered of the consumption
+
+test("device cost: a kWh costs the grid price for the grid share and the lost feed-in tariff for the rest", () => {
+  const p = usageWithLines({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } }, "sensor.t_feed": { state: "0.08", attributes: {} } });
+  p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } };
+  const none = p._mixPrice(0.3, "day", 0);
+  assert.equal(none, 0.3); // no balance: the grid price
+  p._bal = { range: "day", off: 0, failed: false, rows: [], totals: { cons: 10, imp: 2 } }; // 20 % from the grid
+  assert.ok(Math.abs(p._mixPrice(0.3, "day", 0) - (0.3 * 0.2 + 0.08 * 0.8)) < 1e-9);
+  assert.equal(p._mixPrice(0.3, "week", 0), 0.3); // a balance of another period does not count
+  p._bal.totals = { cons: 10, imp: 0 }; // a self-sufficiency of 100 %: only the lost feed-in
+  assert.ok(Math.abs(p._mixPrice(0.3, "day", 0) - 0.08) < 1e-9);
+  p._bal.totals = { cons: 10, imp: 30 }; // more import than consumption (charging the storage): at most the grid price
+  assert.equal(p._mixPrice(0.3, "day", 0), 0.3);
+  p._cfg.cost_grid_only = true; // the setting
+  p._bal.totals = { cons: 10, imp: 0 };
+  assert.equal(p._mixPrice(0.3, "day", 0), 0.3);
+  assert.ok(Number.isNaN(p._mixPrice(NaN, "day", 0)));
+});
+
+test("device cost: the rows of the Consumption tab are priced with the mix of the period", () => {
+  const p = usageWithLines({ "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } }, "sensor.t_feed": { state: "0.08", attributes: {} } });
+  p._int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_feed" } };
+  p._open = new Set(["usage:top:sensor.c"]);
+  p._bal = { range: "day", off: 0, failed: false, rows: [], totals: { cons: 10, imp: 0 } }; // all own power
+  const html = p._renderUsage();
+  const detail = html.slice(html.indexOf('class="subs"'));
+  assert.match(detail, /Cost<\/span><b>[^<]*0[.,]20[^<]*<\/b>/); // 2.5 kWh x 0.08, not x 0.30 = 0.75
+  assert.doesNotMatch(detail, /0[.,]75/);
+});

@@ -85,6 +85,7 @@ async def test_setup_registers_panel_with_normalized_config(
         "energy_house": [],
         "invert_grid": True,
         "invert_battery": False,
+        "cost_grid_only": False,
     }
 
     assert await hass.config_entries.async_unload(entry.entry_id)

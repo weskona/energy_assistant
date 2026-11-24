@@ -371,6 +371,8 @@ const STRINGS = {
     f_battery_soc_more: "Further storages: charge level sensors (%, one battery each in the results)",
     f_battery_capacity: "Storage capacity (kWh)",
     f_battery_min_soc: "Minimum charge level (%)",
+    f_cost_grid_only: "Price every kWh at the grid price (ignore the solar share)",
+    h_cost_mix: "The cost sensors of devices, labels and areas price a kWh by what the grid delivers at that moment: own solar power only costs the feed-in tariff that is lost by using it (with 100 % self-sufficiency that is all), grid power costs the price of the contract. Tick this to price everything at the grid price as before.",
     f_ev_consumption: "Electric car: consumption (kWh per 100 km, for the kilometres of the results)",
     liveTitle: "Right now",
     liveHouse: "Consumption now",
@@ -787,6 +789,8 @@ const STRINGS = {
     f_battery_soc_more: "Weitere Speicher: Ladestand-Sensoren (%, je eine Batterie in den Ergebnissen)",
     f_battery_capacity: "Speicherkapazität (kWh)",
     f_battery_min_soc: "Mindest-Ladestand (%)",
+    f_cost_grid_only: "Jede kWh zum Netzpreis rechnen (Solaranteil ignorieren)",
+    h_cost_mix: "Die Kostensensoren von Geräten, Labels und Bereichen bewerten eine kWh nach dem, was das Netz in dem Moment liefert: eigener Solarstrom kostet nur die Einspeisevergütung, die durch das Verbrauchen entgeht (bei 100 % Autarkie ist das alles), Netzstrom kostet den Preis des Vertrags. Hake das an, um wie bisher alles zum Netzpreis zu rechnen.",
     f_ev_consumption: "E-Auto: Verbrauch (kWh pro 100 km, für die Kilometer der Ergebnisse)",
     liveTitle: "Jetzt",
     liveHouse: "Verbrauch jetzt",
@@ -1368,7 +1372,7 @@ const RES_ART = {
 const SETTINGS_SECTIONS = [
   { title: "sectionGrid", fields: [["grid_power", "multi"], ["invert_grid", "bool"], ["grid_import", "single"], ["grid_export", "single"], ["house_power", "single"]] },
   { title: "sectionSolar", fields: [["solar_power", "multi"], ["battery_power", "multi"], ["invert_battery", "bool"], ["battery_discharge", "multi"], ["battery_charge", "multi"], ["battery_grid_charge", "single"], ["battery_soc", "soc"], ["battery_soc_more", "socs"], ["battery_capacity", "number"], ["battery_min_soc", "number"]] },
-  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["history_years", "history"]] },
+  { title: "sectionEnergy", fields: [["energy_offer", "energyoffer"], ["energy_solar", "emulti"], ["energy_grid_import", "emulti"], ["energy_grid_export", "emulti"], ["energy_battery_charge", "emulti"], ["energy_battery_discharge", "emulti"], ["energy_house", "emulti"], ["ev_consumption", "number"], ["cost_grid_only", "bool"], ["h_cost_mix", "note"], ["history_years", "history"]] },
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
@@ -1423,7 +1427,7 @@ const compilePatterns = (patterns) => {
     return list.some((p) => p.re.test(p.full ? entityId : short));
   };
 };
-const BOOL_KEYS = ["invert_grid", "invert_battery"];
+const BOOL_KEYS = ["invert_grid", "invert_battery", "cost_grid_only"];
 
 // Power is always shown in watts (also above 1000 W), whatever unit the sensors report.
 const fmtPower = (w) => {
@@ -1529,6 +1533,20 @@ class EnergyAssistantPanel extends HTMLElement {
     if (Number.isNaN(value)) return null;
     const unit = String(state.attributes?.unit_of_measurement || "EUR/kWh");
     return { value, currency: unit.split("/")[0] || "EUR" };
+  }
+
+  /**
+   * The price of a kWh of a device in the shown period: the grid price for the share the grid delivered of the
+   * consumption of the period (grid import / consumption of the balance), the feed-in tariff that is lost for the rest.
+   * The grid price when the balance is not there, with the setting that prices everything at the grid price, or
+   * when no price is known.
+   */
+  _mixPrice(price, range, off) {
+    if (Number.isNaN(price) || this._cfg.cost_grid_only) return price;
+    const b = this._bal, t = b?.totals;
+    if (!b || b.failed || b.range !== range || b.off !== off || !(t?.cons > 0) || t.imp == null) return price;
+    const share = Math.max(0, Math.min(1, t.imp / t.cons));
+    return price * share + (this._feedInTariff() ?? 0) * (1 - share);
   }
 
   _feedInTariff() {
@@ -1987,6 +2005,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = priceState ? parseFloat(priceState.state) : NaN;
     const currency = String(priceState?.attributes?.unit_of_measurement || "EUR/kWh").split("/")[0] || "EUR";
     const money = (v) => this._money(v, currency).join(" ");
+    const unitPrice = this._mixPrice(price, range, off); // what a kWh of a device costs in this period (solar share)
     const num = (v, d) => v.toLocaleString(lang, { minimumFractionDigits: d, maximumFractionDigits: d });
     const tile = (label, value, unit, extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}<small>${esc(unit)}</small></div>${extra}</div>`;
     const sub = (text) => `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(text)}</div>`;
@@ -2029,7 +2048,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const f = [[this._t("uFactEnergy"), `${num(d.kwh, 2)} kWh`]];
       const evCost = this._evCostOf(d.id, range, off); // a wallbox: what EV Assistant says it cost, not the kWh at the grid price
       if (evCost != null) f.push([this._t("uFactCostEv"), money(evCost)]);
-      else if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * price)]);
+      else if (!Number.isNaN(price)) f.push([this._t("uFactCost"), money(d.kwh * unitPrice)]);
       if (d.avgW != null) f.push([this._t("uFactAvg"), fmtPower(d.avgW).join(" ")]);
       if (d.peak != null) f.push([this._t("uFactPeak"), fmtPower(d.peak).join(" ")]);
       if (d.baseW != null && d.baseW >= 2) f.push([this._t("uFactBase"), fmtPower(d.baseW).join(" ")]);
@@ -2059,7 +2078,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const alwaysFold = fold(always, this._usAlwaysExpanded, "data-usalwaystoggle");
     const topRows = topFold.shown.map((d) => {
       const evCost = this._evCostOf(d.id, range, off);
-      const cost = evCost != null ? money(evCost) : !Number.isNaN(price) ? money(d.kwh * price) : "";
+      const cost = evCost != null ? money(evCost) : !Number.isNaN(price) ? money(d.kwh * unitPrice) : "";
       return row("top", d, d.name, num(d.kwh, 2), "kWh", total > 0 ? Math.round((d.kwh / total) * 100) : null, total > 0 ? (d.kwh / total) * 100 : 0, cost); // bar = share of the whole period
     }).join("");
     const topCard = `<div class="eb-card"><div class="row"><span class="eb-title">${esc(this._t("uTopTitle"))}</span><span class="eb-label">${num(total, 2)} kWh</span></div>

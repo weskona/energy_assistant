@@ -733,3 +733,137 @@ async def test_saving_the_same_selection_again_never_creates_a_second_set(
     )
     await hass.async_block_till_done()
     assert ours() == first
+
+
+# -- the price of a kWh depends on what the grid delivers of the consumption -----------------------
+
+
+def _mix_tracker(hass: HomeAssistant, options: dict | None = None) -> GroupEnergy:
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=options or {})
+    tracker = GroupEnergy(hass, entry, "klima")
+    tracker.last = datetime(2026, 11, 13, 10, 0, tzinfo=BERLIN)
+    tracker.starts = {p: period_start(tracker.last, p) for p in PERIODS}
+    tracker.powers = {"sensor.a": 2.0}  # 2 kW: 2 kWh per hour
+    tracker.price = 0.30
+    return tracker
+
+
+async def test_own_solar_power_costs_only_the_lost_feed_in(hass: HomeAssistant) -> None:
+    tracker = _mix_tracker(hass)
+    tracker.feed_in = 0.08
+    tracker.share = 0.0  # a self-sufficiency of 100 %
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 6) == round(2 * 0.08, 6)  # not 2 x 0.30
+    assert tracker.unit_price() == 0.08
+
+
+async def test_a_mix_is_priced_by_the_share(hass: HomeAssistant) -> None:
+    tracker = _mix_tracker(hass)
+    tracker.feed_in = 0.08
+    tracker.share = 0.5
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 6) == round(2 * (0.5 * 0.30 + 0.5 * 0.08), 6)
+
+
+async def test_without_a_share_the_grid_price_stays(hass: HomeAssistant) -> None:
+    tracker = _mix_tracker(hass)
+    tracker.feed_in = 0.08
+    tracker.share = None  # no usable sensors: never a lower price by guessing
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 6) == round(2 * 0.30, 6)
+
+
+async def test_without_a_feed_in_tariff_the_own_power_costs_nothing(
+    hass: HomeAssistant,
+) -> None:
+    tracker = _mix_tracker(hass)
+    tracker.feed_in = None
+    tracker.share = 0.0
+    _run(tracker, 60)
+    assert tracker.costs["day"] == 0.0
+    tracker.share = 0.25  # only the grid part is paid
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 6) == round(2 * 0.25 * 0.30, 6)
+
+
+async def test_the_setting_prices_everything_at_the_grid_price(
+    hass: HomeAssistant,
+) -> None:
+    tracker = _mix_tracker(hass, {"cost_grid_only": True})
+    tracker._refresh_mix()
+    assert tracker.grid_only is True
+    tracker.share = 0.0
+    tracker.feed_in = 0.08
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 6) == round(2 * 0.30, 6)
+
+
+async def test_a_change_of_the_share_closes_the_running_interval_with_the_old_share(
+    hass: HomeAssistant,
+) -> None:
+    options = {"grid_import": ["sensor.gi"], "house_power": "sensor.h"}
+    tracker = _mix_tracker(hass, options)
+    hass.states.async_set("sensor.h", "2000", {"unit_of_measurement": "W"})
+    hass.states.async_set(
+        "sensor.gi", "0", {"unit_of_measurement": "W"}
+    )  # all own power
+    tracker.feed_in = None
+    tracker._refresh_mix()
+    assert tracker.share == 0.0
+    _run(tracker, 60)  # one hour at a share of 0: free
+    assert tracker.costs["day"] == 0.0
+    # the grid takes over: the interval until now is closed with the old share, the new one counts afterwards
+    hass.states.async_set("sensor.gi", "2000", {"unit_of_measurement": "W"})
+    with patch(
+        "custom_components.energy_assistant.sensor.dt_util.now",
+        return_value=tracker.last + timedelta(hours=1) - timedelta(seconds=1),
+    ):
+        tracker._on_mix(MagicMock())
+    assert (
+        round(tracker.costs["day"], 4) == 0.0
+    )  # the last stretch still had the old share
+    assert tracker.share == 1.0
+    _run(tracker, 60)
+    assert round(tracker.costs["day"], 3) == round(
+        2 * 0.30, 3
+    )  # an hour with the grid price
+
+
+async def test_the_feed_in_tariff_is_read_checked_and_kept(hass: HomeAssistant) -> None:
+    tracker = _mix_tracker(hass)
+    offer = {"price": "sensor.t_preis", "feed_in": "sensor.t_feed"}
+    with patch("custom_components.energy_assistant.sensor.tariffy", return_value=offer):
+        hass.states.async_set("sensor.t_feed", "0.082")
+        tracker._refresh_mix()
+        assert tracker.feed_in == 0.082
+        for bad in ("nan", "inf", "-0.1", "abc", "50", "unavailable"):
+            hass.states.async_set("sensor.t_feed", bad)
+            tracker._refresh_mix()
+            assert tracker.feed_in == 0.082, bad  # the last good one stays
+        assert (
+            "sensor.t_feed" in tracker._mix_watched
+        )  # a change closes the interval first
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    ):
+        tracker._refresh_mix()
+        assert tracker.feed_in is None  # no feed-in tariff at all
+    tracker.stop()
+
+
+async def test_the_cost_sensor_shows_the_price_it_uses(hass: HomeAssistant) -> None:
+    from custom_components.energy_assistant.sensor import LabelCostSensor
+
+    tracker = _mix_tracker(hass)
+    tracker.feed_in = 0.08
+    tracker.share = 0.5
+    entry = MockConfigEntry(domain=DOMAIN, data={})
+    attrs = LabelCostSensor(entry, tracker, "Klima", "day").extra_state_attributes
+    assert attrs["price"] == 0.30  # the grid price
+    assert attrs["unit_price"] == 0.19  # what a kWh costs now
+    assert attrs["grid_share"] == 0.5
+    tracker.share = None
+    attrs = LabelCostSensor(entry, tracker, "Klima", "day").extra_state_attributes
+    assert attrs["unit_price"] == 0.30
+    assert attrs["grid_share"] is None
