@@ -2935,7 +2935,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const more = c.devices.length > DEV_ROWS
       ? `<button type="button" class="linkbtn" data-open="devtab:${esc(c.id)}">${esc(open ? this._t("showLess") : this._t("showAll", { n: c.devices.length }))}</button>`
       : "";
-    const ring = this._donut(c.devices.map((x, i) => ({ value: x.kwh, color: colors[i] })), kwh(c.total), "kWh");
+    // clockwise from the smallest to the biggest (the list keeps the biggest first, the colors stay with their device)
+    const ring = this._donut(c.devices.map((x, i) => ({ value: x.kwh, color: colors[i] })).sort((x, y) => x.value - y.value), kwh(c.total), "kWh");
     return `<div class="eb-card cat"><div class="row"><span class="eb-title">${this._iconOnly(c.icon, c.tint) || `<i class="dot" style="background:${c.color};margin-right:8px"></i>`}${esc(c.name)}</span><span class="eb-label">${kwh(c.total)} kWh · ${esc(this._t("devOfHouse", { pct: pct(c.total, denom) }))}</span></div>
       <div class="cbody"><div class="dring">${ring}</div><div class="clist">${rows}${more}</div></div></div>`;
   }

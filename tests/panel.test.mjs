@@ -5167,3 +5167,14 @@ test("devices tab: the ring, bar and legend run from small to big, the tooltip f
   const tip = JSON.parse(html.match(/class="bslot"[^>]*data-tipj="([^"]*)"/)[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
   assert.deepEqual(tip.r.map(([, , name]) => name), ["Klima", "Licht", "not assigned"]);
 });
+
+test("devices tab: the ring of a category runs clockwise from the smallest to the biggest device, the list keeps the biggest first", () => {
+  const p = devicesTabPanel();
+  const c = { id: "x", name: "X", icon: null, tint: null, color: "#fff", total: 6, buckets: [6], devices: [{ id: "a", name: "Big", kwh: 3 }, { id: "b", name: "Mid", kwh: 2 }, { id: "c", name: "Small", kwh: 1 }] };
+  const html = p._devCategoryCard(c, 10, (v) => String(v), (v) => Math.round(v));
+  const arcs = [...html.matchAll(/<circle [^>]*stroke="([^"]+)"[^>]*stroke-dasharray="([\d.]+) /g)].map((m) => ({ color: m[1], len: Number(m[2]) }));
+  assert.equal(arcs.length, 3);
+  assert.ok(arcs[0].len < arcs[1].len && arcs[1].len < arcs[2].len); // clockwise from the top: small, middle, big
+  const names = [...html.matchAll(/class="cn" title="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(names, ["Big", "Mid", "Small"]); // the list: the biggest first
+});
