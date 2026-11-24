@@ -20,6 +20,7 @@ from .const import (
     CONF_HISTORY_YEARS,
     CONF_HOUSE_POWER,
     CONF_LABEL_TARIFFS,
+    CONF_SOURCE_EXCLUDE,
     DOMAIN,
     HISTORY_KINDS,
     HISTORY_MAX_COST,
@@ -34,7 +35,7 @@ from .const import (
     TEXT_KEYS,
 )
 from .energy_prefs import async_energy_suggestion
-from .providers import available
+from .providers import available, sources
 from .pv_assistant import suggestion
 from .sensor import COST, PERIODS, unique_id
 from .settings import has_source, normalize, to_storage
@@ -238,7 +239,15 @@ def ws_integrations(
 
     Only entity ids and meta data: the panel reads the live values from the states.
     """
-    connection.send_result(msg["id"], available(hass))
+    entry = _entry(hass)
+    excluded = frozenset(
+        normalize({**entry.data, **entry.options}).get(CONF_SOURCE_EXCLUDE, [])
+        if entry
+        else []
+    )
+    connection.send_result(
+        msg["id"], {**available(hass, excluded), "sources": sources(hass)}
+    )
 
 
 @websocket_api.websocket_command(

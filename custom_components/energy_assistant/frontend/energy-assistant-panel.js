@@ -311,6 +311,16 @@ details.tableview th:first-child{text-align:left;font-weight:400}
 .msg{font-size:13px;color:var(--eb-green)}
 .msg.err{color:var(--eb-red)}
 .note{font-size:12.5px;color:var(--eb-muted)}
+.srcs .sblock{margin-top:14px}
+.srcs .shead{font-weight:600;font-size:14px}
+.srcs .shead small,.srcs .sname small{display:block;font-weight:400;font-size:12px;color:var(--eb-muted);overflow-wrap:anywhere}
+.srcs .sgroup{margin:10px 0 2px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--eb-muted)}
+.srcs .srow{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--eb-tile-border);font-size:14px;cursor:pointer}
+.srcs .srow input{accent-color:var(--eb-green);width:18px;height:18px}
+.srcs .srow.off .sname,.srcs .srow.off .sval{opacity:.5;text-decoration:line-through}
+.srcs .sval{font-variant-numeric:tabular-nums;color:var(--eb-muted)}
+.srcs .sstate{font-size:12px;color:var(--eb-muted);min-width:84px;text-align:right}
+@media (max-width:520px){.srcs .srow{grid-template-columns:auto 1fr auto}.srcs .sstate{display:none}}
 .warn{color:var(--eb-orange)}
 @media (max-width:640px){
 .row{flex-wrap:wrap;row-gap:2px}
@@ -699,6 +709,47 @@ const STRINGS = {
     areas: "Areas",
     noArea: "No area",
     labels: "Labels",
+    sectionSources: "Sources from other integrations",
+    h_source_list: "These sensors come from Tariffy, EV Assistant, PV Assistant and Amortix. Energy Assistant only reads them. Everything is used at first; untick a sensor to stop using it (for example a second wallbox row in the device list).",
+    srcNone: "No sensors of Tariffy, EV Assistant, PV Assistant or Amortix were found.",
+    srcInt_tariffy: "Tariffy",
+    srcInt_ev_assistant: "EV Assistant",
+    srcInt_pv_assistant: "PV Assistant",
+    srcInt_amortix: "Amortix",
+    srcUse_tariffy: "price per kWh for costs and savings, feed-in revenue, Costs tab",
+    srcUse_ev_assistant: "car in the Power tab and the picture, EV tab, wallbox row in the device list",
+    srcUse_pv_assistant: "PV day figures, forecast and notices in the PV tab",
+    srcUse_amortix: "savings and payback in the Amortix tab",
+    srcUsed: "in use",
+    srcOff: "not used",
+    src_arbeitspreis: "Electricity price",
+    src_einspeiseverguetung: "Feed-in tariff",
+    src_kosten_bisher: "Costs so far",
+    src_guthaben_bisher: "Balance so far",
+    src_prognose_real: "Forecast",
+    src_home_kwh: "Home charging total (its attributes carry the live data of the wallbox)",
+    src_kwh_day: "Energy charged today",
+    src_cost_day: "Cost of today",
+    src_charge_before_pv_recommended: "Advice: charge before the sun",
+    src_wallbox_power: "Power sensor of the wallbox (also the wallbox row in the device list)",
+    src_production_today: "Production today",
+    src_feed_in_today: "Feed-in today",
+    src_self_consumption_rate_today: "Self-consumption today",
+    src_autarky_today: "Self-sufficiency today",
+    src_benefit_today: "Benefit today",
+    src_forecast_reached_today: "Forecast reached today",
+    src_expected_feed_in_tomorrow: "Expected feed-in tomorrow",
+    src_best_window_tomorrow: "Best window tomorrow",
+    src_storage_usable: "Usable storage energy",
+    src_storage_empty_at: "Storage empty at",
+    src_string_fault: "Plant fault",
+    src_einsparung: "Savings total",
+    src_investition: "Investment",
+    src_fortschritt: "Payback progress",
+    src_verbleibend: "Remaining",
+    src_tagesschnitt: "Savings per day",
+    src_resttage: "Days to payback",
+    src_datum: "Payback date",
     sectionLabels: "Labels",
     f_label_ids: "Labels (their power sensors are summed up per label)",
     noLabelsDefined: "No labels exist in Home Assistant yet. Create them under Settings → Areas, labels & zones.",
@@ -1071,6 +1122,47 @@ const STRINGS = {
     areas: "Bereiche",
     noArea: "Ohne Bereich",
     labels: "Labels",
+    sectionSources: "Quellen aus anderen Integrationen",
+    h_source_list: "Diese Sensoren kommen von Tariffy, EV Assistant, PV Assistant und Amortix. Energy Assistant liest sie nur. Zuerst wird alles verwendet; nimm den Haken weg, um einen Sensor nicht mehr zu verwenden (zum Beispiel eine zweite Wallbox-Zeile in der Geräteliste).",
+    srcNone: "Es wurden keine Sensoren von Tariffy, EV Assistant, PV Assistant oder Amortix gefunden.",
+    srcInt_tariffy: "Tariffy",
+    srcInt_ev_assistant: "EV Assistant",
+    srcInt_pv_assistant: "PV Assistant",
+    srcInt_amortix: "Amortix",
+    srcUse_tariffy: "Preis pro kWh für Kosten und Ersparnis, Einspeiseerlös, Reiter Kosten",
+    srcUse_ev_assistant: "Auto im Reiter Leistung und im Bild, Reiter Auto, Wallbox-Zeile in der Geräteliste",
+    srcUse_pv_assistant: "PV-Tageswerte, Prognose und Hinweise im Reiter PV",
+    srcUse_amortix: "Einsparung und Amortisation im Reiter Amortix",
+    srcUsed: "in Verwendung",
+    srcOff: "nicht verwendet",
+    src_arbeitspreis: "Strompreis",
+    src_einspeiseverguetung: "Einspeisevergütung",
+    src_kosten_bisher: "Kosten bisher",
+    src_guthaben_bisher: "Guthaben bisher",
+    src_prognose_real: "Prognose",
+    src_home_kwh: "Heimladen gesamt (seine Attribute tragen die Livedaten der Wallbox)",
+    src_kwh_day: "Heute geladene Energie",
+    src_cost_day: "Kosten heute",
+    src_charge_before_pv_recommended: "Empfehlung: vor der Sonne laden",
+    src_wallbox_power: "Leistungssensor der Wallbox (auch die Wallbox-Zeile in der Geräteliste)",
+    src_production_today: "Erzeugung heute",
+    src_feed_in_today: "Einspeisung heute",
+    src_self_consumption_rate_today: "Eigenverbrauch heute",
+    src_autarky_today: "Autarkie heute",
+    src_benefit_today: "Nutzen heute",
+    src_forecast_reached_today: "Prognose heute erreicht",
+    src_expected_feed_in_tomorrow: "Erwartete Einspeisung morgen",
+    src_best_window_tomorrow: "Bestes Fenster morgen",
+    src_storage_usable: "Nutzbare Speicherenergie",
+    src_storage_empty_at: "Speicher leer um",
+    src_string_fault: "Anlagenstörung",
+    src_einsparung: "Einsparung gesamt",
+    src_investition: "Investition",
+    src_fortschritt: "Fortschritt der Amortisation",
+    src_verbleibend: "Verbleibend",
+    src_tagesschnitt: "Einsparung pro Tag",
+    src_resttage: "Tage bis zur Amortisation",
+    src_datum: "Amortisationsdatum",
     sectionLabels: "Labels",
     f_label_ids: "Labels (ihre Leistungssensoren werden je Label zusammengefasst)",
     noLabelsDefined: "In Home Assistant gibt es noch keine Labels. Anlegen unter Einstellungen → Bereiche, Labels & Zonen.",
@@ -1274,8 +1366,9 @@ const SETTINGS_SECTIONS = [
   { title: "sectionDevices", fields: [["device_patterns", "text"], ["device_exclude_patterns", "text"], ["device_power", "multi"], ["device_standby", "multi"], ["h_device_standby", "note"], ["alert_exclude", "multi"], ["h_alert_exclude", "note"], ["device_matches", "matches"], ["device_ids", "multi"], ["device_ids_note", "devnote"], ["device_setup", "devsetup"], ["device_exclude", "multi"]] },
   { title: "sectionAreas", fields: [["area_ids", "areas"], ["h_area_sensors", "note"], ["area_tariffs", "areatariffs"]] },
   { title: "sectionLabels", fields: [["label_ids", "labels"], ["h_label_sensors", "note"], ["label_tariffs", "labeltariffs"]] },
+  { title: "sectionSources", fields: [["h_source_list", "note"], ["source_list", "sources"]] },
 ];
-const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "battery_soc_more", "device_power", "device_standby", "standby_normal", "alert_exclude", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "label_ids", "area_ids", ...ENERGY_KEYS];
+const LIST_KEYS = ["grid_power", "grid_import", "grid_export", "solar_power", "battery_power", "battery_discharge", "battery_charge", "battery_grid_charge", "battery_soc", "battery_soc_more", "device_power", "device_standby", "standby_normal", "alert_exclude", "device_ids", "device_patterns", "device_exclude", "device_exclude_patterns", "source_exclude", "label_ids", "area_ids", ...ENERGY_KEYS];
 // Sensors that are part of the energy balance and therefore never listed as devices.
 // The two pick lists of the settings (labels and areas) share their code. Each has its own
 // attribute names, element id and filter state.
@@ -3533,6 +3626,8 @@ class EnergyAssistantPanel extends HTMLElement {
       this._status = "saved";
       this._error = "";
       this._maybeLoadHistory();
+      // The deselected sensors count at once (the backend leaves them out of the answer).
+      this._loadIntegrations();
       // A newly selected label gets its sensors now; they show up a moment later.
       this._loadGroupEnergy();
       setTimeout(() => this._loadGroupEnergy(), 2000);
@@ -3748,7 +3843,12 @@ class EnergyAssistantPanel extends HTMLElement {
     const t = e.target;
     if (!this._isAdmin) return;
     this._fieldError = {};
-    if (t.dataset?.area) {
+    if (t.dataset?.source !== undefined) {
+      const id = t.dataset.source;
+      const rest = (this._draft.source_exclude || []).filter((x) => x !== id);
+      this._draft.source_exclude = t.checked ? rest : [...rest, id];
+      this._edited();
+    } else if (t.dataset?.area) {
       const id = t.dataset.area;
       const rest = this._draft.area_ids.filter((x) => x !== id);
       this._draft.area_ids = t.checked ? [...rest, id] : rest;
@@ -4067,6 +4167,34 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="mlist" id="mlist">${this._renderMatchRows(ro)}</div>`;
   }
 
+  /**
+   * The list of sources: every sensor Energy Assistant takes from Tariffy, EV Assistant, PV Assistant and Amortix,
+   * grouped by integration (and contract, vehicle or entry), with the current value. A ticked sensor is used;
+   * unticking puts it on the list `source_exclude` (applied when saved). The backend always lists all of them.
+   */
+  _renderSources(ro) {
+    const list = Array.isArray(this._int?.sources) ? this._int.sources : [];
+    if (!list.length) return `<div class="fld span note">${esc(this._t("srcNone"))}</div>`;
+    const off = new Set(this._draft.source_exclude || []);
+    const row = (src) => {
+      const state = this._hass?.states?.[src.entity_id];
+      const unit = state?.attributes?.unit_of_measurement || "";
+      const value = state ? `${state.state}${unit ? ` ${unit}` : ""}` : "–";
+      const used = !off.has(src.entity_id);
+      return `<label class="srow${used ? "" : " off"}" title="${esc(src.entity_id)}"><input type="checkbox" data-source="${esc(src.entity_id)}" ${used ? "checked" : ""} ${ro ? "disabled" : ""}>
+        <span class="sname">${esc(this._t(`src_${src.key}`))}<small>${esc(src.entity_id)}</small></span>
+        <span class="sval">${esc(value)}</span><span class="sstate">${esc(this._t(used ? "srcUsed" : "srcOff"))}</span></label>`;
+    };
+    const blocks = ["tariffy", "ev_assistant", "pv_assistant", "amortix"].map((integration) => {
+      const mine = list.filter((x) => x.integration === integration);
+      if (!mine.length) return "";
+      const groups = [...new Set(mine.map((x) => x.group))];
+      const body = groups.map((g) => `${g ? `<div class="sgroup">${esc(g)}</div>` : ""}${mine.filter((x) => x.group === g).map(row).join("")}`).join("");
+      return `<div class="sblock"><div class="shead">${esc(this._t(`srcInt_${integration}`))}<small>${esc(this._t(`srcUse_${integration}`))}</small></div>${body}</div>`;
+    }).join("");
+    return `<div class="fld span srcs">${blocks}</div>`;
+  }
+
   _renderSettings() {
     if (!this._ready) return `<div class="eb-card"><div class="empty">${this._t("loading")}</div></div>`;
     const ro = !this._isAdmin;
@@ -4083,6 +4211,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (kind === "devnote") return `<div class="fld span note">${esc(this._deviceCounter())}</div>`;
       if (kind === "devsetup") return this._renderDeviceSetup(ro);
       if (kind === "history") return this._renderHistory(ro);
+      if (kind === "sources") return this._renderSources(ro);
       const label = this._t(`f_${key}`);
       if (kind === "number") {
         const v = this._draft[key];
@@ -4114,7 +4243,7 @@ class EnergyAssistantPanel extends HTMLElement {
         <div class="tags${long ? " cap" : ""}">${chips}${input}</div>${err}</div>`;
     };
     const sections = SETTINGS_SECTIONS.map(
-      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels"].includes(sec.title) ? " wide" : ""}${sec.title === "sectionDevices" ? " devsec" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
+      (sec) => `<div class="eb-card sec${["sectionDevices", "sectionAreas", "sectionLabels", "sectionSources"].includes(sec.title) ? " wide" : ""}${sec.title === "sectionDevices" ? " devsec" : ""}"><div class="eb-title">${this._t(sec.title)}</div><div class="fields">${sec.fields.map(field).join("")}</div></div>`,
     ).join("");
     const dirty = this._isDirty();
     let msg = "";
@@ -4370,7 +4499,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const excluded = this._excluder(this._cfg);
     const rows = [];
     for (const v of vehicles) {
-      if (v.wallbox_power && (deviceIds.includes(v.wallbox_power) || excluded(v.wallbox_power))) continue;
+      if (v.wallbox_off || (v.wallbox_power && (deviceIds.includes(v.wallbox_power) || excluded(v.wallbox_power)))) continue;
       const attrs = this._hass?.states?.[v.live]?.attributes || {};
       const live = attrs.evcc_live || attrs.home_generic_live;
       const kw = Number(live?.charge_power);

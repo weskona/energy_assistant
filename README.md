@@ -229,6 +229,10 @@ If [EV Assistant](https://github.com/weskona/ev_assistant) is installed, the **E
 
 If [Amortix](https://github.com/weskona/amortix) is installed, the **Payback** tab shows a card **Payback**: total savings, investment, progress, remaining amount, savings per day, time left and the expected payback date. When Amortix has an overview entry it is shown alone (it combines all other entries), otherwise every entry gets its own block. Energy Assistant only reads Amortix; without it nothing is shown and both run on their own.
 
+### Sources from other integrations
+
+The **Settings** tab ends with the card **Sources from other integrations**. It lists every sensor Energy Assistant takes from Tariffy, EV Assistant, PV Assistant and Amortix, grouped by integration (and by contract, vehicle or entry), with the current value and what it is used for. Everything is used at first. Untick a sensor and press **Save** to stop using it: it disappears from the tabs that need it, for example the **Wallbox** row in the device list or the savings, and stays in the list so you can tick it again. The choice is stored in `source_exclude`. For EV Assistant the list also shows the power sensor of the wallbox (from its settings), which is used for the energy that went to the car. Energy Assistant never changes the other integrations.
+
 ### Changing the settings
 
 After the first setup in the config flow you can change everything in the panel itself:
