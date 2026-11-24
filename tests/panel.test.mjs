@@ -2438,29 +2438,75 @@ test("balance: consumption, self-consumption and self-sufficiency", () => {
   assert.equal(p._balCompute({ imp: set(zero, 0, 5) }, win).totals.self, null);
 });
 
-test("balance: the statistics are asked for with the counters, the period and kWh", async () => {
+test("balance: the statistics are asked for with the counters, the period and kWh, a day in half hours", async () => {
   const p = balPanel();
   const calls = [];
   p._hass.callWS = async (msg) => { calls.push(msg); return {}; };
   p._tab = "balance";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 2); // this period and the one before
+  // this day in 5-minute statistics (added up to half hours), the day before in hours, and as there is nothing in the
+  // 5-minute statistics (older than the recorder keeps them) the day again in hours
+  assert.equal(calls.length, 3);
   const first = calls[0];
   assert.equal(first.type, "recorder/statistics_during_period");
-  assert.equal(first.period, "hour");
+  assert.equal(first.period, "5minute");
   assert.deepEqual(first.types, ["change"]);
   assert.deepEqual(first.units, { energy: "kWh" });
   assert.deepEqual([...first.statistic_ids].sort(), ["sensor.balkon_e", "sensor.chg_e", "sensor.dis_e", "sensor.exp_e", "sensor.imp_e", "sensor.pv_e"]);
+  assert.equal(calls[1].period, "hour");
+  assert.equal(calls[2].period, "hour");
   assert.equal(p._bal.range, "day");
+  assert.equal(p._bal.win.bucket, "hour"); // the fallback
   p._maybeLoadBalance(); // fresh data: no new request
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   p._usRange = "month";
   p._maybeLoadBalance();
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(calls.length, 4);
-  assert.equal(calls[2].period, "day");
+  assert.equal(calls.length, 5);
+  assert.equal(calls[3].period, "day");
+});
+
+test("balance: a day is shown in half hours when the 5-minute statistics have data", async () => {
+  const p = balPanel();
+  p._usRange = "day";
+  p._usOff = 0;
+  const half = p._balWindow("day", 0, { half: true });
+  assert.equal(half.bucket, "half");
+  assert.equal(half.period, "5minute");
+  assert.ok([46, 48, 50].includes(half.edges.length - 1)); // 48 half hours, 46 or 50 on the days of the clock change
+  assert.equal(half.edges[1] - half.edges[0], 1800000);
+  assert.equal(p._balWindow("day", 0).edges.length - 1 >= 23, true); // the default window stays hourly
+  // five-minute rows are added up to their half hour
+  const rows = (v) => [0, 1, 2, 3, 4, 5, 6].map((k) => ({ start: half.edges[0] + k * 300000, change: v }));
+  p._balFetch = async (w) => (w.bucket === "half" ? { "sensor.imp_e": rows(0.1) } : {});
+  await p._loadBalance();
+  assert.equal(p._bal.win.bucket, "half");
+  assert.ok(Math.abs(p._bal.rows[0].imp - 0.6) < 1e-9); // 6 rows (00:00-00:25) in the first half hour
+  assert.ok(Math.abs(p._bal.rows[1].imp - 0.1) < 1e-9); // the seventh in the second
+  // the labels of the axis: every three hours, on the full hour only
+  assert.equal(p._balTick(half, 0), p._balTick(p._balWindow("day", 0), 0));
+  assert.equal(p._balTick(half, 1), ""); // half past
+  assert.equal(p._balTick(half, 2), ""); // 01:00 is not a label
+  assert.notEqual(p._balTick(half, 6), ""); // 03:00
+});
+
+test("devices tab: a balance in half hours is added up to hours for the part that is not assigned", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  const half = p._balWindow("day", 0, { half: true });
+  p._bal = { range: "day", off: 0, failed: false, win: half, rows: Array.from({ length: half.edges.length - 1 }, () => ({ cons: 0.5 })), totals: {} };
+  if (half.edges.length - 1 === 48) {
+    const m = p._devModel();
+    assert.equal(m.house, 24); // 48 half hours of 0.5 kWh
+    assert.ok(m.unassigned >= 0);
+  }
 });
 
 test("balance: a failing request says there is no data instead of breaking", async () => {

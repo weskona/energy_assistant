@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Half hours in the day view:** the bars of the chart *Energy per period* show a day in half hours (48 bars) instead of hours. They are made from the 5-minute statistics of Home Assistant, which it only keeps for the last days (the recorder setting `purge_keep_days`, 10 by default); an older day falls back to hours. The Devices tab still works with hours and adds the half hours of the house up in pairs.
+
 - **Consumption of the house with all its sources:** the chart *Energy per period* of the Consumption tab now shows the consumption as a white line over bars of its sources: solar used directly, from the storage and from the grid, so the bar reaches the line. Feed-in and charging of the storage are not consumption, they stay in the tooltip and in the table. The table has the consumption first, then its sources, feed-in, charging and production. Without a consumption the grouped bars stay as before.
 
 ### Fixed

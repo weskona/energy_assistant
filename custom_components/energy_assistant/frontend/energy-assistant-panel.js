@@ -2487,7 +2487,7 @@ class EnergyAssistantPanel extends HTMLElement {
    * or a calendar year (per month); `off` counts the periods back from now (0 = the current one).
    * `edges` are the starts of the buckets plus the end of the period.
    */
-  _balWindow(range = this._usRange ?? "day", off = this._usOff ?? 0) {
+  _balWindow(range = this._usRange ?? "day", off = this._usOff ?? 0, { half = false } = {}) {
     const tz = this._tz();
     const now = tzParts(Date.now(), tz);
     const y = now.y, m = now.m - 1, d = now.d;
@@ -2509,18 +2509,18 @@ class EnergyAssistantPanel extends HTMLElement {
     } else {
       start = zonedTime(y, m, d + off, 0, tz);
       end = zonedTime(y, m, d + off + 1, 0, tz);
-      bucket = "hour";
+      bucket = half ? "half" : "hour"; // half: the 5-minute statistics added up to half hours
     }
     const edges = [start];
     while (edges[edges.length - 1] < end) {
       const last = edges[edges.length - 1];
       const t = tzParts(last, tz);
-      edges.push(bucket === "hour" ? last + 3600000
+      edges.push(bucket === "half" ? last + 1800000 : bucket === "hour" ? last + 3600000
         : bucket === "day" ? zonedTime(t.y, t.m - 1, t.d + 1, 0, tz)
           : zonedTime(t.y, t.m, 1, 0, tz));
     }
     edges[edges.length - 1] = end;
-    return { range, off, start, end, bucket, period: bucket, edges };
+    return { range, off, start, end, bucket, period: bucket === "half" ? "5minute" : bucket, edges };
   }
 
   /** The changes of the counters per bucket and category (null where a category has no counter). */
@@ -2629,8 +2629,15 @@ class EnergyAssistantPanel extends HTMLElement {
     this._balLoading = true;
     const range = this._usRange ?? "day", off = this._usOff ?? 0;
     try {
-      const win = this._balWindow(range, off), prev = this._balWindow(range, off - 1);
-      const [cur, old] = await Promise.all([this._balFetch(win), this._balFetch(prev)]);
+      // A day is shown in half hours (the 5-minute statistics added up); the 5-minute statistics only go back as far
+      // as the recorder keeps them, so an older day falls back to hours.
+      let win = this._balWindow(range, off, { half: range === "day" });
+      const prev = this._balWindow(range, off - 1);
+      let [cur, old] = await Promise.all([this._balFetch(win), this._balFetch(prev)]);
+      if (range === "day" && cur != null && !Object.values(cur).some((rows) => rows?.length)) {
+        win = this._balWindow(range, off);
+        cur = await this._balFetch(win);
+      }
       const data = this._balCompute(this._balBuckets(win, cur || {}), win);
       let before = old ? this._balCompute(this._balBuckets(prev, old), prev).totals : null;
       // Years without statistics fall back to the values entered by hand (statistics always win).
@@ -2709,6 +2716,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const tz = this._tz();
     const d = new Date(win.edges[i]);
+    if (win.bucket === "half") return tzParts(win.edges[i], tz).h % 3 === 0 && tzParts(win.edges[i], tz).mi === 0 ? d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: tz }) : "";
     if (win.bucket === "hour") return tzParts(win.edges[i], tz).h % 3 === 0 ? d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: tz }) : "";
     if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "short", timeZone: tz });
     return win.range === "week" ? d.toLocaleDateString(lang, { weekday: "short", day: "numeric", timeZone: tz }) : String(tzParts(win.edges[i], tz).d);
@@ -2718,7 +2726,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const tz = this._tz();
     const d = new Date(win.edges[i]);
-    if (win.bucket === "hour") return d.toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz });
+    if (win.bucket === "hour" || win.bucket === "half") return d.toLocaleString(lang, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz });
     if (win.bucket === "month") return d.toLocaleDateString(lang, { month: "long", year: "numeric", timeZone: tz });
     return d.toLocaleDateString(lang, { weekday: "short", day: "numeric", month: "numeric", timeZone: tz });
   }
@@ -2807,8 +2815,11 @@ class EnergyAssistantPanel extends HTMLElement {
       .filter((c) => c.devices.length);
     const assignedBuckets = Array.from({ length: n }, (_, k) => cats.reduce((a, c) => a + c.buckets[k], 0));
     const b = this._bal;
-    const fresh = b && b.range === d.range && b.off === d.off && !b.failed && b.rows?.length === n && b.rows.every((r) => r.cons != null);
-    const houseBuckets = fresh ? b.rows.map((r) => r.cons) : null;
+    // The balance of a day comes in half hours, the Devices tab works with hours: add them up in pairs
+    let cons = b && !b.failed ? b.rows?.map((r) => r.cons) : null;
+    if (cons && b.win?.bucket === "half" && cons.length === n * 2) cons = Array.from({ length: n }, (_, k) => (cons[2 * k] == null || cons[2 * k + 1] == null ? null : cons[2 * k] + cons[2 * k + 1]));
+    const fresh = b && b.range === d.range && b.off === d.off && cons?.length === n && cons.every((v) => v != null);
+    const houseBuckets = fresh ? cons : null;
     const unBuckets = houseBuckets ? houseBuckets.map((h, k) => Math.max(0, h - assignedBuckets[k])) : null;
     const assigned = sum(assignedBuckets);
     const unassigned = unBuckets ? sum(unBuckets) : 0;
