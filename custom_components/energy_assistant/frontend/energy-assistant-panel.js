@@ -178,8 +178,8 @@ const STYLE = `
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
-.reshero{grid-template-columns:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1)) minmax(0,1fr);align-items:stretch;column-gap:6px;width:100%}
-.resillu{display:block;position:relative;z-index:2;pointer-events:none}
+.reshero{grid-template-columns:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1)) minmax(0,1fr);align-items:stretch;width:100%}
+.resillu{display:block;position:relative;z-index:2;margin-right:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1) * -.24);pointer-events:none}
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:0;right:0;bottom:-8px;width:100%;height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
@@ -5758,8 +5758,8 @@ class EnergyAssistantPanel extends HTMLElement {
    * The picture beside the card *Right now* is taller than the card and reaches up beside the top bar. Its size is
    * chosen so that the top of the sun (or of the moon) stands on the same height as the top of the tab bar: the picture
    * is as high as the card plus the distance between the card and the tab bar, as long as the card keeps its minimum
-   * width beside it (it never overlaps the picture). Where the room is too small, the sun stays a little lower; room is
-   * made above only where the picture would reach above the top of the page.
+   * width beside it. Where the room is too small, the sun stays a little lower; room is made above only where the
+   * picture would reach above the top of the page.
    * Measured after the layout and again when the size changes.
    */
   _fitPicture() {
@@ -5773,13 +5773,14 @@ class EnergyAssistantPanel extends HTMLElement {
       const pad = parseFloat(hero.style.paddingTop) || 0;
       const cardBox = card.getBoundingClientRect();
       const frac = (parseFloat(svg.dataset.top) || 12.4) / 290;
-      // The height of the picture that puts its top on the top of the tab bar; the picture is as wide as its drawing is
-      // high times the ratio of the drawing. The card beside it keeps a minimum width, so the picture gives way when needed.
+      // The height of the picture that puts its top on the top of the tab bar. The picture is as wide as its column plus the
+      // 24 % of it that reaches into the card (the grass and the house reach to the card, like in the first design), and as
+      // high as its drawing allows. The card beside it keeps a minimum width, so the picture gives way when needed.
       const height = (cardBox.top - pad - tabsTop + cardBox.height + 8) / (1 - frac);
       const ratio = (svg.viewBox?.baseVal?.width || 424) / 290;
       const resx = parseFloat(hero.style.getPropertyValue("--resx")) || 1;
-      const room = hero.clientWidth - 6 - 730;
-      const pic = Math.max(240, Math.min(height * ratio, room)) / resx;
+      const room = hero.clientWidth - 730;
+      const pic = Math.max(240, Math.min((height * ratio) / 1.24, room)) / resx;
       const cur = parseFloat(hero.style.getPropertyValue("--pic")) || 0;
       if (Math.abs(pic - cur) >= 2) hero.style.setProperty("--pic", `${pic.toFixed(1)}px`);
       // Where the size was limited: keep the drawing below the top of the page
