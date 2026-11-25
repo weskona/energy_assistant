@@ -156,11 +156,17 @@ const STYLE = `
 .resper{font-size:14px;font-weight:500;color:var(--eb-muted);white-space:nowrap}
 .ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
+.resnum .resself{margin-left:auto;padding-bottom:0;gap:12px;font-size:16px}
+.resnum .resring,.resnum .resring .donut{width:72px;height:72px}
+.resnum .resbig{font-size:30px}
+.resnum .resbig small{font-size:15px}
+.resnum .reslab2{font-size:14px}
 .resring{position:relative;flex:none;width:96px;height:96px}
 .resring .donut{width:96px;height:96px;display:block;filter:drop-shadow(0 0 7px rgba(52,211,153,.45))}
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
 .ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid var(--eb-line)}
 .ressave .pig{flex:none;display:flex}
+.resr>.ressave:first-child{border-top:0;padding-top:0}
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
@@ -3357,9 +3363,9 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
       <div class="resgrid">
         <div class="resl">
-          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${ring}</div>
           <div class="hbars">${bars}</div></div>
-        <div class="resr">${ring}${savings}</div>
+        <div class="resr">${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
