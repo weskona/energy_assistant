@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The space above the card now grows with the picture.
+
 ## [0.40.0] - 2026-11-25
 
 ### Changed

@@ -5418,6 +5418,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
         this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })));
       const content = this.shadowRoot.getElementById("content");
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this._fitPicture()).observe(content);
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
@@ -5509,6 +5510,7 @@ class EnergyAssistantPanel extends HTMLElement {
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);
+      this._fitPicture();
       this._wireChart(content);
       this._wireBalance(content);
       this._wireDevChart(content);
@@ -5722,6 +5724,24 @@ class EnergyAssistantPanel extends HTMLElement {
    * Replace the markup of the page. Home Assistant sends new values all the time, so this happens
    * often. The scroll position of the expanded lists is kept, otherwise they jump back to the top.
    */
+  /**
+   * The picture beside the card *Right now* is taller than the card and grows above it (the sun or the moon stands
+   * there). Make room for that above the card so nothing is cut off at the top of the page: the space above is as
+   * high as the picture reaches over the card, measured after the layout and again when the size changes.
+   */
+  _fitPicture() {
+    const heroes = this.shadowRoot?.querySelectorAll?.(".reshero");
+    if (!heroes) return;
+    for (const hero of heroes) {
+      const svg = hero.querySelector(".resillu svg");
+      if (!svg) continue;
+      const pad = parseFloat(hero.style.paddingTop) || 0;
+      const over = hero.getBoundingClientRect().top + pad - svg.getBoundingClientRect().top;
+      const want = over > 0 ? Math.ceil(over) + 4 : 0;
+      if (Math.abs(want - pad) >= 1) hero.style.paddingTop = want ? `${want}px` : "";
+    }
+  }
+
   _swapMarkup(content, html) {
     // Keyed by the title of the card, so the positions stay with their list when lists come and go.
     const key = (el) => el.closest(".eb-card")?.querySelector(".eb-title")?.textContent;
