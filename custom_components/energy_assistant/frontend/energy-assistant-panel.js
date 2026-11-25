@@ -429,7 +429,7 @@ const STRINGS = {
     resFootKm: "**{km} km** you drive electrically ({kwh} kWh charged at home).",
     resFootEv: "Your electric car charged **{kwh} kWh** at home.",
     resFootSelf: "You cover **{pct} %** of your electricity needs yourself.",
-    resSavingTip: "Solar power used directly plus power from the storage, at the price of your contract minus the lost feed-in revenue (storage: plus its losses)",
+    resSavingTip: "Solar power used directly plus power from the storage, each kWh at the feed-in tariff (storage: minus the loss of the round trip)",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
     stUnit: "Storage {n}",
@@ -850,7 +850,7 @@ const STRINGS = {
     resFootKm: "**{km} km** fahren Sie elektrisch ({kwh} kWh zu Hause geladen).",
     resFootEv: "Ihr Elektroauto hat **{kwh} kWh** zu Hause geladen.",
     resFootSelf: "Sie decken **{pct} %** Ihres Strombedarfs selbst.",
-    resSavingTip: "Direkt genutzter Solarstrom plus Strom aus dem Speicher, zum Preis deines Vertrags abzüglich der entgangenen Einspeisevergütung (Speicher: samt Verlusten)",
+    resSavingTip: "Direkt genutzter Solarstrom plus Strom aus dem Speicher, jede kWh zur Einspeisevergütung (Speicher: abzüglich des Roundtrip-Verlusts)",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
     stUnit: "Speicher {n}",
@@ -2838,18 +2838,20 @@ class EnergyAssistantPanel extends HTMLElement {
   /**
    * What the own solar power saved in a period, in kWh and money. The kWh are what the house used of its own power:
    * the solar power used directly plus what came out of the storage (consumption minus grid import minus discharge
-   * is the direct part; without a consumption: production minus feed-in minus charge). Own power is not free: every
-   * kWh used directly costs the feed-in revenue it would have brought, every kWh from the storage costs that revenue
-   * divided by the round-trip efficiency of the storage (the storage charges from solar only). The saving is the
-   * price of the grid minus that cost for each kWh, never below 0. `x` has solar, exp, chg, dis, imp, cons (kWh).
+   * is the direct part; without a consumption: production minus feed-in minus charge). Each kWh is worth the feed-in
+   * tariff, the revenue it would have brought; a kWh from the storage is worth that minus what the round trip lost:
+   * 1 / efficiency kWh had to be charged, so it is worth tariff * (2 - 1 / efficiency), never below 0 (the efficiency
+   * is `storage_roundtrip_total` of PV Assistant; the storage charges from solar only; without it no loss is deducted).
+   * Without a feed-in tariff the price of the grid (not below 0) is the unit instead.
+   * `x` has solar, exp, chg, dis, imp, cons (kWh); `unit` is the worth of a kWh.
    */
   _savedBy(x, price, feed) {
     const dis = x.dis > 0 ? x.dis : 0;
     const direct = x.cons != null && x.imp != null ? Math.max(0, x.cons - x.imp - dis) : Math.max(0, (x.solar ?? 0) - (x.exp ?? 0) - (x.chg ?? 0));
-    const fi = feed != null && Number.isFinite(feed) ? Math.max(0, feed) : 0;
+    const unit = feed != null && Number.isFinite(feed) ? Math.max(0, feed) : Math.max(0, price);
     const eta = this._roundtrip();
-    const money = Math.max(0, direct * (price - fi) + dis * (price - (eta != null ? fi / eta : fi)));
-    return { kwh: direct + dis, money, direct, dis };
+    const storeFactor = eta != null ? Math.max(0, 2 - 1 / eta) : 1;
+    return { kwh: direct + dis, money: unit * (direct + dis * storeFactor), direct, dis, unit, storeFactor };
   }
 
   /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
@@ -3407,7 +3409,8 @@ class EnergyAssistantPanel extends HTMLElement {
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     } else if (price && cur.solar != null) {
-      const perHour = ((cur.direct || 0) / 1000) * (price.value - (feed ?? 0)) + ((cur.discharge || 0) / 1000) * (price.value - (feed ?? 0) / (this._roundtrip() ?? 1));
+      const unit = feed != null ? Math.max(0, feed) : Math.max(0, price.value), eta = this._roundtrip();
+      const perHour = unit * (((cur.direct || 0) / 1000) + ((cur.discharge || 0) / 1000) * (eta != null ? Math.max(0, 2 - 1 / eta) : 1));
       const [n, sym] = this._money(Math.max(0, perHour), price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
