@@ -4865,8 +4865,8 @@ test("results: production, self-consumption ring and the savings with Tariffy", 
   assert.match(html, /class="rbars"/);
   assert.match(html, /background:var\(--eb-cyan\)/);
   assert.equal((html.match(/class="rbar"/g) || []).length, 7);
-  // consumption 27, import 6, discharge 1: 20 kWh direct and 1 kWh from the storage, 21 kWh at the feed-in tariff 0.08: 1.68 EUR, in whole euros
-  assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">2 € <span class="resper">per week/);
+  // consumption 27, import 6, discharge 1: 20 kWh direct and 1 kWh from the storage, each saves 0.30 - 0.08 = 0.22: 4.62 EUR, in whole euros
+  assert.match(html, /Electricity cost<\/div><div class="resub">Savings<\/div>\s*<div class="resbig">5 € <span class="resper">per week/);
   // no electric car: the sentence is about the self-sufficiency, with the figure in bold
   assert.match(html, /<div class="resfoot">You cover <b>78 %<\/b> of your electricity needs yourself\.<\/div>/);
 });
@@ -5546,43 +5546,52 @@ function savingsPanel(price, feed, eta, totals) {
   return p;
 }
 
-test("power tab: the savings box shows the own power used today (direct plus from the storage) in kWh and what it saved in money, the hourly value only until today is loaded", () => {
+test("power tab: the savings box shows the own power used today (direct plus from the storage) in kWh and the saving in money, the hourly value only until today is loaded", () => {
   assert.match(savingsPanel(0.4, 0.1, null)._renderHouse(), /<span class="resper">per hour<\/span>/); // today is not loaded yet
-  // consumption 20, import 5, discharge 5: 10 kWh direct and 5 kWh from the storage, 15 kWh at the feed-in tariff 0.10: 1.50
+  // consumption 20, import 5, discharge 5: 10 kWh direct and 5 kWh from the storage, 15 kWh at 0.40 - 0.10 = 0.30: 4.50
   const html = savingsPanel(0.4, 0.1, null, { solar: 20, exp: 4, chg: 6, dis: 5, imp: 5, cons: 20 })._renderHouse();
   assert.match(html, /Savings today/);
-  assert.match(html, /<div class="resbig">1[.,]50 €? ?[^<]*<span class="resper">15\.0 kWh<\/span>/);
+  assert.match(html, /<div class="resbig">4[.,]50 €? ?[^<]*<span class="resper">15\.0 kWh<\/span>/);
   assert.doesNotMatch(html, /per hour/);
 });
 
-test("savings: every kWh is worth the feed-in tariff, a kWh from the storage minus the loss of the round trip (PV Assistant)", () => {
-  // 10 kWh direct and 10 kWh from the storage at 0.10: 1.00 and, with 90 %, 1.00 - 0.111 = 0.889
-  const totals = { solar: 30, exp: 4, chg: 11.1, dis: 10, imp: 5, cons: 25 };
+test("savings: a kWh used directly costs the feed-in tariff, a kWh from the storage that divided by the round trip (PV Assistant)", () => {
+  const totals = { solar: 20, exp: 4, chg: 6, dis: 5, imp: 5, cons: 20 }; // 10 kWh direct, 5 kWh from the storage
+  // feed-in 0.10, round trip 90 %: direct costs 0.10, the storage 0.1111; price 0.40: 10 * 0.30 + 5 * 0.2889 = 4.4444
   const p = savingsPanel(0.4, 0.1, 90, totals);
   assert.equal(p._roundtrip(), 0.9);
   const s = p._savedBy(totals, 0.4, 0.1);
-  assert.equal(s.kwh, 20);
-  assert.ok(Math.abs(s.money - (1 + 10 * 0.1 * (2 - 1 / 0.9))) < 1e-9); // 1.889
-  assert.match(p._renderHouse(), /<div class="resbig">1[.,]89 €? ?[^<]*<span class="resper">20\.0 kWh<\/span>/);
-  // without the sensor no loss is deducted: 20 * 0.10
-  assert.ok(Math.abs(savingsPanel(0.4, 0.1, null, totals)._savedBy(totals, 0.4, 0.1).money - 2) < 1e-9);
+  assert.equal(s.kwh, 15);
+  assert.ok(Math.abs(s.money - (10 * 0.3 + 5 * (0.4 - 0.1 / 0.9))) < 1e-9);
+  assert.match(p._renderHouse(), /<div class="resbig">4[.,]44 €? ?[^<]*<span class="resper">15\.0 kWh<\/span>/);
+  // without the sensor the storage costs the feed-in tariff like the direct part: 15 * 0.30
+  assert.ok(Math.abs(savingsPanel(0.4, 0.1, null, totals)._savedBy(totals, 0.4, 0.1).money - 4.5) < 1e-9);
   // unusable values of the sensor change nothing: text, 0, negative, above 100 %
   for (const bad of ["unknown", "abc", 0, -5, 140]) assert.equal(savingsPanel(0.4, 0.1, bad)._roundtrip(), null, String(bad));
-  // without a consumption: production minus feed-in minus charge is the direct part (30 - 4 - 11.1 = 14.9)
-  assert.ok(Math.abs(p._savedBy({ solar: 30, exp: 4, chg: 11.1, dis: 10 }, 0.4, 0.1).kwh - 24.9) < 1e-9);
-  // a very bad storage (50 %): the storage part is worth nothing, but never negative
-  assert.equal(savingsPanel(0.4, 0.1, 50)._savedBy({ solar: 0, exp: 0, chg: 0, dis: 10, imp: 0, cons: 10 }, 0.4, 0.1).money, 0);
-  // without a feed-in tariff the price of the grid is the unit
-  assert.ok(Math.abs(savingsPanel(0.4, null, null, totals)._savedBy(totals, 0.4, null).money - 20 * 0.4) < 1e-9);
+  // without a consumption: production minus feed-in minus charge is the direct part (20 - 4 - 6 = 10)
+  assert.equal(p._savedBy({ solar: 20, exp: 4, chg: 6, dis: 5 }, 0.4, 0.1).kwh, 15);
+  // no feed-in tariff: the own power costs nothing
+  assert.ok(Math.abs(savingsPanel(0.4, null, null, totals)._savedBy(totals, 0.4, null).money - 6) < 1e-9);
 });
 
-test("savings: never negative, also with a negative price and no feed-in tariff", () => {
+test("savings: never negative, a price below the lost feed-in revenue saves nothing", () => {
   const totals = { solar: 20, exp: 4, chg: 6, dis: 5, imp: 5, cons: 20 };
-  const p = savingsPanel(-0.05, null, null, totals);
-  assert.equal(p._savedBy(totals, -0.05, null).money, 0);
+  const p = savingsPanel(-0.05, 0.08, null, totals);
+  assert.equal(p._savedBy(totals, -0.05, 0.08).money, 0);
   const html = p._renderHouse();
   assert.match(html, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">15\.0 kWh<\/span>/);
   assert.doesNotMatch(html.slice(html.indexOf("Savings today")), /-0[.,]\d\d/);
-  // a negative price with a feed-in tariff: the feed-in tariff counts
-  assert.ok(Math.abs(savingsPanel(-0.05, 0.08, null, totals)._savedBy(totals, -0.05, 0.08).money - 15 * 0.08) < 1e-9);
+  // the storage part costs more than the price (0.10 / 0.8 = 0.125 > 0.105), the sum is below 0: nothing is saved
+  assert.equal(savingsPanel(0.105, 0.1, 80, totals)._savedBy(totals, 0.105, 0.1).money, 0);
+});
+
+test("savings: the example 0.30 EUR grid price, 0.10 EUR feed-in, 90 % round trip: 0.20 per kWh direct, 0.19 per kWh from the storage", () => {
+  const p = savingsPanel(0.3, 0.1, 90);
+  const direct = p._savedBy({ cons: 10, imp: 0, dis: 0 }, 0.3, 0.1);
+  assert.equal(direct.kwh, 10);
+  assert.ok(Math.abs(direct.money - 2) < 1e-9); // 10 kWh * 0.20
+  const store = p._savedBy({ cons: 10, imp: 0, dis: 10 }, 0.3, 0.1);
+  assert.equal(store.kwh, 10);
+  assert.ok(Math.abs(store.money - 10 * (0.3 - 0.1 / 0.9)) < 1e-9); // 1.89 for 10 kWh = 0.189 per kWh
+  assert.equal(Math.round(store.money * 100) / 100, 1.89);
 });
