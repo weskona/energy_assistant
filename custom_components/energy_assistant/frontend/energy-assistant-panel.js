@@ -132,6 +132,8 @@ const STYLE = `
 .resnum{display:flex;align-items:flex-start;gap:10px;font-size:56px;font-weight:800;line-height:1.05;color:var(--eb-text);margin-top:8px}
 .resnum small{font-size:20px;font-weight:600;color:var(--eb-muted)}
 .rn{display:flex;align-items:baseline;gap:8px;min-width:0}
+.srcbar{display:flex;flex-direction:column;gap:2px;width:26px;height:78px;margin-left:auto;margin-top:4px}
+.srcbar i{display:block;min-height:4px;border-radius:5px}
 .stackbadge{display:flex;flex-direction:column;gap:4px;margin-left:auto;align-self:flex-start;margin-top:4px}
 .stackbadge i{display:block;height:7px;width:38px;border-radius:3px;background:var(--eb-green);box-shadow:0 0 8px rgba(52,211,153,.5)}
 .stackbadge i:nth-child(2){background:var(--eb-blue);width:30px;box-shadow:0 0 8px rgba(96,165,250,.5)}
@@ -3325,6 +3327,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const sources = [["solar", cur.solar, RES_FLOW.pv], ["grid", cur.gridIn, RES_FLOW.in], ["storage", cur.discharge, RES_FLOW.discharge], ["liveFeed", cur.gridOut, RES_FLOW.out]].filter(([, w]) => w != null);
     const top = Math.max(...sources.map(([, w]) => w), 1);
     const bars = sources.map(([label, w, color]) => `<div class="rbar"><div class="rcol"><i style="height:${Math.max(3, Math.round((w / top) * 100))}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i></div><span>${esc(this._t(label))}</span></div>`).join("");
+    // Where the consumption comes from, as one vertical bar: grid, solar used directly, storage
+    const parts = [["grid", cur.gridIn, RES_FLOW.in], ["solarDirect", cur.direct, RES_FLOW.pv], ["storage", cur.discharge, RES_FLOW.discharge]].filter(([, w]) => w != null && Number.isFinite(w) && w >= PIC_FLOW_W);
+    const partSum = parts.reduce((a, [, w]) => a + w, 0);
+    const srcBar = partSum > 0 ? `<span class="srcbar" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</span>` : "";
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
@@ -3347,7 +3353,7 @@ class EnergyAssistantPanel extends HTMLElement {
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
       <div class="resgrid">
         <div class="resl">
-          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${srcBar}</div>
           <div class="rbars">${bars}</div></div>
         <div class="resr">${ring}${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
