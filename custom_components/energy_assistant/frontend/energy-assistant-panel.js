@@ -137,6 +137,8 @@ const STYLE = `
 .resself.live{align-items:flex-start}
 .resself.live .dtext{display:flex;flex-direction:column;gap:2px;padding-top:6px}
 .dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
+.dwhen{font-size:12px;color:var(--eb-dim)}
+.dwhen b{color:var(--eb-text);font-weight:600}
 .dstat.discharging{color:var(--ea-bout)}
 .dstat.charging{color:var(--ea-bin)}
 .resr{align-self:stretch}
@@ -3409,12 +3411,15 @@ class EnergyAssistantPanel extends HTMLElement {
       return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
     };
     const perUnit = units.length <= 1 || units.every((u) => u.mode);
-    // Under the value stands the power of the storage in the color of what it does (teal discharging, pink charging)
-    const modeText = (mode, power) => {
+    // Under the value stands the power of the storage in the color of what it does (teal discharging, pink charging),
+    // below it when it is empty or full (several storages: the time of each one)
+    const timeAt = (hours) => new Date(Date.now() + hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
+    const modeText = (mode, power, hours = null) => {
       if (!mode) return "";
-      return `<div class="dstat ${mode}">${esc(fmtPower(mode !== "idle" && power > 0 ? power : 0).join(" "))}</div>`;
+      const when = hours != null && Number.isFinite(hours) ? `<div class="dwhen">${esc(this._t(mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(timeAt(hours))}</b></div>` : "";
+      return `<div class="dstat ${mode}">${esc(fmtPower(mode !== "idle" && power > 0 ? power : 0).join(" "))}</div>${when}`;
     };
-    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power) : "") : modeText(st.mode, st.power))).join("");
+    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power, units[i]?.hours) : "") : modeText(st.mode, st.power))).join("");
     // When the sensors cannot be matched to several storages, the power stands once below, in the color of the mode
     let line = units.length > 1 && !perUnit && st.mode !== "idle" ? modeText(st.mode, st.power) : "";
     let until = "";

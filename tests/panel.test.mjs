@@ -5628,7 +5628,7 @@ test("power tab: a battery card sits between the power and the savings, with a d
   const mid2 = two.slice(two.indexOf('class="resm"'), two.indexOf('class="resr"'));
   assert.match(mid2, /Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">900 W<\/div>/);
   assert.match(mid2, /Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div><div class="dstat charging">650 W<\/div>/);
-  assert.doesNotMatch(mid2, /class="bline"|Empty at/); // each storage has its own power, so no common line below
+  assert.doesNotMatch(mid2, /class="bline"/); // each storage has its own power, so no common line below
   // the self-sufficiency also has its caption above the value
   assert.match(two, /<div class="reslab2">Self-sufficiency<\/div><div class="resbig">\d+<small>%<\/small><\/div>/);
   // without a charge level there is no battery card and two columns as before
@@ -5656,4 +5656,17 @@ test("power tab: with several storages the storage part of the source bar is spl
   const one = livePanel({ ...cfg, battery_discharge: ["bd"] }, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(900), bc: st(0), bc2: st(0) })._renderHouse();
   assert.match(one, /Storage <em>900 W<\/em>/);
   assert.doesNotMatch(one, /Storage 1 <em>/);
+});
+
+test("power tab: with several storages each one shows when it is empty or full, from its own power and its share of the capacity", () => {
+  const cfg = { battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_capacity: 10, battery_min_soc: 10, battery_discharge: ["bd", "bd2"], battery_charge: ["bc", "bc2"] };
+  const html = livePanel(cfg, { soc: st(60, "%"), soc2: st(20, "%"), bd: st(900), bd2: st(0), bc: st(0), bc2: st(500) })._renderHouse();
+  const mid = html.slice(html.indexOf('class="resm"'), html.indexOf('class="resr"'));
+  assert.match(mid, /Storage 1<\/div><div class="resbig">60<small>%<\/small><\/div><div class="dstat discharging">900 W<\/div><div class="dwhen">Empty at <b>[^<]+<\/b><\/div>/);
+  assert.match(mid, /Storage 2<\/div><div class="resbig">20<small>%<\/small><\/div><div class="dstat charging">500 W<\/div><div class="dwhen">Full at <b>[^<]+<\/b><\/div>/);
+  // an idle storage has no time; without a capacity there is none either
+  const idle = livePanel(cfg, { soc: st(60, "%"), soc2: st(20, "%"), bd: st(0), bd2: st(0), bc: st(0), bc2: st(0) })._renderHouse();
+  assert.doesNotMatch(idle.slice(idle.indexOf('class="resm"'), idle.indexOf('class="resr"')), /dwhen/);
+  const noCap = livePanel({ ...cfg, battery_capacity: null }, { soc: st(60, "%"), soc2: st(20, "%"), bd: st(900), bd2: st(0), bc: st(0), bc2: st(500) })._renderHouse();
+  assert.doesNotMatch(noCap.slice(noCap.indexOf('class="resm"'), noCap.indexOf('class="resr"')), /dwhen/);
 });
