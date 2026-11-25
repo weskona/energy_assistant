@@ -140,7 +140,12 @@ const STYLE = `
 .dstat.discharging{color:var(--ea-bout)}
 .dstat.charging{color:var(--ea-bin)}
 .resr{align-self:stretch}
-.resgrid.three .resl{padding-right:22px}
+.resgrid.three{align-items:stretch}
+.resgrid.three .resl{padding-right:22px;display:flex;flex-direction:column}
+.resgrid.three .hbars{margin-top:auto;padding-top:22px}
+.resgrid.three .resm>:last-child{margin-top:auto}
+.stackleg,.resm .bline{line-height:20px;min-height:20px}
+.resm .bline{align-items:center}
 .resgrid.three .resr{padding-left:22px}
 .resgrid.three .resnum{font-size:44px;margin-top:0;gap:16px}
 .resgrid.three .resnum small{font-size:16px}
