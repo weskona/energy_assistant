@@ -5756,20 +5756,22 @@ class EnergyAssistantPanel extends HTMLElement {
    */
   /**
    * The picture beside the card *Right now* is taller than the card and grows above it (the sun or the moon stands
-   * there). Make room for that above the card so nothing is cut off at the top of the page: the space above is as
-   * high as the picture reaches over the card, measured after the layout and again when the size changes.
+   * there). It may reach up beside the top bar, but never above it: room is made only for what would reach above the top
+   * of the page, measured after the layout and again when the size changes.
    */
   _fitPicture() {
     const heroes = this.shadowRoot?.querySelectorAll?.(".reshero");
     if (!heroes) return;
+    const top = this.shadowRoot.querySelector(".top")?.getBoundingClientRect().top;
     for (const hero of heroes) {
       const svg = hero.querySelector(".resillu svg");
-      if (!svg) continue;
+      if (!svg || top == null) continue;
       const pad = parseFloat(hero.style.paddingTop) || 0;
       const box = svg.getBoundingClientRect();
-      // The top of the drawing (the rays of the sun) starts a little below the top of the picture: no space for that part
-      const over = hero.getBoundingClientRect().top + pad - box.top - box.height * 0.045;
-      const want = over > 0 ? Math.ceil(over) + 2 : 0;
+      // The picture may reach up beside the top bar (its left side is empty): the top of the drawing (the rays of the
+      // sun start a little below the top of the picture) stays just below the top of the bar, nothing is cut off there
+      const sunTop = box.top + box.height * 0.045;
+      const want = Math.max(0, Math.ceil(pad + top + 6 - sunTop));
       if (Math.abs(want - pad) >= 1) hero.style.paddingTop = want ? `${want}px` : "";
     }
   }
