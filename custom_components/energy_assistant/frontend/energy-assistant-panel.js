@@ -3302,7 +3302,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
     if (price) {
-      const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
+      const saving = (x) => Math.max(0, Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0)); // savings are never negative
       const [n2, sym] = this._money(saving(t), price.currency, 0);
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n2} ${esc(sym)} <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
@@ -3377,13 +3377,13 @@ class EnergyAssistantPanel extends HTMLElement {
     const day = this._today?.totals;
     if (price && day?.solar != null) {
       const self = Math.max(0, day.solar - (day.exp ?? 0));
-      const [n, sym] = this._money(self * price.value + (day.exp != null && feed != null ? day.exp * feed : 0), price.currency, 2);
+      const [n, sym] = this._money(Math.max(0, self * price.value + (day.exp != null && feed != null ? day.exp * feed : 0)), price.currency, 2);
       const kwhTxt = self.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     } else if (price && cur.solar != null) {
       const perHour = ((cur.direct || 0) / 1000) * price.value + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
-      const [n, sym] = this._money(perHour, price.currency, 2);
+      const [n, sym] = this._money(Math.max(0, perHour), price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     }

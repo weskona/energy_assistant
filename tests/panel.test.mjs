@@ -5547,3 +5547,12 @@ test("power tab: the savings card shows what the sun saved today in kWh and mone
   assert.match(html, /<div class="resbig">4[.,]24 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
   assert.doesNotMatch(html, /per hour/);
 });
+
+test("savings are never negative, not even with a negative price", () => {
+  const states = { pv: st(1000), "sensor.t_preis": { state: "-0.05", attributes: { unit_of_measurement: "EUR/kWh" } } };
+  const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis" } });
+  p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
+  const html = p._renderHouse();
+  assert.match(html, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.doesNotMatch(html.slice(html.indexOf("Savings today")), /-0[.,]\d\d/);
+});
