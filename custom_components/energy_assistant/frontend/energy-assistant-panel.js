@@ -2907,13 +2907,15 @@ class EnergyAssistantPanel extends HTMLElement {
     const b = this._bal;
     // The balance of a day comes in half hours, the Devices tab works with hours: add them up in pairs
     let cons = b && !b.failed ? b.rows?.map((r) => r.cons) : null;
-    if (cons && b.win?.bucket === "half" && cons.length === n * 2) cons = Array.from({ length: n }, (_, k) => (cons[2 * k] == null || cons[2 * k + 1] == null ? null : cons[2 * k] + cons[2 * k + 1]));
-    const fresh = b && b.range === d.range && b.off === d.off && cons?.length === n && cons.every((v) => v != null);
+    if (cons && b.win?.bucket === "half" && cons.length === n * 2) cons = Array.from({ length: n }, (_, k) => (cons[2 * k] == null && cons[2 * k + 1] == null ? null : (cons[2 * k] ?? 0) + (cons[2 * k + 1] ?? 0)));
+    // The consumption of the house is known for the buckets that have data: a running day has none for the hours that
+    // are still to come, they simply have no part that is not assigned (and no share of the house).
+    const fresh = b && b.range === d.range && b.off === d.off && cons?.length === n && cons.some((v) => v != null);
     const houseBuckets = fresh ? cons : null;
-    const unBuckets = houseBuckets ? houseBuckets.map((h, k) => Math.max(0, h - assignedBuckets[k])) : null;
+    const unBuckets = houseBuckets ? houseBuckets.map((h, k) => (h == null ? 0 : Math.max(0, h - assignedBuckets[k]))) : null;
     const assigned = sum(assignedBuckets);
     const unassigned = unBuckets ? sum(unBuckets) : 0;
-    return { win: d.win, n, cats, assignedBuckets, unBuckets, assigned, unassigned, total: assigned + unassigned, house: houseBuckets ? sum(houseBuckets) : null };
+    return { win: d.win, n, cats, assignedBuckets, unBuckets, assigned, unassigned, total: assigned + unassigned, house: houseBuckets ? sum(houseBuckets.map((v) => v ?? 0)) : null };
   }
 
   /** The icon of a label as a real icon only (the plain dot that _iconHtml falls back to is drawn by the caller). */

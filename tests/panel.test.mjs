@@ -5367,3 +5367,30 @@ test("device cost: the rows of the Consumption tab are priced with the mix of th
   assert.match(detail, /Cost<\/span><b>[^<]*0[.,]20[^<]*<\/b>/); // 2.5 kWh x 0.08, not x 0.30 = 0.75
   assert.doesNotMatch(detail, /0[.,]75/);
 });
+
+test("devices tab: a running day still has a part that is not assigned, for the hours that have data", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  // the consumption of the house is only known until 12:00, the hours to come have no data yet
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, (_, i) => ({ cons: i < 12 ? 1 : null })), totals: {} };
+  const m = p._devModel();
+  assert.equal(m.house, 12); // what the house used so far
+  assert.ok(m.unassigned > 1.5 && m.unassigned < 2.5); // 12 hours of 1 - 0.85 = 0.15
+  assert.ok(m.unBuckets.slice(12).every((v) => v === 0)); // nothing for the hours without data
+  const html = p._renderDevicesTab();
+  assert.match(html, /not assigned/);
+  // in half hours the pairs are added up, a pair with one half still counts
+  const half = p._balWindow("day", 0, { half: true });
+  const rows = Array.from({ length: half.edges.length - 1 }, (_, i) => ({ cons: i < 25 ? 0.5 : null }));
+  p._bal = { range: "day", off: 0, failed: false, win: half, rows, totals: {} };
+  if (rows.length === 48) assert.equal(p._devModel().house, 12.5); // 25 half hours of 0.5
+  // no data at all: nothing is assigned
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: null })), totals: {} };
+  assert.equal(p._devModel().house, null);
+  assert.equal(p._devModel().unassigned, 0);
+});
