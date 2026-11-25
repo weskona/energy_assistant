@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.2] - 2026-11-25
+
 ### Changed
 
 - **Fixed columns in the card *Right now*:** the left part (power, self-sufficiency, sources) is narrower and has a fixed width (360 px), the storage part too (270 px); the columns no longer widen and shrink with the values.
@@ -586,7 +588,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.40.1...HEAD
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.40.2...HEAD
+[0.40.2]: https://github.com/weskona/energy_assistant/compare/v0.40.1...v0.40.2
 [0.40.1]: https://github.com/weskona/energy_assistant/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/weskona/energy_assistant/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/weskona/energy_assistant/compare/v0.38.0...v0.39.0
