@@ -5612,6 +5612,9 @@ test("power tab: a battery card sits between the power and the savings, with a d
   assert.match(mid, /<div class="resbig">28<small>%<\/small><\/div><div class="reslab2">Storage 2<\/div>/);
   assert.match(mid, /class="eb-chip stat discharging">Discharging<\/span><b>900 W<\/b>/);
   assert.match(mid, /Empty at <b>/);
+  // the minimum level (10 %) is the first part of every donut, in blue, then the level in its color
+  assert.equal((mid.match(/stroke="var\(--eb-blue\)"/g) || []).length, 2);
+  assert.match(mid, /stroke="var\(--eb-blue\)"[^>]*\/><circle[^>]*stroke="var\(--eb-green\)"/);
   // one storage: the caption is just the name of the card
   const one = livePanel({ battery_soc: ["soc"], battery_soc_more: [] }, { soc: st(64, "%") })._renderHouse();
   assert.match(one.slice(one.indexOf('class="resm"')), /<div class="reslab2">Storage<\/div>/);
