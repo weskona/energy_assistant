@@ -5121,7 +5121,8 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   p._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
   const html = p._renderHouse();
   assert.match(html, /<span class="eb-title">Right now<\/span>/);
-  assert.doesNotMatch(html, /Consumption now|class="rn"|stackbadge/); // the house card shows the power already
+  assert.match(html, /<span class="rn">1,400<small>W<\/small>/); // the power in whole watts stays
+  assert.doesNotMatch(html, /Consumption now/); // without the caption
   assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resgrid"')), /class="eb-chip"/); // and no live badge
   assert.ok(html.indexOf("Right now") < html.indexOf("Live consumption") || html.indexOf("Right now") < html.indexOf("eb-card--glow\">\n        <div class=\"row\"><span class=\"eb-title\">House"));
   // flows of now: sun, feed-in, charging and the electric car, all in whole watts
