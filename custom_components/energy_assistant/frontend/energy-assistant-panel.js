@@ -1422,6 +1422,7 @@ const UNUSUAL_FACTOR = 1.3;
 const UNUSUAL_MIN_W = 20;
 const UNUSUAL_MIN_HOURS_REF = 48; // hourly values needed from the days before to know what is usual
 const FLOW_W = 20; // charging or discharging from this power on
+const PIC_FLOW_W = 1; // the picture shows a flow from this power on (a few watts of grid import still count)
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
 const MIN_ROWS = 5;
@@ -3307,13 +3308,13 @@ class EnergyAssistantPanel extends HTMLElement {
   /**
    * The picture of the Power tab: the same house as in the results card of the Consumption tab, with the power of
    * now (W) instead of the energy of a period: consumption, where it comes from, the self-sufficiency, what the
-   * sun saves per hour (Tariffy) and the electric car that charges. The flows show from FLOW_W on.
+   * sun saves per hour (Tariffy) and the electric car that charges. The flows show from PIC_FLOW_W on.
    */
   _renderLiveResults(cur) {
     if (!cur || (cur.house == null && cur.solar == null && cur.gridIn == null)) return "";
     const lang = this._hass?.language || "en";
     const kw = (w) => `${Math.round(w).toLocaleString(lang)} W`; // power is always shown in whole watts
-    const on = (w) => w != null && Number.isFinite(w) && w >= FLOW_W;
+    const on = (w) => w != null && Number.isFinite(w) && w >= PIC_FLOW_W;
     const ev = this._evLive();
     const flows = {};
     for (const [key, w] of [["pv", cur.solar], ["in", cur.gridIn], ["out", cur.gridOut], ["charge", cur.charge], ["discharge", cur.discharge], ["ev", ev]]) {

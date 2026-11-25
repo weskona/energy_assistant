@@ -5138,11 +5138,11 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   assert.match(html, /class="unit" data-soc="50"/); // the storage with its live level
 });
 
-test("power tab: without a charging car the sentence is about the self-sufficiency, no flow below 20 W", () => {
-  const p = livePanel({}, { pv: st(10), ge: st(0), bc: st(0) });
+test("power tab: without a charging car the sentence is about the self-sufficiency, no flow at 0 W", () => {
+  const p = livePanel({}, { pv: st(0), ge: st(0), bc: st(0) });
   const html = p._renderHouse();
   assert.match(html, /<div class="resfoot">Right now you cover <b>100 %<\/b> of your electricity needs yourself\.<\/div>/);
-  assert.doesNotMatch(html, /class="flowhead"/); // nothing flows (10 W is below the limit)
+  assert.doesNotMatch(html, /class="flowhead"/); // nothing flows
   assert.doesNotMatch(html, /class="resdrive"/); // no car box
 });
 
@@ -5468,4 +5468,10 @@ test("storage: every storage shows when it is empty or full, from its own power 
   assert.match(html, /until">Full at /);
   set("sensor.bd1", 0); set("sensor.bc2", 0);
   assert.equal(p._storageUnits()[0].hours, null); // idle: no time
+});
+
+test("power tab: a small grid import of a few watts is drawn as a flow in the picture", () => {
+  const p = livePanel({}, { pv: st(0), gi: st(7), ge: st(0), bc: st(0) });
+  const html = p._renderHouse();
+  assert.match(html, />7 W</);
 });

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Small flows in the picture:** the picture of the Power tab hid every flow below 20 W, so a grid import of 7 W did not show at the pole. Flows now show from 1 W on (the storage status still switches at 20 W).
 - **Not assigned in the Devices tab:** the part of the consumption that no category explains (*not assigned*) disappeared for a running day, week, month or year, because it was only calculated when every hour of the period had a consumption of the house, and the hours to come have none yet. It is now calculated for the hours that have data (the hours without data count as nothing), so it also shows for today.
 
 ## [0.38.0] - 2026-11-25
