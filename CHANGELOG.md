@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Notice bar in the top bar:** the notices (plant fault, negative price, unusual devices) no longer take a card on top of the Power tab. The most important one (warnings before information) is a pill between the tabs and the gear, with the count of the others; a click opens the list of all of them. On narrow screens only the icon and the count are shown.
+
 ### Fixed
 
 - **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The space above the card now grows with the picture.

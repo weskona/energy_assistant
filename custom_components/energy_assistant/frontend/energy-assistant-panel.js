@@ -18,7 +18,13 @@ const STYLE = `
 *{box-sizing:border-box}
 .wrap{padding:16px 24px}
 .top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:16px}
-.top .right{justify-self:end}
+.top .right{justify-self:end;display:flex;align-items:center;gap:10px;min-width:0;max-width:100%}
+.topalerts{position:relative;display:flex;min-width:0}
+.apill{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:8px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font:inherit;font-size:13px;cursor:pointer}
+.apill.info{border-color:var(--eb-green);background:rgba(52,211,153,.12)}
+.apill .atext{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.apill .acount{flex:none;padding:1px 7px;border-radius:9px;background:rgba(255,255,255,.12);font-weight:700}
+.alist{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:max-content;min-width:260px;max-width:min(520px,86vw);padding:4px 12px 12px;border-radius:14px;background:var(--eb-panel);border:1px solid var(--eb-line);box-shadow:0 14px 34px rgba(0,0,0,.5)}
 .menu{background:none;border:0;color:var(--eb-muted);cursor:pointer;padding:6px}
 .tabs{display:flex;gap:4px;padding:4px;background:var(--eb-panel);border:1px solid var(--eb-line);border-radius:14px}
 .gear{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--eb-line);background:var(--eb-panel);color:var(--eb-muted);cursor:pointer;padding:0}
@@ -186,7 +192,7 @@ const STYLE = `
 .resillu .glowa{filter:drop-shadow(0 0 9px rgba(255,200,100,.8))}
 .resfoot{padding-left:112px}
 }
-@media (max-width:640px){.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
+@media (max-width:640px){.apill .atext{display:none}.apill{padding:8px 10px}.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -2583,11 +2589,29 @@ class EnergyAssistantPanel extends HTMLElement {
     return out;
   }
 
+  /**
+   * The notice bar in the top bar, between the tabs and the gear: the most important notice (warnings before
+   * information) as a pill with a count of the others; a click opens the list of all of them. Empty without notices.
+   */
   _renderAlerts() {
-    const list = this._alerts();
+    const list = [...this._alerts()].sort((a, b) => (a.level === "warn" ? 0 : 1) - (b.level === "warn" ? 0 : 1));
     if (!list.length) return "";
-    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("alTitle"))}</span></div>
-      ${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${a.level === "info" ? "ℹ" : "⚠"} ${esc(a.text)}</div>`).join("")}</div>`;
+    const icon = (a) => (a.level === "info" ? "ℹ" : "⚠");
+    const first = list[0], more = list.length - 1;
+    const open = !!this._alertsOpen;
+    return `<button class="apill${first.level === "info" ? " info" : ""}" data-alerts aria-expanded="${open}" title="${esc(list.map((a) => `${icon(a)} ${a.text}`).join("\n"))}"><span class="aic">${icon(first)}</span><span class="atext">${esc(first.text)}</span>${more ? `<span class="acount">+${more}</span>` : ""}</button>${open ? `<div class="alist">${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${icon(a)} ${esc(a.text)}</div>`).join("")}</div>` : ""}`;
+  }
+
+  /** Put the notice bar into its place in the top bar (only when it changed, so an open list is not rebuilt for nothing). */
+  _updateTopAlerts() {
+    const slot = this.shadowRoot?.getElementById?.("topalerts");
+    if (!slot) return;
+    const html = this._renderAlerts();
+    if (html !== this._alertsHtml) {
+      this._alertsHtml = html;
+      slot.innerHTML = html;
+    }
+    if (!html) this._alertsOpen = false;
   }
 
   /** The time zone of the Home Assistant instance; the browser's if it is unknown or not usable. */
@@ -5157,7 +5181,6 @@ class EnergyAssistantPanel extends HTMLElement {
     const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._historyChart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
-      ${this._renderAlerts()}
       ${this._renderLiveResults(cur)}
       <div class="eb-card fullrow">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
@@ -5410,7 +5433,7 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="top">
             <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
             <div class="tabs"><button class="tab active" data-tab="house">Power</button></div>
-            <div class="right"><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
+            <div class="right"><div id="topalerts" class="topalerts"></div><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
           </div>
           <div id="content"></div></div>
         <div class="tip gtip" hidden></div>`;
@@ -5419,6 +5442,12 @@ class EnergyAssistantPanel extends HTMLElement {
         this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })));
       const content = this.shadowRoot.getElementById("content");
       if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this._fitPicture()).observe(content);
+      this.shadowRoot.getElementById("topalerts").addEventListener("click", (e) => {
+        if (!e.target.closest?.("[data-alerts]")) return;
+        this._alertsOpen = !this._alertsOpen;
+        this._alertsHtml = null;
+        this._updateTopAlerts();
+      });
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
@@ -5506,6 +5535,7 @@ class EnergyAssistantPanel extends HTMLElement {
       if (this._balEnabled()) this._maybeLoadBalance();
     }
     if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); if (this._balEnabled()) this._maybeLoadToday(); }
+    this._updateTopAlerts();
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
