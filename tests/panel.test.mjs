@@ -5516,3 +5516,22 @@ test("power tab: the picture shows a moon instead of the sun when nothing is pro
   const none = livePanel({ solar_power: [] }, {})._renderHouse();
   assert.doesNotMatch(none, /class="moon"/);
 });
+
+test("power tab: the sentence says what solar covered of the electricity needs today, the live value only as long as today is unknown", async () => {
+  const p = livePanel({}, { pv: st(0) });
+  assert.match(p._renderHouse(), /Right now you cover/); // today is not loaded yet
+  p._balFetch = async () => ({});
+  p._balBuckets = () => ({});
+  p._balCompute = () => ({ totals: { autarky: 71.6 } });
+  p._render = () => {};
+  await p._loadToday();
+  assert.equal(p._today.autarky, 71.6);
+  assert.match(p._renderHouse(), /<div class="resfoot">You have covered <b>72 %<\/b> of your electricity needs with solar today\.<\/div>/);
+  p._hass.language = "de";
+  assert.match(p._renderHouse(), /Du hast heute <b>72 %<\/b> deines Strombedarfs durch PV gedeckt\./);
+  // a charging car still comes first
+  const car = livePanel({}, { pv: st(0) }, { ev_assistant: { vehicles: [{ name: "EV", live: "sensor.evlive" }] } });
+  car._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
+  car._today = { autarky: 50, at: Date.now() };
+  assert.match(car._renderHouse(), /electric car is charging/);
+});

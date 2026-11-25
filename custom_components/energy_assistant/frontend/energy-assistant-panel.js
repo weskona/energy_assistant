@@ -413,6 +413,7 @@ const STRINGS = {
     liveCharging: "Charging",
     liveFootEv: "Your electric car is charging at home with **{p}**.",
     liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
+    liveFootToday: "You have covered **{pct} %** of your electricity needs with solar today.",
     resTitle: "Your results",
     resCost: "Electricity cost",
     resSaving: "Savings",
@@ -833,6 +834,7 @@ const STRINGS = {
     liveCharging: "Laden",
     liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
     liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
+    liveFootToday: "Du hast heute **{pct} %** deines Strombedarfs durch PV gedeckt.",
     resTitle: "Ihre Ergebnisse",
     resCost: "Stromkosten",
     resSaving: "Einsparung",
@@ -2823,6 +2825,26 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 
+  /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
+  async _loadToday() {
+    if (!this._hass || this._todayLoading) return;
+    this._todayLoading = true;
+    try {
+      const win = this._balWindow("day", 0);
+      const cur = await this._balFetch(win);
+      const totals = cur != null ? this._balCompute(this._balBuckets(win, cur), win).totals : null;
+      this._today = { autarky: totals?.autarky ?? null, at: Date.now() };
+    } finally {
+      this._todayLoading = false;
+      this._render();
+    }
+  }
+
+  _maybeLoadToday() {
+    if (!this._ready || this._todayLoading) return;
+    if (!this._today || Date.now() - this._today.at > 5 * 60 * 1000) this._loadToday();
+  }
+
   /** (Re)load the balance when the period changed or the data is older than five minutes. */
   _maybeLoadBalance() {
     if (!this._ready || this._balLoading) return;
@@ -3358,6 +3380,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const drive = ev != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("liveCharging"))}</div><div class="resdk"><b>${esc(kw(ev))}</b></div></div></div>` : "";
     let foot = "";
     if (ev != null) foot = this._t("liveFootEv", { p: kw(ev) });
+    else if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
     else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows, cur.solar != null && !(cur.solar >= PIC_FLOW_W))}</div>
@@ -5541,7 +5564,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._maybeLoadDevices();
       if (this._balEnabled()) this._maybeLoadBalance();
     }
-    if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); }
+    if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); if (this._balEnabled()) this._maybeLoadToday(); }
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
