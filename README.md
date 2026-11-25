@@ -7,7 +7,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 | Tab | Content |
 |-----|---------|
-| **Power** (German: Leistung) | Current house power, solar power used directly, source of consumption (solar, storage, grid), tiles, history chart of the last 24 hours, power of individual devices |
+| **Power** (German: Leistung) | The picture of the house with the flows of now, the card *Right now* (power, self-sufficiency, sources of the consumption, storages, savings of the day), history chart of the last 24 hours, power of individual devices |
 | **Consumption** (German: Verbrauch) | One period picker (day, week, month, year) for the whole tab. On top the **balance** of your energy counters (only with energy counters, see below): the energy of the period in kWh with the change to the period before, self-consumption, self-sufficiency, grid cost and feed-in revenue (with Tariffy) and bars per hour, day or month. Below it the **devices** (only with devices set up): the base load of the house with its cost per year, the biggest consumers in kWh, the devices that are always on (standby) and the energy per label |
 | **Devices** (German: Geräte) | Only with selected labels (settings, *Labels*): the energy of the devices grouped by label, for the chosen day, week, month or year (same period picker as the Consumption tab). On top a ring and a bar of the categories with kWh and share, the energy per hour, day or month as stacked bars (hover for the values) and, with energy counters, the part of the house that no category explains (*not assigned*); below one card per label with a ring and its devices (kWh and share, five at first, *Show all* for the rest) and its share of the house |
 | **PV** | Only with PV Assistant: production, feed-in, self-consumption, self-sufficiency, forecast, storage, plant fault and the PV power by plant |
@@ -26,7 +26,7 @@ The UI is English with a German translation (follows your Home Assistant languag
 
 **Device names:** every device has one name that is used everywhere (device list, consumers, standby, tooltips of areas and labels, the settings, the names of its sensors): the display name you gave it with the pencil (or in the name field of the settings), else the name of its sensor without the word *Leistung* or *Power* at the end (*Staubsauger* instead of *Staubsauger Leistung*). Rename a device once and it changes everywhere (the entity id of existing sensors stays).
 
-**Layout:** the first row shows the house card and the history. Below it **Devices**, **Areas** and **Labels** sit side by
+**Layout:** the picture and the card *Right now* come first, then the history. Below it **Devices**, **Areas** and **Labels** sit side by
 side in one row, in this order and with the same height (missing cards leave more room to the others). On narrow screens
 they stack. Areas and labels show their Home Assistant icon in front of the name (labels tinted with their color).
 
@@ -140,9 +140,9 @@ The panel shows it as a tile, in the source bar and as a second line in the hist
 
 The config flow (and the options, which can be changed later with *Configure*) has four steps: grid and house, solar and storage, **energy counters** and devices. The storage step now also asks for the charge level sensor, the capacity (kWh) and the minimum charge level (%). The energy step asks for the counters of the balance; if the Energy dashboard of Home Assistant is set up, its counters are suggested the first time and can be changed or removed. In the options, a field that you empty is cleared (before, the old value came back).
 
-### Storage card
+### Storages in the card *Right now*
 
-With a **charge level sensor** (percent) in the settings (section *Solar and storage*) the Power tab shows a **Storage** card: the charge level as a bar with the minimum level marked, the status (charging, discharging, idle) and, with the **capacity** (kWh) and the **minimum charge level** (%), what is stored and what is usable. While the storage discharges it says when it is empty, while it charges when it is full, from the current power (from 20 W on). PV Assistant offers its charge level sensor, capacity and minimum level with the button of the notice.
+With a **charge level sensor** (percent) in the settings (section *Solar and storage*) the card *Right now* of the Power tab has a **Storage** dial between the power and the savings: a donut with the charge level (the minimum level as the first, gray part), the level in the color of the charge (green from 60 %, amber from 25 %, red below), the power in the color of what the storage does (teal discharging, pink charging) and, with the **capacity** (kWh), when it is empty or full. With several storages (further charge level sensors) every storage has its own dial; its power and its time come from its own charge, discharge or combined power sensor when there are as many of them as storages (matched in the order of the settings), the capacity is shared equally.
 
 **Picture of the Power tab:** the Power tab starts with the house of the results card, but with the power of now (whole watts): the consumption, where it comes from (sun, grid, storage, feed-in), the self-sufficiency as a ring, what the sun saves per hour (Tariffy), and the electric car with its charging power (EV Assistant). The lines show the flows of now from 20 W on, the storages show their live charge level. The notices stay on top, the cards below are unchanged.
 

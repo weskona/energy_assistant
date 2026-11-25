@@ -40,30 +40,6 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
-.stor .storbody{display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
-.storrings{display:flex;gap:14px;flex:none}
-.storring{width:128px;height:128px}
-.storring.small{width:100px;height:100px}
-.storring svg{width:100%;height:100%;display:block}
-.storring .sv{font:800 30px var(--eb-font);fill:var(--eb-text)}
-.storring .su{font:600 13px var(--eb-font);fill:var(--eb-muted)}
-.storright{flex:1;min-width:260px}
-.eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
-.eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
-.eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
-.storunits{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
-.storunit{background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:var(--eb-radius-tile);padding:12px 14px}
-.storunit .row{align-items:center}
-.storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
-.storunit .unright{flex:1;min-width:0}
-.storunit .until{margin-top:2px;text-transform:none;letter-spacing:0}
-.stsum{margin-top:18px}
-@media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
-.socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
-.socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
-.socbar.charging i{background:var(--ea-bin)}
-.socbar.discharging i{background:var(--ea-bout)}
-.socbar b{position:absolute;top:-3px;width:2px;height:18px;background:var(--eb-text);opacity:.6;border-radius:1px}
 .spk{display:inline-block;vertical-align:middle;margin-right:10px;overflow:visible}
 .spk .spkline{fill:none;stroke:var(--eb-green);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .spk .spkarea{fill:var(--eb-green);opacity:.15}
@@ -2432,51 +2408,6 @@ class EnergyAssistantPanel extends HTMLElement {
     return total >= 60 ? this._t("stDur", { h: Math.floor(total / 60), m: total % 60 }) : this._t("stDurMin", { m: total });
   }
 
-  /** The storage card: charge level as a bar with the minimum marked, what is stored and usable, power and the time. */
-  _renderStorage(cur) {
-    const st = this._storage(cur);
-    if (!st) return "";
-    const lang = this._hass?.language || "en";
-    const tile = (label, value, unit = "", extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${extra}</div>`;
-    const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    const tiles = [tile(this._t("stSoc"), Math.round(st.soc), "%")];
-    if (st.stored != null) tiles.push(tile(this._t("stStored"), kwh(st.stored), "kWh"));
-    if (st.usable != null && st.min > 0) tiles.push(tile(this._t("stUsable"), kwh(st.usable), "kWh"));
-    if (st.mode !== "idle") {
-      const [v, u] = fmtPower(st.power);
-      tiles.push(tile(this._t("stPower"), v, u));
-    }
-    if (st.hours != null && Number.isFinite(st.hours)) {
-      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
-      tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
-    }
-    const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
-    // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
-    // One ring for every storage (the mean level in the tiles), the minimum level as a tick
-    const levels = this._storageLevels().slice(0, 4);
-    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
-    const units = this._storageUnits().slice(0, 4);
-    if (units.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
-    if (units.length > 1) {
-      // Several storages: each one on its own (its ring, its bar, its power when the sensors can be matched), the total below
-      const cards = units.map((u) => {
-        const color = levelColor(u.soc);
-        const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
-        const until = u.hours != null && Number.isFinite(u.hours)
-          ? `<div class="eb-label until">${esc(this._t(u.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} ${esc(new Date(Date.now() + u.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }))} · ${esc(this._t("stIn", { dur: this._duration(u.hours) }))}</div>` : "";
-        const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
-        return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
-          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${power}${until}</div></div></div>`;
-      }).join("");
-      return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
-        <div class="storunits">${cards}</div>
-        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div><div class="tiles">${tiles.join("")}</div></div>`;
-    }
-    return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
-      <div class="storbody"><div class="storrings">${rings}</div>
-        <div class="storright"><div class="tiles">${tiles.join("")}</div></div></div></div>`;
-  }
-
   /**
    * The storages one by one: the charge level of each charge level sensor (the first one and the further ones) and,
    * when there are as many charge, discharge or combined power sensors as storages, what each one does (the
@@ -2517,20 +2448,6 @@ class EnergyAssistantPanel extends HTMLElement {
       }
     });
     return out;
-  }
-
-  /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
-  _storRing(level, color, min, small = false) {
-    const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
-    const tick = min > 0 ? (() => {
-      const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
-      return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
-    })() : "";
-    return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
-      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
-      <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
   /**
@@ -5300,17 +5217,6 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._cfg.house_power && !(this._cfg.grid_import || []).length && !(this._cfg.grid_power || []).length) {
       return `<div class="eb-card"><div class="empty">${this._t("notConfigured")}</div></div>`;
     }
-    const [val, unit] = fmtPower(cur.house);
-    const mix = this._mix(cur);
-    const split = this._pvSplit(cur, cur.direct);
-    const sharePv = split ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(split.map((p) => `${p.pct} % ${this._t(p.key)}`).join(" · "))}</div>` : "";
-    // The tiles come from the configured sensors only, never from the current values: the card keeps its size
-    // and nothing appears or disappears during the day.
-    const tile = (label, w, extra = "") => {
-      if (w == null) return "";
-      const [v, u] = fmtPower(Math.abs(w));
-      return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
-    };
     const limit = this._collapsedLimit();
     const areas = this._renderAreas(cur.house, limit);
     const labels = this._renderLabels(cur.house, limit);
@@ -5321,29 +5227,10 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="grid">
       ${this._renderAlerts()}
       ${this._renderLiveResults(cur)}
-      <div class="eb-card eb-card--glow">
-        <div class="row"><span class="eb-title">${this._t("house")}</span>
-          <span class="eb-chip">${cur.house == null ? this._t("noData") : this._t("live")}</span></div>
-        <div class="big"><b>${val}</b><span>${unit}</span></div>
-        ${mix ? `<div class="eb-bar bar">
-            <div class="eb-solar" style="width:${mix.solar * 100}%"></div>
-            <div style="width:${mix.battery * 100}%;background:var(--eb-violet)"></div>
-            <div class="eb-grid" style="width:${mix.grid * 100}%"></div></div>
-          <div class="legend">
-            <span><i style="background:var(--eb-solar)"></i>PV ${Math.round(mix.solar * 100)} %</span>
-            ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>${this._t("storage")} ${Math.round(mix.battery * 100)} %</span>` : ""}
-            <span><i style="background:var(--eb-grid)"></i>${this._t("grid")} ${Math.round(mix.grid * 100)} %</span></div>` : ""}
-        <div class="tiles compact">
-          ${cur.autarky == null ? "" : `<div class="eb-tile"><div class="eb-label">${this._t("autarky")}</div><div class="eb-value">${Math.round(cur.autarky)}<small>%</small></div></div>`}
-          ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
-          ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
-        </div>
-      </div>
       <div class="eb-card">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${this._renderStorage(cur)}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 
