@@ -5496,10 +5496,12 @@ test("power tab: the card shows where the consumption comes from in one bar: gri
 test("power tab: the self-sufficiency stands next to the power, not in the right column", () => {
   const html = livePanel({}, { h: st(1400), pv: st(3200), gi: st(300), ge: st(2100), bc: st(0), bd: st(500) })._renderHouse();
   const num = html.slice(html.indexOf('class="resnum"'), html.indexOf('class="hbars"'));
-  assert.match(num, /class="resself"/);
+  assert.match(num, /class="resself live"/);
   assert.match(num, /Self-sufficiency/);
+  assert.match(num, /class="storring small"/); // the same ring style as the storage
+  assert.match(num, /<text class="sv"[^>]*>97<\/text>|<text class="sv"[^>]*>\d+<\/text>/);
   const right = html.slice(html.indexOf('class="resr"'));
-  assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself"/);
+  assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself/);
   assert.doesNotMatch(html, /stackbadge/); // the little bars are gone
 });
 

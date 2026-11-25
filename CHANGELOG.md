@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Battery card in the *Right now* card:** between the power and the savings there is a battery card with a ring for each storage (up to four), the status, the power and when it is empty or full. The columns get narrower with it, the piggy bank is left out then. Without a charge level the card keeps its two columns.
+- **Battery card in the *Right now* card:** between the power and the savings there is a battery card with a ring for each storage (up to four), the status, the power and when it is empty or full. The columns get narrower with it, the piggy bank is left out then. Without a charge level the card keeps its two columns. The self-sufficiency is now a ring in the same style and size as the storage rings, on the same height.
 - **Savings of the day, new calculation:** the kWh in the savings box are what the house used of its own power today: the solar power used directly plus what came out of the storage. A kWh used directly costs the feed-in revenue it would have brought, a kWh from the storage costs that revenue divided by the round-trip efficiency of the storage (`storage_roundtrip_total` of PV Assistant, the storage is assumed to charge from solar only; without the sensor the storage part costs the feed-in tariff). The saving is the price of the grid minus that cost for each kWh, never below 0; the fed-in energy is no longer counted in it. The same calculation is used for the savings of the results card.
 - **No electric car in the *Right now* card:** the box with the charging power and the sentence about the charging car are gone from the card of the Power tab; the car stays in the picture, with its flow into the garage.
 

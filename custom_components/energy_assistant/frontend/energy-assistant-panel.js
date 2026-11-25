@@ -127,15 +127,16 @@ const STYLE = `
 .resdk{font-size:14px;color:var(--eb-text)}.resdk b{font-size:17px}
 .resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
+.resgrid{align-items:start}
 .resgrid.three{grid-template-columns:minmax(0,1.7fr) auto minmax(0,.9fr)}
+.resself.live{flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:0;margin-left:auto}
+.resself.live .storring.small{width:72px;height:72px}
+.resself.live .reslab,.resm .reslab{line-height:1.3;margin:0}
+.resr{align-self:stretch}
 .resgrid.three .resl{padding-right:22px}
 .resgrid.three .resr{padding-left:22px}
-.resgrid.three .resnum{font-size:44px}
+.resgrid.three .resnum{font-size:44px;margin-top:0}
 .resgrid.three .resnum small{font-size:16px}
-.resgrid.three .resnum .resself{gap:8px}
-.resgrid.three .resnum .resring,.resgrid.three .resnum .resring .donut{width:60px;height:60px}
-.resgrid.three .resnum .resbig{font-size:24px}
-.resgrid.three .resnum .reslab2{font-size:12px}
 .resgrid.three .pig{display:none}
 .resgrid.three .ressave .resbig{font-size:26px}
 .resm{padding:0 22px;border-right:1px solid var(--eb-line);display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0}
@@ -172,11 +173,7 @@ const STYLE = `
 .resper{font-size:14px;font-weight:500;color:var(--eb-muted);white-space:nowrap}
 .ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
-.resnum .resself{margin-left:auto;padding-bottom:0;gap:12px;font-size:16px}
-.resnum .resring,.resnum .resring .donut{width:72px;height:72px}
-.resnum .resbig{font-size:30px}
-.resnum .resbig small{font-size:15px}
-.resnum .reslab2{font-size:14px}
+.resnum .resself{margin-left:auto;padding-bottom:0;font-size:16px}
 .resring{position:relative;flex:none;width:96px;height:96px}
 .resring .donut{width:96px;height:96px;display:block;filter:drop-shadow(0 0 7px rgba(52,211,153,.45))}
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
@@ -2507,7 +2504,7 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
-  _storRing(level, color, min, small = false) {
+  _storRing(level, color, min, small = false, bolt = true) {
     const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
     const tick = min > 0 ? (() => {
       const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
@@ -2516,7 +2513,7 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
       <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
       <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
-      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
+      ${bolt ? `<path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>` : ""}
       <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
@@ -3435,8 +3432,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
-    const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
-      <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
+    // The self-sufficiency as a ring in the style of the storage rings (same size, same height)
+    const ring = autarky != null ? `<div class="resself live"><div class="reslab">${esc(this._t("autarky"))}</div>${this._storRing(autarky, "var(--eb-green)", 0, true, false)}</div>` : "";
     // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
     // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();
