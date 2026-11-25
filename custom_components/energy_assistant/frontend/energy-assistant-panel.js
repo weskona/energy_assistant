@@ -35,9 +35,6 @@ const STYLE = `
 .fld.span{grid-column:1/-1}
 @media (max-width:800px){.grid,.set .grid{grid-template-columns:minmax(0,1fr)}.wrap{padding:12px}}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.big{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px}
-.big b{font-size:64px;font-weight:800;line-height:1}
-.big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
 .spk{display:inline-block;vertical-align:middle;margin-right:10px;overflow:visible}
@@ -197,8 +194,6 @@ const STYLE = `
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
-.bar{margin-top:16px}
-.bar>div{transition:width .6s}
 svg.hsvg{display:block;max-width:100%;touch-action:pan-y}
 .hchart{margin-top:12px}
 .hchart .legend{margin:0 0 8px}
@@ -439,13 +434,6 @@ const STRINGS = {
     stTitle: "Storage",
     stUnit: "Storage {n}",
     stTotal: "Total",
-    stCharging: "Charging",
-    stDischarging: "Discharging",
-    stIdle: "Idle",
-    stSoc: "Charge level",
-    stStored: "Stored",
-    stUsable: "Usable",
-    stPower: "Power",
     stEmptyAt: "Empty at",
     stFullAt: "Full at",
     stIn: "in {dur}",
@@ -585,7 +573,6 @@ const STRINGS = {
     rename: "Rename",
     originalName: "Original: {name}",
     live: "Live consumption",
-    noData: "No data",
     history: "History",
     historyLoading: "Loading history …",
     noHistory: "No history available yet",
@@ -612,10 +599,6 @@ const STRINGS = {
     solar: "Solar",
     solarDirect: "Solar direct",
     gridImport: "Grid import",
-    gridExport: "Grid export",
-    fromStorage: "From storage",
-    toStorage: "To storage",
-    storageFromGrid: "Storage from grid",
     storage: "Storage",
     grid: "Grid",
     devices: "Devices",
@@ -860,13 +843,6 @@ const STRINGS = {
     stTitle: "Speicher",
     stUnit: "Speicher {n}",
     stTotal: "Gesamt",
-    stCharging: "Lädt",
-    stDischarging: "Entlädt",
-    stIdle: "Ruhe",
-    stSoc: "Ladestand",
-    stStored: "Gespeichert",
-    stUsable: "Nutzbar",
-    stPower: "Leistung",
     stEmptyAt: "Leer um",
     stFullAt: "Voll um",
     stIn: "in {dur}",
@@ -1006,7 +982,6 @@ const STRINGS = {
     rename: "Umbenennen",
     originalName: "Original: {name}",
     live: "Verbrauch live",
-    noData: "Keine Daten",
     history: "Verlauf",
     historyLoading: "Verlauf wird geladen …",
     noHistory: "Noch kein Verlauf verfügbar",
@@ -1033,10 +1008,6 @@ const STRINGS = {
     solar: "PV",
     solarDirect: "PV direkt",
     gridImport: "Netzbezug",
-    gridExport: "Einspeisung",
-    fromStorage: "Vom Speicher",
-    toStorage: "Zum Speicher",
-    storageFromGrid: "Speicher aus Netz",
     storage: "Speicher",
     grid: "Netz",
     devices: "Geräte",
@@ -4944,45 +4915,6 @@ class EnergyAssistantPanel extends HTMLElement {
     const pvCharge = Math.max(0, (charge ?? 0) - (gridCharge ?? 0));
     const d = solar - (gridOut ?? 0) - pvCharge;
     return Math.max(0, Math.min(d, solar, house ?? solar));
-  }
-
-  /**
-   * Where the solar production goes, in whole percent that add up to 100: straight to the house, into the
-   * storage (solar share of the charging) and into the grid. Parts that round to 0 % are left out, the house
-   * part always stays. Null without production.
-   */
-  _pvSplit({ solar, gridOut, charge, gridCharge }, direct) {
-    if (solar == null || !(solar > 0) || direct == null) return null;
-    const parts = [
-      { key: "house", w: Math.max(0, direct) },
-      { key: "storage", w: Math.max(0, (charge ?? 0) - (gridCharge ?? 0)) },
-      { key: "grid", w: Math.max(0, gridOut ?? 0) },
-    ];
-    const total = parts.reduce((a, p) => a + p.w, 0);
-    if (!(total > 0)) return null;
-    // Largest remainder: whole percentages that add up to exactly 100.
-    for (const p of parts) {
-      p.exact = (p.w / total) * 100;
-      p.pct = Math.floor(p.exact);
-    }
-    let missing = 100 - parts.reduce((a, p) => a + p.pct, 0);
-    for (const p of [...parts].sort((a, b) => b.exact - b.pct - (a.exact - a.pct))) {
-      if (missing <= 0) break;
-      p.pct += 1;
-      missing -= 1;
-    }
-    return parts.filter((p) => p.key === "house" || p.pct > 0).map((p) => ({ key: p.key, pct: p.pct }));
-  }
-
-  /** Source of consumption as shares (solar, storage, grid). */
-  _mix({ house, gridIn, discharge, direct }) {
-    if (!house || house <= 0) return null;
-    const g = Math.max(0, gridIn ?? 0);
-    const b = Math.max(0, discharge ?? 0);
-    // Solar share = directly used solar, else what remains after grid import and storage.
-    const s = direct != null ? direct : Math.max(0, house - g - b);
-    const sum = g + b + s || 1;
-    return { solar: s / sum, battery: b / sum, grid: g / sum };
   }
 
   async _maybeLoadHistory() {
