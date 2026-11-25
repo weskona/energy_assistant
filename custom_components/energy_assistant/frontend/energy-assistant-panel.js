@@ -127,6 +127,22 @@ const STYLE = `
 .resdk{font-size:14px;color:var(--eb-text)}.resdk b{font-size:17px}
 .resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
+.resgrid.three{grid-template-columns:minmax(0,1.7fr) auto minmax(0,.9fr)}
+.resgrid.three .resl{padding-right:22px}
+.resgrid.three .resr{padding-left:22px}
+.resgrid.three .resnum{font-size:44px}
+.resgrid.three .resnum small{font-size:16px}
+.resgrid.three .resnum .resself{gap:8px}
+.resgrid.three .resnum .resring,.resgrid.three .resnum .resring .donut{width:60px;height:60px}
+.resgrid.three .resnum .resbig{font-size:24px}
+.resgrid.three .resnum .reslab2{font-size:12px}
+.resgrid.three .pig{display:none}
+.resgrid.three .ressave .resbig{font-size:26px}
+.resm{padding:0 22px;border-right:1px solid var(--eb-line);display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0}
+.resm .rings{display:flex;gap:6px}
+.resm .storring.small{width:72px;height:72px}
+.resm .bline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--eb-dim)}
+.resm .bline b{font-size:15px;color:var(--eb-text)}
 .resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
 .reslab{font-size:11px;font-weight:600;letter-spacing:var(--eb-label-spacing);text-transform:uppercase;color:var(--eb-muted)}
 .resnum{display:flex;align-items:flex-start;gap:10px;font-size:56px;font-weight:800;line-height:1.05;color:var(--eb-text);margin-top:8px}
@@ -184,7 +200,7 @@ const STYLE = `
 .resillu .glowa{filter:drop-shadow(0 0 9px rgba(255,200,100,.8))}
 .resfoot{padding-left:112px}
 }
-@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
+@media (max-width:640px){.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -1438,6 +1454,7 @@ const UNUSUAL_FACTOR = 1.3;
 const UNUSUAL_MIN_W = 20;
 const UNUSUAL_MIN_HOURS_REF = 48; // hourly values needed from the days before to know what is usual
 const FLOW_W = 20; // charging or discharging from this power on
+const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)"); // the color of a charge level
 const PIC_FLOW_W = 1; // the picture shows a flow from this power on (a few watts of grid import still count)
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
@@ -2422,7 +2439,6 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
     // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
-    const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)");
     // One ring for every storage (the mean level in the tiles), the minimum level as a tick
     const levels = this._storageLevels().slice(0, 4);
     const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
@@ -3353,6 +3369,31 @@ class EnergyAssistantPanel extends HTMLElement {
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
+  /**
+   * The battery card between the power and the savings in the card of the Power tab: a small ring for each storage
+   * (up to four), the status, the power and when it is empty or full. Empty without a charge level.
+   */
+  _liveBattery(cur) {
+    const st = this._storage(cur);
+    if (!st) return "";
+    const lang = this._hass?.language || "en";
+    const units = this._storageUnits().slice(0, 4);
+    const levels = units.length ? units.map((u) => u.soc) : [st.soc];
+    const rings = levels.map((v) => this._storRing(v, levelColor(v), st.min, true)).join("");
+    const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
+    let line = `<span class="eb-chip stat ${st.mode}">${esc(status)}</span>`;
+    if (st.mode !== "idle") {
+      const [v, u] = fmtPower(st.power);
+      line += `<b>${v} ${u}</b>`;
+    }
+    let until = "";
+    if (st.hours != null && Number.isFinite(st.hours)) {
+      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
+      until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
+    }
+    return `<div class="resm"><div class="reslab">${esc(this._t("stTitle"))}</div><div class="rings">${rings}</div><div class="bline">${line}</div>${until}</div>`;
+  }
+
   /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
   _evLive() {
     let total = 0, charging = false;
@@ -3391,6 +3432,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
     const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>
       <div class="stackleg">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(this._t(label))} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
+    const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
@@ -3418,11 +3460,11 @@ class EnergyAssistantPanel extends HTMLElement {
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows, cur.solar != null && !(cur.solar >= PIC_FLOW_W))}</div>
       <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span></div>
-      <div class="resgrid">
+      <div class="resgrid${battery ? " three" : ""}">
         <div class="resl">
           <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${ring}</div>
           <div class="hbars">${bars}</div></div>
-        <div class="resr">${savings}</div>
+        ${battery}<div class="resr">${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 

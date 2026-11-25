@@ -5123,10 +5123,10 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   assert.match(html, /<span class="eb-title">Right now<\/span>/);
   assert.match(html, /<span class="rn">1,400<small>W<\/small>/); // the power in whole watts stays
   assert.doesNotMatch(html, /Consumption now/); // without the caption
-  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resgrid"')), /class="eb-chip"/); // and no live badge
+  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resgrid')), /class="eb-chip"/); // and no live badge
   assert.ok(html.indexOf("Right now") < html.indexOf("Live consumption") || html.indexOf("Right now") < html.indexOf("eb-card--glow\">\n        <div class=\"row\"><span class=\"eb-title\">House"));
   // flows of now: sun, feed-in, charging and the electric car, all in whole watts
-  const live = html.slice(html.indexOf('class="reshero fullrow"'), html.indexOf('class="resgrid"'));
+  const live = html.slice(html.indexOf('class="reshero fullrow"'), html.indexOf('class="resgrid'));
   assert.equal((live.match(/class="flowhead"/g) || []).length, 4);
   assert.match(live, />3,200 W</);
   assert.match(live, />1,800 W</);
@@ -5594,4 +5594,22 @@ test("savings: the example 0.30 EUR grid price, 0.10 EUR feed-in, 90 % round tri
   assert.equal(store.kwh, 10);
   assert.ok(Math.abs(store.money - 10 * (0.3 - 0.1 / 0.9)) < 1e-9); // 1.89 for 10 kWh = 0.189 per kWh
   assert.equal(Math.round(store.money * 100) / 100, 1.89);
+});
+
+test("power tab: a battery card sits between the power and the savings, with a ring for every storage, the status and the time", () => {
+  const p = livePanel({ battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_capacity: 10, battery_min_soc: 10 }, { soc: st(64, "%"), soc2: st(28, "%"), bc: st(0), bd: st(900) });
+  const html = p._renderHouse();
+  assert.match(html, /class="resgrid three"/);
+  const grid = html.slice(html.indexOf('class="resgrid'));
+  const iL = grid.indexOf('class="resl"'), iM = grid.indexOf('class="resm"'), iR = grid.indexOf('class="resr"');
+  assert.ok(iL < iM && iM < iR); // power, battery, savings
+  const mid = grid.slice(iM, iR);
+  assert.equal((mid.match(/class="storring small"/g) || []).length, 2);
+  assert.match(mid, /<text class="sv"[^>]*>64<\/text>/);
+  assert.match(mid, /<text class="sv"[^>]*>28<\/text>/);
+  assert.match(mid, /class="eb-chip stat discharging">Discharging<\/span><b>900 W<\/b>/);
+  assert.match(mid, /Empty at <b>/);
+  // without a charge level there is no battery card and two columns as before
+  const none = livePanel({ battery_soc: [] }, {})._renderHouse();
+  assert.doesNotMatch(none, /class="resm"|resgrid three/);
 });
