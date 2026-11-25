@@ -3401,16 +3401,21 @@ class EnergyAssistantPanel extends HTMLElement {
       return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
     };
     const perUnit = units.length <= 1 || units.every((u) => u.mode);
-    const modeText = (mode) => (mode ? `<div class="dstat ${mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[mode]))}</div>` : "");
-    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), modeText(units.length > 1 ? (perUnit ? units[i]?.mode : null) : st.mode))).join("");
+    const modeText = (mode, power) => {
+      if (!mode) return "";
+      const label = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[mode]);
+      const w = mode !== "idle" && power > 0 ? ` · ${fmtPower(power).join(" ")}` : "";
+      return `<div class="dstat ${mode}">${esc(label + w)}</div>`;
+    };
+    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power) : "") : modeText(st.mode, 0))).join("");
     // The status stands under the value of each storage; when the sensors cannot be matched to the storages it stands once below
     let line = perUnit ? "" : `<span class="dstat ${st.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]))}</span>`;
-    if (st.mode !== "idle") {
+    if (st.mode !== "idle" && !(units.length > 1 && perUnit)) {
       const [v, u] = fmtPower(st.power);
       line += `<b>${v} ${u}</b>`;
     }
     let until = "";
-    if (st.hours != null && Number.isFinite(st.hours)) {
+    if (st.hours != null && Number.isFinite(st.hours) && !(units.length > 1 && perUnit)) {
       const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
       until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
     }

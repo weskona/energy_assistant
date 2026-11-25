@@ -5626,8 +5626,9 @@ test("power tab: a battery card sits between the power and the savings, with a d
   // two storages with a discharge and a charge sensor each: every storage has its own status under its value
   const two = livePanel({ battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_discharge: ["bd", "bd2"], battery_charge: ["bc", "bc2"] }, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(900), bd2: st(0), bc: st(0), bc2: st(650) })._renderHouse();
   const mid2 = two.slice(two.indexOf('class="resm"'), two.indexOf('class="resr"'));
-  assert.match(mid2, /Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">Discharging<\/div>/);
-  assert.match(mid2, /Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div><div class="dstat charging">Charging<\/div>/);
+  assert.match(mid2, /Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">Discharging · 900 W<\/div>/);
+  assert.match(mid2, /Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div><div class="dstat charging">Charging · 650 W<\/div>/);
+  assert.doesNotMatch(mid2, /class="bline"/); // each storage has its own power, so no common line below
   // the self-sufficiency also has its caption above the value
   assert.match(two, /<div class="reslab2">Self-sufficiency<\/div><div class="resbig">\d+<small>%<\/small><\/div>/);
   // without a charge level there is no battery card and two columns as before
