@@ -5482,8 +5482,8 @@ test("power tab: the card shows where the consumption comes from in one bar: gri
   const html = p._renderHouse();
   const bar = html.slice(html.indexOf('class="stackh"'), html.indexOf('class="resr"'));
   assert.equal((bar.slice(0, bar.indexOf('class="stackleg"')).match(/<i /g) || []).length, 3); // one part for each source
-  assert.ok(bar.indexOf("Solar direct") < bar.indexOf("Storage") && bar.indexOf("Storage") < bar.indexOf("Grid")); // like the bar of the House card
-  assert.match(bar, /background:var\(--eb-solar\)[\s\S]*background:var\(--eb-violet\)[\s\S]*background:var\(--eb-grid\)/);
+  assert.ok(bar.indexOf("Solar direct") < bar.indexOf("Storage") && bar.indexOf("Storage") < bar.indexOf("Grid")); // solar, storage, grid
+  assert.match(bar, /background:var\(--eb-solar\)[\s\S]*background:var\(--ea-bout\)[\s\S]*background:var\(--eb-grid\)/);
   assert.match(bar, /Grid <em>300 W<\/em> · 16 %/);
   assert.match(bar, /Storage <em>500 W<\/em> · 26 %/);
   assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resr"')), /class="rbar"|class="hbar"|Feed-in/);
