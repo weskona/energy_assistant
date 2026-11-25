@@ -3136,23 +3136,27 @@ test("storage: without a charge level there is no card, without a capacity only 
   assert.equal(clamped._storage(clamped._cur).soc, 100);
 });
 
-test("storage: the card shows the status, the bar with the minimum and the tiles", () => {
+test("storage: the card shows the status, the ring with the minimum and the tiles", () => {
   const p = storagePanel({ cur: { discharge: 1000 } });
   const html = p._renderStorage(p._cur);
-  assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip">Discharging<\/span>/);
-  assert.match(html, /class="socbar discharging"[^>]*><i style="width:60%"><\/i><b style="left:10%"><\/b>/);
+  assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip stat discharging">Discharging<\/span>/);
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
+  assert.match(html, /<text class="sv"[^>]*>60<\/text>/); // the ring with the level
+  assert.match(html, /stroke-dasharray="[\d.]+ [\d.]+"/);
   assert.match(html, /Stored<\/div><div class="eb-value">6\.0<small>kWh/);
   assert.match(html, /Usable<\/div><div class="eb-value">5\.0<small>kWh/);
   assert.match(html, /Power<\/div><div class="eb-value">1[.,]?000<small>W/);
   assert.match(html, /Empty at<\/div>[\s\S]*in 5 h 0 min/);
   const idle = storagePanel();
   assert.match(idle._renderStorage(idle._cur), /Idle/);
+  assert.match(idle._renderStorage(idle._cur), /class="eb-chip stat idle"/);
   assert.doesNotMatch(idle._renderStorage(idle._cur), /Power<\/div>|Empty at|Full at/);
   const charging = storagePanel({ cur: { charge: 2000 }, cfg: { battery_min_soc: null } });
   const c = charging._renderStorage(charging._cur);
   assert.match(c, /Full at<\/div>[\s\S]*in 2 h 0 min/);
   assert.doesNotMatch(c, /Usable/); // without a minimum usable equals stored
   assert.doesNotMatch(c, /<b style/); // and no marker
+  assert.match(c, /class="eb-chip stat charging"/);
   const de = storagePanel({ cur: { charge: 2000 }, lang: "de" });
   assert.match(de._renderStorage(de._cur), /Lädt[\s\S]*Voll um/);
 });
@@ -5117,11 +5121,12 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   p._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
   const html = p._renderHouse();
   assert.match(html, /<span class="eb-title">Right now<\/span>/);
-  assert.match(html, /<div class="reslab">Consumption now<\/div>/);
-  assert.match(html, /<span class="rn">1,400<small>W<\/small>/);
+  assert.match(html, /<span class="rn">1,400<small>W<\/small>/); // the power in whole watts stays
+  assert.doesNotMatch(html, /Consumption now/); // without the caption
+  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resgrid"')), /class="eb-chip"/); // and no live badge
   assert.ok(html.indexOf("Right now") < html.indexOf("Live consumption") || html.indexOf("Right now") < html.indexOf("eb-card--glow\">\n        <div class=\"row\"><span class=\"eb-title\">House"));
   // flows of now: sun, feed-in, charging and the electric car, all in whole watts
-  const live = html.slice(html.indexOf('class="reshero fullrow"'), html.indexOf("Consumption now"));
+  const live = html.slice(html.indexOf('class="reshero fullrow"'), html.indexOf('class="resgrid"'));
   assert.equal((live.match(/class="flowhead"/g) || []).length, 4);
   assert.match(live, />3,200 W</);
   assert.match(live, />1,800 W</);
@@ -5134,11 +5139,11 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   assert.match(html, /class="unit" data-soc="50"/); // the storage with its live level
 });
 
-test("power tab: without a charging car the sentence is about the self-sufficiency, no flow below 20 W", () => {
-  const p = livePanel({}, { pv: st(10), ge: st(0), bc: st(0) });
+test("power tab: without a charging car the sentence is about the self-sufficiency, no flow at 0 W", () => {
+  const p = livePanel({}, { pv: st(0), ge: st(0), bc: st(0) });
   const html = p._renderHouse();
   assert.match(html, /<div class="resfoot">Right now you cover <b>100 %<\/b> of your electricity needs yourself\.<\/div>/);
-  assert.doesNotMatch(html, /class="flowhead"/); // nothing flows (10 W is below the limit)
+  assert.doesNotMatch(html, /class="flowhead"/); // nothing flows
   assert.doesNotMatch(html, /class="resdrive"/); // no car box
 });
 
@@ -5366,4 +5371,221 @@ test("device cost: the rows of the Consumption tab are priced with the mix of th
   const detail = html.slice(html.indexOf('class="subs"'));
   assert.match(detail, /Cost<\/span><b>[^<]*0[.,]20[^<]*<\/b>/); // 2.5 kWh x 0.08, not x 0.30 = 0.75
   assert.doesNotMatch(detail, /0[.,]75/);
+});
+
+test("devices tab: a running day still has a part that is not assigned, for the hours that have data", () => {
+  const p = devicesTabPanel();
+  const cats = p._devCats();
+  const klima = cats.find((c) => c.id === "klima").members;
+  p._devTab = {
+    key: p._devKey("day", 0), range: "day", off: 0, win: p._balWindow("day", 0), cats, n: 24, at: Date.now(),
+    series: bucketsOf(p, { [klima[0]]: () => 0.5, [klima[1]]: () => 0.25, "sensor.licht_flur_leistung": () => 0.1 }),
+  };
+  // the consumption of the house is only known until 12:00, the hours to come have no data yet
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, (_, i) => ({ cons: i < 12 ? 1 : null })), totals: {} };
+  const m = p._devModel();
+  assert.equal(m.house, 12); // what the house used so far
+  assert.ok(m.unassigned > 1.5 && m.unassigned < 2.5); // 12 hours of 1 - 0.85 = 0.15
+  assert.ok(m.unBuckets.slice(12).every((v) => v === 0)); // nothing for the hours without data
+  const html = p._renderDevicesTab();
+  assert.match(html, /not assigned/);
+  // in half hours the pairs are added up, a pair with one half still counts
+  const half = p._balWindow("day", 0, { half: true });
+  const rows = Array.from({ length: half.edges.length - 1 }, (_, i) => ({ cons: i < 25 ? 0.5 : null }));
+  p._bal = { range: "day", off: 0, failed: false, win: half, rows, totals: {} };
+  if (rows.length === 48) assert.equal(p._devModel().house, 12.5); // 25 half hours of 0.5
+  // no data at all: nothing is assigned
+  p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: null })), totals: {} };
+  assert.equal(p._devModel().house, null);
+  assert.equal(p._devModel().unassigned, 0);
+});
+
+
+test("storage: with several storages every one has its own ring, the mean level is in the tiles", () => {
+  const p = storagePanel({ cur: { discharge: 1000 } });
+  p._config = { ...p._config, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"] };
+  p._hass.states["sensor.soc2"] = { state: "20", attributes: { unit_of_measurement: "%" } };
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="storring small"/g) || []).length, 2);
+  assert.match(html, /<text class="sv"[^>]*>60<\/text>/);
+  assert.match(html, /<text class="sv"[^>]*>20<\/text>/);
+  assert.match(html, /Charge level<\/div><div class="eb-value">40<small>%<\/small><\/div>[\s\S]*60 % · 20 %/); // the mean and each one
+  // the colors of the level: green from 60 %, amber from 25 %, red below
+  assert.match(html, /stroke="var\(--eb-green\)"/);
+  assert.match(html, /stroke="var\(--eb-red\)"/);
+  // one storage: one big ring
+  const one = storagePanel();
+  assert.equal((one._renderStorage(one._cur).match(/class="storring"/g) || []).length, 1);
+});
+
+test("storage: several storages are shown one by one, with their own power when the sensors match, and the total below", () => {
+  const p = storagePanel({ cur: { discharge: 1500 } });
+  p._config = { ...p._config, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"], battery_discharge: ["sensor.bd1", "sensor.bd2"], battery_charge: ["sensor.bc1", "sensor.bc2"] };
+  const set = (id, v, unit = "W") => { p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: unit } }; };
+  set("sensor.soc2", 20, "%");
+  set("sensor.bd1", 900); set("sensor.bd2", 0); set("sensor.bc1", 0); set("sensor.bc2", 650);
+  const units = p._storageUnits();
+  assert.deepEqual(units.map((u) => [u.name, u.soc, u.mode, u.power]), [["Storage 1", 60, "discharging", 900], ["Storage 2", 20, "charging", 650]]);
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="storunit"/g) || []).length, 2); // each one on its own
+  assert.match(html, /<span class="eb-label" title="[^"]*">Storage 1<\/span><span class="eb-chip stat discharging">Discharging<\/span>/);
+  assert.match(html, /<span class="eb-label" title="[^"]*">Storage 2<\/span><span class="eb-chip stat charging">Charging<\/span>/);
+  assert.match(html, /<div class="eb-value">900<small>W<\/small><\/div>/);
+  assert.match(html, /<div class="eb-value">650<small>W<\/small><\/div>/);
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
+  // the total comes after the storages
+  assert.ok(html.indexOf("Storage 2") < html.indexOf(">Total<"));
+  assert.match(html, /Charge level<\/div><div class="eb-value">40<small>%<\/small>/);
+  // power sensors that cannot be matched (a different number): no mode and no power per storage
+  p._config = { ...p._config, battery_discharge: ["sensor.bd1"], battery_charge: [] };
+  const plain = p._storageUnits();
+  assert.deepEqual(plain.map((u) => u.mode), [null, null]);
+  const html2 = p._renderStorage(p._cur);
+  assert.equal((html2.match(/class="storunit"/g) || []).length, 2);
+  assert.doesNotMatch(html2.slice(html2.indexOf("storunits"), html2.indexOf(">Total<")), /eb-chip stat/);
+  // combined signed sensors, one for each storage
+  p._config = { ...p._config, battery_discharge: [], battery_charge: [], battery_power: ["sensor.bp1", "sensor.bp2"], invert_battery: false };
+  set("sensor.bp1", 400); set("sensor.bp2", -300);
+  assert.deepEqual(p._storageUnits().map((u) => [u.mode, u.power]), [["discharging", 400], ["charging", 300]]);
+  // a storage without a value is left out; one storage keeps the single card
+  p._hass.states["sensor.soc2"] = { state: "unavailable", attributes: {} };
+  assert.equal(p._storageUnits().length, 1);
+  assert.doesNotMatch(p._renderStorage(p._cur), /class="storunit"/);
+});
+
+test("storage: every storage shows when it is empty or full, from its own power and its share of the capacity", () => {
+  const p = storagePanel({ cur: { discharge: 1500 } });
+  p._config = { ...p._config, battery_capacity: 10, battery_min_soc: 10, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"], battery_discharge: ["sensor.bd1", "sensor.bd2"], battery_charge: ["sensor.bc1", "sensor.bc2"] };
+  const set = (id, v, unit = "W") => { p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: unit } }; };
+  set("sensor.soc", 60, "%"); set("sensor.soc2", 20, "%");
+  set("sensor.bd1", 900); set("sensor.bd2", 0); set("sensor.bc1", 0); set("sensor.bc2", 500);
+  const [a, b] = p._storageUnits();
+  assert.ok(Math.abs(a.hours - (5 * 0.5) / 0.9) < 1e-9); // 5 kWh each, 50 % usable down to 10 %
+  assert.ok(Math.abs(b.hours - (5 * 0.8) / 0.5) < 1e-9); // 80 % still to charge
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="eb-label until"/g) || []).length, 2);
+  assert.match(html, /until">Empty at /);
+  assert.match(html, /until">Full at /);
+  set("sensor.bd1", 0); set("sensor.bc2", 0);
+  assert.equal(p._storageUnits()[0].hours, null); // idle: no time
+});
+
+test("power tab: a small grid import of a few watts is drawn as a flow in the picture", () => {
+  const p = livePanel({}, { pv: st(0), gi: st(7), ge: st(0), bc: st(0) });
+  const html = p._renderHouse();
+  assert.match(html, />7 W</);
+});
+
+test("power tab: the card shows where the consumption comes from in one bar: grid, solar direct, storage", () => {
+  const p = livePanel({}, { h: st(1400), pv: st(3200), gi: st(300), ge: st(2100), bc: st(0), bd: st(500) });
+  const html = p._renderHouse();
+  const bar = html.slice(html.indexOf('class="stackh"'), html.indexOf('class="resr"'));
+  assert.equal((bar.slice(0, bar.indexOf('class="stackleg"')).match(/<i /g) || []).length, 3); // one part for each source
+  assert.ok(bar.indexOf("Grid") < bar.indexOf("Solar direct") && bar.indexOf("Solar direct") < bar.indexOf("Storage")); // grid, solar direct, storage
+  assert.match(bar, /background:var\(--eb-grid\)[\s\S]*background:var\(--eb-solar\)[\s\S]*background:var\(--ea-bout\)/);
+  assert.match(bar, /Grid <em>300 W<\/em><\/span>/);
+  assert.match(bar, /Storage <em>500 W<\/em><\/span>/);
+  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resr"')), /class="rbar"|class="hbar"|Feed-in/);
+  // without any power: no parts, the legend still names the sources
+  const none = livePanel({}, { h: st(0), pv: st(0), gi: st(0), ge: st(0), bc: st(0), bd: st(0) });
+  const n = none._renderHouse();
+  assert.equal((n.slice(n.indexOf('class="stackh"'), n.indexOf('class="stackleg"')).match(/<i /g) || []).length, 0);
+});
+
+test("power tab: the self-sufficiency stands next to the power, not in the right column", () => {
+  const html = livePanel({}, { h: st(1400), pv: st(3200), gi: st(300), ge: st(2100), bc: st(0), bd: st(500) })._renderHouse();
+  const num = html.slice(html.indexOf('class="resnum"'), html.indexOf('class="hbars"'));
+  assert.match(num, /class="resself"/);
+  assert.match(num, /Self-sufficiency/);
+  const right = html.slice(html.indexOf('class="resr"'));
+  assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself"/);
+  assert.doesNotMatch(html, /stackbadge/); // the little bars are gone
+});
+
+test("power tab: the picture shows a moon instead of the sun when nothing is produced any more", () => {
+  const day = livePanel({}, { pv: st(3200) })._renderHouse();
+  assert.match(day, /class="glows"/);
+  assert.doesNotMatch(day, /class="moon"/);
+  const night = livePanel({}, { pv: st(0) })._renderHouse();
+  assert.match(night, /class="moon"/);
+  assert.doesNotMatch(night, /class="glows"|class="beams"/);
+  // a few watts are still production
+  assert.match(livePanel({}, { pv: st(5) })._renderHouse(), /class="glows"/);
+  // without a solar sensor there is no statement about the sun: the picture keeps the sun
+  const none = livePanel({ solar_power: [] }, {})._renderHouse();
+  assert.doesNotMatch(none, /class="moon"/);
+});
+
+test("power tab: the sentence says what solar covered of the electricity needs today, the live value only as long as today is unknown", async () => {
+  const p = livePanel({}, { pv: st(0) });
+  assert.match(p._renderHouse(), /Right now you cover/); // today is not loaded yet
+  p._balFetch = async () => ({});
+  p._balBuckets = () => ({});
+  p._balCompute = () => ({ totals: { autarky: 71.6 } });
+  p._render = () => {};
+  await p._loadToday();
+  assert.equal(p._today.autarky, 71.6);
+  assert.match(p._renderHouse(), /<div class="resfoot">You have covered <b>72 %<\/b> of your electricity needs with solar today\.<\/div>/);
+  p._hass.language = "de";
+  assert.match(p._renderHouse(), /Du hast heute <b>72 %<\/b> deines Strombedarfs durch PV gedeckt\./);
+  // a charging car still comes first
+  const car = livePanel({}, { pv: st(0) }, { ev_assistant: { vehicles: [{ name: "EV", live: "sensor.evlive" }] } });
+  car._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
+  car._today = { autarky: 50, at: Date.now() };
+  assert.match(car._renderHouse(), /electric car is charging/);
+});
+
+test("power tab: the savings card shows what the sun saved today in kWh and money, the hourly value only until today is loaded", () => {
+  const states = { pv: st(1000), "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } }, "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } } };
+  const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } });
+  assert.match(p._renderHouse(), /<span class="resper">per hour<\/span>/); // today is not loaded yet
+  p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
+  const html = p._renderHouse();
+  assert.match(html, /Savings today/);
+  // 12 kWh used themselves at 0.30 plus 8 kWh fed in at 0.08
+  assert.match(html, /<div class="resbig">4[.,]24 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.doesNotMatch(html, /per hour/);
+});
+
+test("savings: own solar power is worth at least the feed-in tariff, never below 0, also with a negative price", () => {
+  const st2 = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR/kWh" } });
+  const make = (price, feed) => {
+    const states = { pv: st(1000), "sensor.t_preis": st2(price), ...(feed != null ? { "sensor.t_einsp": st2(feed) } : {}) };
+    const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis", ...(feed != null ? { feed_in: "sensor.t_einsp" } : {}) } });
+    p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
+    return p._renderHouse();
+  };
+  // 12 kWh used themselves, 8 kWh fed in; the price is negative: the 12 kWh count with the feed-in tariff 0.08
+  assert.match(make(-0.05, 0.08), /<div class="resbig">1[.,]60 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  // a price above the feed-in tariff counts as before: 12 * 0.30 + 8 * 0.08
+  assert.match(make(0.30, 0.08), /<div class="resbig">4[.,]24 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  // negative price and no feed-in tariff: nothing, but never a minus
+  const none = make(-0.05, null);
+  assert.match(none, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.doesNotMatch(none.slice(none.indexOf("Savings today")), /-0[.,]\d\d/);
+});
+
+test("savings: what the storage loses on the way (round trip from PV Assistant) is deducted, bad values are ignored", () => {
+  const st2 = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR/kWh" } });
+  const make = (eta) => {
+    const states = { pv: st(1000), "sensor.t_preis": st2(0.4), "sensor.t_einsp": st2(0.1), ...(eta != null ? { "sensor.rt": { state: String(eta), attributes: { unit_of_measurement: "%" } } } : {}) };
+    const int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" }, ...(eta != null ? { pv_assistant: { entities: { storage_roundtrip_total: "sensor.rt" } } } : {}) };
+    const p = livePanel({}, states, int);
+    p._today = { autarky: 60, totals: { solar: 20, exp: 8, dis: 5 }, at: Date.now() };
+    return p;
+  };
+  // without the sensor: 12 kWh at 0.40 plus 8 kWh at 0.10
+  assert.match(make(null)._renderHouse(), /<div class="resbig">5[.,]60 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.equal(make(null)._roundtrip(), null);
+  // 80 %: 5 kWh discharged mean 6.25 kWh charged, so 1.25 kWh are lost: 10.75 kWh at 0.40 plus 0.80
+  assert.match(make(80)._renderHouse(), /<div class="resbig">5[.,]10 €? ?[^<]*<span class="resper">10\.8 kWh<\/span>/);
+  assert.equal(make(80)._roundtrip(), 0.8);
+  // unusable values change nothing: text, 0, negative, above 100 %
+  for (const bad of ["unknown", "abc", 0, -5, 140]) assert.equal(make(bad)._roundtrip(), null, String(bad));
+  // the results card of a period uses it too
+  const p = make(80);
+  assert.equal(p._savedBy({ solar: 20, exp: 8, dis: 5 }, 0.4, 0.1).kwh, 10.75);
+  assert.equal(p._savedBy({ solar: 20, exp: 8, dis: 0 }, 0.4, 0.1).kwh, 12);
+  assert.equal(p._savedBy({ solar: 1, exp: 0, dis: 10 }, 0.4, 0.1).kwh, 0); // never below 0
 });

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-25
+
+### Changed
+
+- **Storage losses in the savings:** with the sensor `storage_roundtrip_total` of PV Assistant (round-trip efficiency in %) the energy the storage loses on the way (what was discharged divided by the efficiency, minus what was discharged) is deducted from the self-used solar energy in the savings of the Power tab and of the results card. Without the sensor or with a value that is text, 0 or less, or above 100 % nothing is deducted.
+- **Savings of the day:** the savings box of the Power tab shows what the sun saved today in money and kWh (the self-used solar energy at the current price plus the feed-in revenue, like the results card) instead of the value per hour. Until the statistics of today are loaded the value per hour is shown.
+- **Sentence of the Power tab:** the line below the picture now says what solar covered of your electricity needs today ("You have covered 72 % of your electricity needs with solar today."), from the statistics of today (the share that did not come from the grid, storage included). Until they are loaded the live value is shown; a charging electric car still comes first.
+- **Moon at night:** the picture of the Power tab shows a moon with a few stars instead of the sun (and without the rays on the panels) when the solar power is below 1 W. Without a solar sensor the sun stays.
+- **Lean *Right now* card:** the card above the house in the Power tab no longer shows the caption *Consumption now* and the *Live consumption* badge; the power in watts stays. The vertical columns below the power are replaced by one horizontal bar that shows where the consumption comes from: grid (blue), solar used directly (orange) and from storage (teal), with a one-line legend of the power. The self-sufficiency moves up next to the power, where the small bars were.
+- **Storage card redesigned:** the *Storage* card of the Power tab shows a glowing ring with the charge level for every storage (the minimum level as a tick, the level colored green from 60 %, amber from 25 % and red below), the tiles with the mean level, stored and usable energy, power and the time when it is empty or full. The status chip has the same colors.
+- **Several storages shown one by one:** with two or more storages (up to four) the *Storage* card has a small card for each of them (name, status chip, ring with the level and the power) and the total with the mean level below. Mode and power per storage appear when the charge, discharge or combined power sensors are as many as the storages, matched by order; otherwise only the level is shown. Each storage that is charging or discharging also shows when it is full or empty (the capacity shared equally, down to the minimum level).
+
+### Fixed
+
+- **Savings never negative:** own solar power that is used in the house is worth at least the feed-in tariff (the revenue it would have brought) and never less than 0, so a very low or negative electricity price no longer makes the savings of the Power tab and of the results card negative or 0.
+- **Small flows in the picture:** the picture of the Power tab hid every flow below 20 W, so a grid import of 7 W did not show at the pole. Flows now show from 1 W on (the storage status still switches at 20 W).
+- **Not assigned in the Devices tab:** the part of the consumption that no category explains (*not assigned*) disappeared for a running day, week, month or year, because it was only calculated when every hour of the period had a consumption of the house, and the hours to come have none yet. It is now calculated for the hours that have data (the hours without data count as nothing), so it also shows for today.
+
 ## [0.38.0] - 2026-11-25
 
 ### Changed
@@ -545,7 +563,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/weskona/energy_assistant/compare/v0.38.0...v0.39.0
 [0.5.0]: https://github.com/weskona/energy_assistant/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/weskona/energy_assistant/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/weskona/energy_assistant/compare/v0.2.2...v0.3.0

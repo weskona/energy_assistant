@@ -40,6 +40,25 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.stor .storbody{display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.storrings{display:flex;gap:14px;flex:none}
+.storring{width:128px;height:128px}
+.storring.small{width:100px;height:100px}
+.storring svg{width:100%;height:100%;display:block}
+.storring .sv{font:800 30px var(--eb-font);fill:var(--eb-text)}
+.storring .su{font:600 13px var(--eb-font);fill:var(--eb-muted)}
+.storright{flex:1;min-width:260px}
+.eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
+.eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
+.eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
+.storunits{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.storunit{background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:var(--eb-radius-tile);padding:12px 14px}
+.storunit .row{align-items:center}
+.storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
+.storunit .unright{flex:1;min-width:0}
+.storunit .until{margin-top:2px;text-transform:none;letter-spacing:0}
+.stsum{margin-top:18px}
+@media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
 .socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
 .socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
 .socbar.charging i{background:var(--ea-bin)}
@@ -118,6 +137,13 @@ const STYLE = `
 .stackbadge i:nth-child(2){background:var(--eb-blue);width:30px;box-shadow:0 0 8px rgba(96,165,250,.5)}
 .stackbadge i:nth-child(3){background:var(--eb-solar);width:34px;box-shadow:0 0 8px rgba(255,152,0,.5)}
 .stackbadge i:nth-child(4){background:var(--eb-cyan);width:24px;box-shadow:0 0 8px rgba(56,189,248,.5)}
+.hbars{margin-top:22px}
+.stackh{display:flex;gap:3px;height:10px;border-radius:5px;background:var(--eb-line);overflow:hidden}
+.stackh i{display:block;min-width:4px}
+.stackleg{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:10px;margin-top:10px;font-size:12px;overflow:hidden;color:var(--eb-dim)}
+.stackleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.stackleg b{width:10px;height:10px;border-radius:3px}
+.stackleg em{font-style:normal;font-weight:700;color:var(--eb-text)}
 .rbars{display:flex;gap:14px;margin-top:20px}
 .rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
 .rcol{width:100%;height:96px;display:flex;align-items:flex-end;border-bottom:1px solid var(--eb-line)}
@@ -130,11 +156,17 @@ const STYLE = `
 .resper{font-size:14px;font-weight:500;color:var(--eb-muted);white-space:nowrap}
 .ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
+.resnum .resself{margin-left:auto;padding-bottom:0;gap:12px;font-size:16px}
+.resnum .resring,.resnum .resring .donut{width:72px;height:72px}
+.resnum .resbig{font-size:30px}
+.resnum .resbig small{font-size:15px}
+.resnum .reslab2{font-size:14px}
 .resring{position:relative;flex:none;width:96px;height:96px}
 .resring .donut{width:96px;height:96px;display:block;filter:drop-shadow(0 0 7px rgba(52,211,153,.45))}
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
 .ressave{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid var(--eb-line)}
 .ressave .pig{flex:none;display:flex}
+.resr>.ressave:first-child{border-top:0;padding-top:0}
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
@@ -378,9 +410,11 @@ const STRINGS = {
     liveHouse: "Consumption now",
     liveFeed: "Feed-in",
     resPerHour: "per hour",
+    resToday: "today",
     liveCharging: "Charging",
     liveFootEv: "Your electric car is charging at home with **{p}**.",
     liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
+    liveFootToday: "You have covered **{pct} %** of your electricity needs with solar today.",
     resTitle: "Your results",
     resCost: "Electricity cost",
     resSaving: "Savings",
@@ -400,6 +434,8 @@ const STRINGS = {
     resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
+    stUnit: "Storage {n}",
+    stTotal: "Total",
     stCharging: "Charging",
     stDischarging: "Discharging",
     stIdle: "Idle",
@@ -746,6 +782,7 @@ const STRINGS = {
     src_expected_feed_in_tomorrow: "Expected feed-in tomorrow",
     src_best_window_tomorrow: "Best window tomorrow",
     src_storage_usable: "Usable storage energy",
+    src_storage_roundtrip_total: "Storage round-trip efficiency",
     src_storage_empty_at: "Storage empty at",
     src_string_fault: "Plant fault",
     src_einsparung: "Savings total",
@@ -796,9 +833,11 @@ const STRINGS = {
     liveHouse: "Verbrauch jetzt",
     liveFeed: "Einsp.",
     resPerHour: "pro Stunde",
+    resToday: "heute",
     liveCharging: "Laden",
     liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
     liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
+    liveFootToday: "Du hast heute **{pct} %** deines Strombedarfs durch PV gedeckt.",
     resTitle: "Ihre Ergebnisse",
     resCost: "Stromkosten",
     resSaving: "Einsparung",
@@ -818,6 +857,8 @@ const STRINGS = {
     resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
+    stUnit: "Speicher {n}",
+    stTotal: "Gesamt",
     stCharging: "Lädt",
     stDischarging: "Entlädt",
     stIdle: "Ruhe",
@@ -1164,6 +1205,7 @@ const STRINGS = {
     src_expected_feed_in_tomorrow: "Erwartete Einspeisung morgen",
     src_best_window_tomorrow: "Bestes Fenster morgen",
     src_storage_usable: "Nutzbare Speicherenergie",
+    src_storage_roundtrip_total: "Speicher-Wirkungsgrad (Roundtrip)",
     src_storage_empty_at: "Speicher leer um",
     src_string_fault: "Anlagenstörung",
     src_einsparung: "Einsparung gesamt",
@@ -1362,11 +1404,12 @@ function resFlows(flows, socs) {
   return out;
 }
 
+const RES_MOON = `<g class="moon"><defs><radialGradient id="resMoonGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#b9c8f0" stop-opacity=".45"/><stop offset="1" stop-color="#b9c8f0" stop-opacity="0"/></radialGradient><mask id="resMoonMask"><rect x="40" y="12" width="64" height="64" fill="#fff"/><circle cx="82" cy="37" r="14" fill="#000"/></mask></defs><circle cx="72" cy="44" r="40" fill="url(#resMoonGlow)"/><circle cx="72" cy="44" r="17" fill="#e6ecfb" mask="url(#resMoonMask)"/><g fill="#cfd8f5"><circle cx="112" cy="26" r="1.6"/><circle cx="40" cy="22" r="1.3"/><circle cx="104" cy="62" r="1.2"/><circle cx="50" cy="70" r="1.4"/><circle cx="124" cy="46" r="1.1"/></g></g>`;
 const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
   pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
-  hero: (socs = [], flows = null) => `<svg viewBox="-24 0 ${424 + resExtra(socs)} 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resCar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d95c8"/><stop offset="1" stop-color="#455781"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${188 + resExtra(socs) / 2}" cy="266" rx="${210 + resExtra(socs) / 2}" ry="22.5" fill="#1d4a30"/><ellipse cx="${200 + resExtra(socs) / 2}" cy="261" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/>${resPole()}<rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g><g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g><rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="255" rx="38" ry="4" fill="#080b12" opacity=".7"/><rect x="92.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><rect x="144.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><path d="M96 243v11M99 243v11M102 243v11M148 243v11M151 243v11M154 243v11" stroke="#3d4760" stroke-width="1"/><path d="M98 224C99 214 103 209 106 207H144C147 209 151 214 152 224Z" fill="#5a73a6"/><path d="M103 222C104 215 107 211.5 109.5 210H140.5C143 211.5 146 215 147 222Z" fill="#1d2539"/><path d="M109 220 113 211.5h6l-4.5 8.5z" fill="#fff" opacity=".1"/><rect x="92" y="220" width="66" height="26" rx="8" fill="url(#resCar)"/><rect x="93" y="221" width="64" height="4.5" rx="2.2" fill="#a4b7e0" opacity=".3"/><rect class="glowr" x="96" y="227" width="58" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="96" y="243" width="58" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}${resFlows(flows, socs)}</svg>`,
+  hero: (socs = [], flows = null, night = false) => `<svg viewBox="-24 0 ${424 + resExtra(socs)} 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resCar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d95c8"/><stop offset="1" stop-color="#455781"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${188 + resExtra(socs) / 2}" cy="266" rx="${210 + resExtra(socs) / 2}" ry="22.5" fill="#1d4a30"/><ellipse cx="${200 + resExtra(socs) / 2}" cy="261" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/>${resPole()}<rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g>${night ? RES_MOON : `<g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g>`}<rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="255" rx="38" ry="4" fill="#080b12" opacity=".7"/><rect x="92.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><rect x="144.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><path d="M96 243v11M99 243v11M102 243v11M148 243v11M151 243v11M154 243v11" stroke="#3d4760" stroke-width="1"/><path d="M98 224C99 214 103 209 106 207H144C147 209 151 214 152 224Z" fill="#5a73a6"/><path d="M103 222C104 215 107 211.5 109.5 210H140.5C143 211.5 146 215 147 222Z" fill="#1d2539"/><path d="M109 220 113 211.5h6l-4.5 8.5z" fill="#fff" opacity=".1"/><rect x="92" y="220" width="66" height="26" rx="8" fill="url(#resCar)"/><rect x="93" y="221" width="64" height="4.5" rx="2.2" fill="#a4b7e0" opacity=".3"/><rect class="glowr" x="96" y="227" width="58" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="96" y="243" width="58" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}${resFlows(flows, socs)}</svg>`,
 };
 
 const SETTINGS_SECTIONS = [
@@ -1399,6 +1442,7 @@ const UNUSUAL_FACTOR = 1.3;
 const UNUSUAL_MIN_W = 20;
 const UNUSUAL_MIN_HOURS_REF = 48; // hourly values needed from the days before to know what is usual
 const FLOW_W = 20; // charging or discharging from this power on
+const PIC_FLOW_W = 1; // the picture shows a flow from this power on (a few watts of grid import still count)
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
 const MIN_ROWS = 5;
@@ -2381,9 +2425,87 @@ class EnergyAssistantPanel extends HTMLElement {
       tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
     }
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
-    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip">${esc(status)}</span></div>
-      <div class="socbar ${st.mode}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %"><i style="width:${st.soc}%"></i>${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
-      <div class="tiles">${tiles.join("")}</div></div>`;
+    // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
+    const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)");
+    // One ring for every storage (the mean level in the tiles), the minimum level as a tick
+    const levels = this._storageLevels().slice(0, 4);
+    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
+    const units = this._storageUnits().slice(0, 4);
+    if (units.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
+    if (units.length > 1) {
+      // Several storages: each one on its own (its ring, its bar, its power when the sensors can be matched), the total below
+      const cards = units.map((u) => {
+        const color = levelColor(u.soc);
+        const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
+        const until = u.hours != null && Number.isFinite(u.hours)
+          ? `<div class="eb-label until">${esc(this._t(u.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} ${esc(new Date(Date.now() + u.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }))} · ${esc(this._t("stIn", { dur: this._duration(u.hours) }))}</div>` : "";
+        const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
+        return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
+          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${power}${until}</div></div></div>`;
+      }).join("");
+      return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
+        <div class="storunits">${cards}</div>
+        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div><div class="tiles">${tiles.join("")}</div></div>`;
+    }
+    return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
+      <div class="storbody"><div class="storrings">${rings}</div>
+        <div class="storright"><div class="tiles">${tiles.join("")}</div></div></div></div>`;
+  }
+
+  /**
+   * The storages one by one: the charge level of each charge level sensor (the first one and the further ones) and,
+   * when there are as many charge, discharge or combined power sensors as storages, what each one does (the
+   * sensors are matched in the order of the settings, like the energy counters).
+   */
+  _storageUnits() {
+    const ids = this._storageIds();
+    const same = (key) => ((this._cfg[key] || []).length === ids.length ? this._cfg[key] : null);
+    const charge = same("battery_charge"), discharge = same("battery_discharge"), combined = same("battery_power");
+    const out = [];
+    ids.forEach((id, i) => {
+      const raw = this._num(id);
+      if (raw == null) return;
+      let into = charge ? Math.abs(this._watts(charge[i]) ?? 0) : null;
+      let from = discharge ? Math.abs(this._watts(discharge[i]) ?? 0) : null;
+      if (into == null && from == null && combined) {
+        let v = this._watts(combined[i]);
+        if (v != null) {
+          if (this._cfg.invert_battery) v = -v;
+          from = Math.max(0, v);
+          into = Math.max(0, -v);
+        }
+      }
+      const known = into != null || from != null;
+      const mode = !known ? null : (from ?? 0) >= FLOW_W ? "discharging" : (into ?? 0) >= FLOW_W ? "charging" : "idle";
+      out.push({
+        id, name: this._t("stUnit", { n: i + 1 }), tip: this._hass?.states?.[id]?.attributes?.friendly_name || id,
+        soc: Math.max(0, Math.min(100, raw)), mode, power: mode === "discharging" ? from : mode === "charging" ? into : 0,
+      });
+      // When it is empty (discharging, down to the minimum level) or full (charging): the capacity is shared equally
+      const u = out[out.length - 1];
+      const cap = this._cfg.battery_capacity > 0 ? this._cfg.battery_capacity / ids.length : null;
+      const min = Math.max(0, Math.min(100, this._cfg.battery_min_soc ?? 0));
+      u.hours = null;
+      if (cap != null && u.power >= FLOW_W) {
+        if (mode === "discharging") u.hours = (cap * Math.max(0, u.soc - min)) / 100 / (u.power / 1000);
+        else if (mode === "charging") u.hours = (cap * Math.max(0, 100 - u.soc)) / 100 / (u.power / 1000);
+      }
+    });
+    return out;
+  }
+
+  /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
+  _storRing(level, color, min, small = false) {
+    const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
+    const tick = min > 0 ? (() => {
+      const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
+      return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
+    })() : "";
+    return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
+      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
+      <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
   /**
@@ -2707,6 +2829,57 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 
+  /**
+   * What a kWh of the own solar power is worth when it is used in the house: the grid price, but at least the feed-in
+   * tariff (the revenue it would have brought), never below 0 (a negative price does not make own power worthless).
+   */
+  _ownValue(price, feed) {
+    return Math.max(price, feed != null && Number.isFinite(feed) ? feed : 0, 0);
+  }
+
+  /**
+   * The round-trip efficiency of the storage as a factor (0-1) from PV Assistant (`storage_roundtrip_total`), or null
+   * when there is no such sensor or the value is not usable (text, 0 or less, above 100 %). Nothing is guessed.
+   */
+  _roundtrip() {
+    const id = this._int?.pv_assistant?.entities?.storage_roundtrip_total;
+    const v = id ? this._num(id) : null;
+    return v != null && Number.isFinite(v) && v > 0 && v <= 100 ? v / 100 : null;
+  }
+
+  /**
+   * What the own solar power saved in a period: the part that was not fed in, minus what the storage lost on the way
+   * (what was discharged, divided by the efficiency, minus what was discharged), in kWh and money. Own power is worth
+   * the grid price, at least the feed-in tariff; the fed in part brings the tariff. `x` has solar, exp and dis (kWh).
+   */
+  _savedBy(x, price, feed) {
+    const eta = this._roundtrip();
+    const loss = eta != null && x.dis > 0 ? x.dis * (1 / eta - 1) : 0;
+    const kwh = Math.max(0, x.solar - (x.exp ?? 0) - loss);
+    const money = kwh * this._ownValue(price, feed) + (x.exp != null && feed != null ? x.exp * feed : 0);
+    return { kwh, money };
+  }
+
+  /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
+  async _loadToday() {
+    if (!this._hass || this._todayLoading) return;
+    this._todayLoading = true;
+    try {
+      const win = this._balWindow("day", 0);
+      const cur = await this._balFetch(win);
+      const totals = cur != null ? this._balCompute(this._balBuckets(win, cur), win).totals : null;
+      this._today = { autarky: totals?.autarky ?? null, totals, at: Date.now() };
+    } finally {
+      this._todayLoading = false;
+      this._render();
+    }
+  }
+
+  _maybeLoadToday() {
+    if (!this._ready || this._todayLoading) return;
+    if (!this._today || Date.now() - this._today.at > 5 * 60 * 1000) this._loadToday();
+  }
+
   /** (Re)load the balance when the period changed or the data is older than five minutes. */
   _maybeLoadBalance() {
     if (!this._ready || this._balLoading) return;
@@ -2907,13 +3080,15 @@ class EnergyAssistantPanel extends HTMLElement {
     const b = this._bal;
     // The balance of a day comes in half hours, the Devices tab works with hours: add them up in pairs
     let cons = b && !b.failed ? b.rows?.map((r) => r.cons) : null;
-    if (cons && b.win?.bucket === "half" && cons.length === n * 2) cons = Array.from({ length: n }, (_, k) => (cons[2 * k] == null || cons[2 * k + 1] == null ? null : cons[2 * k] + cons[2 * k + 1]));
-    const fresh = b && b.range === d.range && b.off === d.off && cons?.length === n && cons.every((v) => v != null);
+    if (cons && b.win?.bucket === "half" && cons.length === n * 2) cons = Array.from({ length: n }, (_, k) => (cons[2 * k] == null && cons[2 * k + 1] == null ? null : (cons[2 * k] ?? 0) + (cons[2 * k + 1] ?? 0)));
+    // The consumption of the house is known for the buckets that have data: a running day has none for the hours that
+    // are still to come, they simply have no part that is not assigned (and no share of the house).
+    const fresh = b && b.range === d.range && b.off === d.off && cons?.length === n && cons.some((v) => v != null);
     const houseBuckets = fresh ? cons : null;
-    const unBuckets = houseBuckets ? houseBuckets.map((h, k) => Math.max(0, h - assignedBuckets[k])) : null;
+    const unBuckets = houseBuckets ? houseBuckets.map((h, k) => (h == null ? 0 : Math.max(0, h - assignedBuckets[k]))) : null;
     const assigned = sum(assignedBuckets);
     const unassigned = unBuckets ? sum(unBuckets) : 0;
-    return { win: d.win, n, cats, assignedBuckets, unBuckets, assigned, unassigned, total: assigned + unassigned, house: houseBuckets ? sum(houseBuckets) : null };
+    return { win: d.win, n, cats, assignedBuckets, unBuckets, assigned, unassigned, total: assigned + unassigned, house: houseBuckets ? sum(houseBuckets.map((v) => v ?? 0)) : null };
   }
 
   /** The icon of a label as a real icon only (the plain dot that _iconHtml falls back to is drawn by the caller). */
@@ -3160,7 +3335,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
     if (price) {
-      const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0);
+      const saving = (x) => this._savedBy(x, price.value, feed).money;
       const [n2, sym] = this._money(saving(t), price.currency, 0);
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n2} ${esc(sym)} <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
@@ -3204,13 +3379,13 @@ class EnergyAssistantPanel extends HTMLElement {
   /**
    * The picture of the Power tab: the same house as in the results card of the Consumption tab, with the power of
    * now (W) instead of the energy of a period: consumption, where it comes from, the self-sufficiency, what the
-   * sun saves per hour (Tariffy) and the electric car that charges. The flows show from FLOW_W on.
+   * sun saves per hour (Tariffy) and the electric car that charges. The flows show from PIC_FLOW_W on.
    */
   _renderLiveResults(cur) {
     if (!cur || (cur.house == null && cur.solar == null && cur.gridIn == null)) return "";
     const lang = this._hass?.language || "en";
     const kw = (w) => `${Math.round(w).toLocaleString(lang)} W`; // power is always shown in whole watts
-    const on = (w) => w != null && Number.isFinite(w) && w >= FLOW_W;
+    const on = (w) => w != null && Number.isFinite(w) && w >= PIC_FLOW_W;
     const ev = this._evLive();
     const flows = {};
     for (const [key, w] of [["pv", cur.solar], ["in", cur.gridIn], ["out", cur.gridOut], ["charge", cur.charge], ["discharge", cur.discharge], ["ev", ev]]) {
@@ -3218,18 +3393,29 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const levels = this._storageLevels();
     // Where the power comes from: four bars, in the colors of the flows
-    const sources = [["solar", cur.solar, RES_FLOW.pv], ["grid", cur.gridIn, RES_FLOW.in], ["storage", cur.discharge, RES_FLOW.discharge], ["liveFeed", cur.gridOut, RES_FLOW.out]].filter(([, w]) => w != null);
+    const sources = [["grid", cur.gridIn, "var(--eb-grid)"], ["solarDirect", cur.direct, "var(--eb-solar)"], ["storage", cur.discharge, "var(--ea-bout)"]].filter(([, w]) => w != null && Number.isFinite(w));
     const top = Math.max(...sources.map(([, w]) => w), 1);
-    const bars = sources.map(([label, w, color]) => `<div class="rbar"><div class="rcol"><i style="height:${Math.max(3, Math.round((w / top) * 100))}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i></div><span>${esc(this._t(label))}</span></div>`).join("");
+    // One bar for all sources, in the colors of the picture (solar, from storage = teal like everywhere else, grid): the width of each part is its share of the consumption
+    const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
+    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>
+      <div class="stackleg">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(this._t(label))} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
       <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
-    // What the sun saves per hour right now (Tariffy): the directly used power at the price plus the feed-in
+    // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
+    // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
-    if (price && cur.solar != null) {
-      const perHour = ((cur.direct || 0) / 1000) * price.value + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
+    const day = this._today?.totals;
+    if (price && day?.solar != null) {
+      const saved = this._savedBy(day, price.value, feed);
+      const [n, sym] = this._money(saved.money, price.currency, 2);
+      const kwhTxt = saved.kwh.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
+        <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
+    } else if (price && cur.solar != null) {
+      const perHour = ((cur.direct || 0) / 1000) * this._ownValue(price.value, feed) + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
       const [n, sym] = this._money(perHour, price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
@@ -3237,15 +3423,16 @@ class EnergyAssistantPanel extends HTMLElement {
     const drive = ev != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("liveCharging"))}</div><div class="resdk"><b>${esc(kw(ev))}</b></div></div></div>` : "";
     let foot = "";
     if (ev != null) foot = this._t("liveFootEv", { p: kw(ev) });
+    else if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
     else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-    return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows)}</div>
-      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span><span class="eb-chip">${this._t(cur.house == null ? "noData" : "live")}</span>${drive}</div>
+    return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows, cur.solar != null && !(cur.solar >= PIC_FLOW_W))}</div>
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
       <div class="resgrid">
-        <div class="resl"><div class="reslab">${esc(this._t("liveHouse"))}</div>
-          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
-          <div class="rbars">${bars}</div></div>
-        <div class="resr">${ring}${savings}</div>
+        <div class="resl">
+          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${ring}</div>
+          <div class="hbars">${bars}</div></div>
+        <div class="resr">${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
@@ -5420,7 +5607,7 @@ class EnergyAssistantPanel extends HTMLElement {
       this._maybeLoadDevices();
       if (this._balEnabled()) this._maybeLoadBalance();
     }
-    if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); }
+    if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); if (this._balEnabled()) this._maybeLoadToday(); }
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;

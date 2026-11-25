@@ -37,6 +37,7 @@ _PV_KEYS = (
     "best_window_tomorrow",
     "storage_usable",
     "storage_empty_at",
+    "storage_roundtrip_total",
     "string_fault",
 )
 _EV_KEYS = (
