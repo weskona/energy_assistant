@@ -35,35 +35,8 @@ const STYLE = `
 .fld.span{grid-column:1/-1}
 @media (max-width:800px){.grid,.set .grid{grid-template-columns:minmax(0,1fr)}.wrap{padding:12px}}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.big{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px}
-.big b{font-size:64px;font-weight:800;line-height:1}
-.big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
-.stor .storbody{display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
-.storrings{display:flex;gap:14px;flex:none}
-.storring{width:128px;height:128px}
-.storring.small{width:100px;height:100px}
-.storring svg{width:100%;height:100%;display:block}
-.storring .sv{font:800 30px var(--eb-font);fill:var(--eb-text)}
-.storring .su{font:600 13px var(--eb-font);fill:var(--eb-muted)}
-.storright{flex:1;min-width:260px}
-.eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
-.eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
-.eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
-.storunits{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
-.storunit{background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:var(--eb-radius-tile);padding:12px 14px}
-.storunit .row{align-items:center}
-.storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
-.storunit .unright{flex:1;min-width:0}
-.storunit .until{margin-top:2px;text-transform:none;letter-spacing:0}
-.stsum{margin-top:18px}
-@media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
-.socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
-.socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
-.socbar.charging i{background:var(--ea-bin)}
-.socbar.discharging i{background:var(--ea-bout)}
-.socbar b{position:absolute;top:-3px;width:2px;height:18px;background:var(--eb-text);opacity:.6;border-radius:1px}
 .spk{display:inline-block;vertical-align:middle;margin-right:10px;overflow:visible}
 .spk .spkline{fill:none;stroke:var(--eb-green);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .spk .spkarea{fill:var(--eb-green);opacity:.15}
@@ -127,6 +100,38 @@ const STYLE = `
 .resdk{font-size:14px;color:var(--eb-text)}.resdk b{font-size:17px}
 .resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
+.resgrid{align-items:start}
+.resgrid.three{grid-template-columns:minmax(0,1.7fr) auto minmax(0,.9fr)}
+.resself.live{padding-bottom:0;gap:12px}
+.resself.live .resring,.resself.live .resring .donut{width:72px;height:72px}
+.resself.live .resbig{font-size:28px}
+.resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500;line-height:1.3}
+.resself.live .resbig{line-height:1.1}
+.resself.live{align-items:flex-start}
+.resself.live .dtext{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding-top:6px}
+.resm .resself.live{width:100%}
+.resm .resself.live .dtext{margin:0 auto;min-width:0}
+.dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
+.dwhen{font-size:12px;color:var(--eb-dim)}
+.dwhen b{color:var(--eb-text);font-weight:600}
+.dstat.discharging{color:var(--ea-bout)}
+.dstat.charging{color:var(--ea-bin)}
+.resr{align-self:stretch}
+.resgrid.three{align-items:stretch}
+.resgrid.three .resl{padding-right:22px;display:flex;flex-direction:column}
+.resgrid.three .hbars{margin-top:auto;padding-top:22px}
+.resgrid.three .resm>:last-child{margin-top:auto}
+.stackleg,.resm .bline{line-height:20px;min-height:20px}
+.resm .bline{align-items:center}
+.resgrid.three .resr{padding-left:22px}
+.resgrid.three .resnum{font-size:44px;margin-top:0;gap:16px}
+.resgrid.three .resnum small{font-size:16px}
+.resgrid.three .pig{display:none}
+.resgrid.three .ressave .resbig{font-size:26px}
+.resm{padding:0 22px;border-right:1px solid var(--eb-line);display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0}
+.resm .dials{display:flex;flex-direction:column;gap:10px}
+.resm .bline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--eb-dim)}
+.resm .bline b{font-size:15px;color:var(--eb-text)}
 .resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
 .reslab{font-size:11px;font-weight:600;letter-spacing:var(--eb-label-spacing);text-transform:uppercase;color:var(--eb-muted)}
 .resnum{display:flex;align-items:flex-start;gap:10px;font-size:56px;font-weight:800;line-height:1.05;color:var(--eb-text);margin-top:8px}
@@ -143,6 +148,7 @@ const STYLE = `
 .stackleg{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:10px;margin-top:10px;font-size:12px;overflow:hidden;color:var(--eb-dim)}
 .stackleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .stackleg b{width:10px;height:10px;border-radius:3px}
+.stackleg.many{flex-wrap:wrap}
 .stackleg em{font-style:normal;font-weight:700;color:var(--eb-text)}
 .rbars{display:flex;gap:14px;margin-top:20px}
 .rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -156,11 +162,7 @@ const STYLE = `
 .resper{font-size:14px;font-weight:500;color:var(--eb-muted);white-space:nowrap}
 .ressave .resbig{font-size:32px;white-space:nowrap}
 .resself{display:flex;align-items:center;gap:18px;padding-bottom:18px}
-.resnum .resself{margin-left:auto;padding-bottom:0;gap:12px;font-size:16px}
-.resnum .resring,.resnum .resring .donut{width:72px;height:72px}
-.resnum .resbig{font-size:30px}
-.resnum .resbig small{font-size:15px}
-.resnum .reslab2{font-size:14px}
+.resnum .resself{margin-left:auto;padding-bottom:0;font-size:16px}
 .resring{position:relative;flex:none;width:96px;height:96px}
 .resring .donut{width:96px;height:96px;display:block;filter:drop-shadow(0 0 7px rgba(52,211,153,.45))}
 .resring .mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex}
@@ -184,7 +186,7 @@ const STYLE = `
 .resillu .glowa{filter:drop-shadow(0 0 9px rgba(255,200,100,.8))}
 .resfoot{padding-left:112px}
 }
-@media (max-width:640px){.resgrid{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
+@media (max-width:640px){.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -192,8 +194,6 @@ const STYLE = `
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--eb-muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
-.bar{margin-top:16px}
-.bar>div{transition:width .6s}
 svg.hsvg{display:block;max-width:100%;touch-action:pan-y}
 .hchart{margin-top:12px}
 .hchart .legend{margin:0 0 8px}
@@ -411,8 +411,6 @@ const STRINGS = {
     liveFeed: "Feed-in",
     resPerHour: "per hour",
     resToday: "today",
-    liveCharging: "Charging",
-    liveFootEv: "Your electric car is charging at home with **{p}**.",
     liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
     liveFootToday: "You have covered **{pct} %** of your electricity needs with solar today.",
     resTitle: "Your results",
@@ -431,18 +429,11 @@ const STRINGS = {
     resFootKm: "**{km} km** you drive electrically ({kwh} kWh charged at home).",
     resFootEv: "Your electric car charged **{kwh} kWh** at home.",
     resFootSelf: "You cover **{pct} %** of your electricity needs yourself.",
-    resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
+    resSavingTip: "Solar power used directly plus power from the storage, at the price of your contract minus the lost feed-in revenue (storage: plus its losses)",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
     stUnit: "Storage {n}",
     stTotal: "Total",
-    stCharging: "Charging",
-    stDischarging: "Discharging",
-    stIdle: "Idle",
-    stSoc: "Charge level",
-    stStored: "Stored",
-    stUsable: "Usable",
-    stPower: "Power",
     stEmptyAt: "Empty at",
     stFullAt: "Full at",
     stIn: "in {dur}",
@@ -582,7 +573,6 @@ const STRINGS = {
     rename: "Rename",
     originalName: "Original: {name}",
     live: "Live consumption",
-    noData: "No data",
     history: "History",
     historyLoading: "Loading history …",
     noHistory: "No history available yet",
@@ -609,10 +599,6 @@ const STRINGS = {
     solar: "Solar",
     solarDirect: "Solar direct",
     gridImport: "Grid import",
-    gridExport: "Grid export",
-    fromStorage: "From storage",
-    toStorage: "To storage",
-    storageFromGrid: "Storage from grid",
     storage: "Storage",
     grid: "Grid",
     devices: "Devices",
@@ -834,8 +820,6 @@ const STRINGS = {
     liveFeed: "Einsp.",
     resPerHour: "pro Stunde",
     resToday: "heute",
-    liveCharging: "Laden",
-    liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
     liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
     liveFootToday: "Du hast heute **{pct} %** deines Strombedarfs durch PV gedeckt.",
     resTitle: "Ihre Ergebnisse",
@@ -854,18 +838,11 @@ const STRINGS = {
     resFootKm: "**{km} km** fahren Sie elektrisch ({kwh} kWh zu Hause geladen).",
     resFootEv: "Ihr Elektroauto hat **{kwh} kWh** zu Hause geladen.",
     resFootSelf: "Sie decken **{pct} %** Ihres Strombedarfs selbst.",
-    resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
+    resSavingTip: "Direkt genutzter Solarstrom plus Strom aus dem Speicher, zum Preis deines Vertrags abzüglich der entgangenen Einspeisevergütung (Speicher: samt Verlusten)",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
     stUnit: "Speicher {n}",
     stTotal: "Gesamt",
-    stCharging: "Lädt",
-    stDischarging: "Entlädt",
-    stIdle: "Ruhe",
-    stSoc: "Ladestand",
-    stStored: "Gespeichert",
-    stUsable: "Nutzbar",
-    stPower: "Leistung",
     stEmptyAt: "Leer um",
     stFullAt: "Voll um",
     stIn: "in {dur}",
@@ -1005,7 +982,6 @@ const STRINGS = {
     rename: "Umbenennen",
     originalName: "Original: {name}",
     live: "Verbrauch live",
-    noData: "Keine Daten",
     history: "Verlauf",
     historyLoading: "Verlauf wird geladen …",
     noHistory: "Noch kein Verlauf verfügbar",
@@ -1032,10 +1008,6 @@ const STRINGS = {
     solar: "PV",
     solarDirect: "PV direkt",
     gridImport: "Netzbezug",
-    gridExport: "Einspeisung",
-    fromStorage: "Vom Speicher",
-    toStorage: "Zum Speicher",
-    storageFromGrid: "Speicher aus Netz",
     storage: "Speicher",
     grid: "Netz",
     devices: "Geräte",
@@ -1442,6 +1414,7 @@ const UNUSUAL_FACTOR = 1.3;
 const UNUSUAL_MIN_W = 20;
 const UNUSUAL_MIN_HOURS_REF = 48; // hourly values needed from the days before to know what is usual
 const FLOW_W = 20; // charging or discharging from this power on
+const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)"); // the color of a charge level
 const PIC_FLOW_W = 1; // the picture shows a flow from this power on (a few watts of grid import still count)
 // Rows the lists show before they fold. They follow the shortest list, but within these bounds.
 const MAX_ROWS = 8;
@@ -2406,52 +2379,6 @@ class EnergyAssistantPanel extends HTMLElement {
     return total >= 60 ? this._t("stDur", { h: Math.floor(total / 60), m: total % 60 }) : this._t("stDurMin", { m: total });
   }
 
-  /** The storage card: charge level as a bar with the minimum marked, what is stored and usable, power and the time. */
-  _renderStorage(cur) {
-    const st = this._storage(cur);
-    if (!st) return "";
-    const lang = this._hass?.language || "en";
-    const tile = (label, value, unit = "", extra = "") => `<div class="eb-tile"><div class="eb-label">${esc(label)}</div><div class="eb-value">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${extra}</div>`;
-    const kwh = (v) => v.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    const tiles = [tile(this._t("stSoc"), Math.round(st.soc), "%")];
-    if (st.stored != null) tiles.push(tile(this._t("stStored"), kwh(st.stored), "kWh"));
-    if (st.usable != null && st.min > 0) tiles.push(tile(this._t("stUsable"), kwh(st.usable), "kWh"));
-    if (st.mode !== "idle") {
-      const [v, u] = fmtPower(st.power);
-      tiles.push(tile(this._t("stPower"), v, u));
-    }
-    if (st.hours != null && Number.isFinite(st.hours)) {
-      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
-      tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
-    }
-    const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
-    // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
-    const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)");
-    // One ring for every storage (the mean level in the tiles), the minimum level as a tick
-    const levels = this._storageLevels().slice(0, 4);
-    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
-    const units = this._storageUnits().slice(0, 4);
-    if (units.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
-    if (units.length > 1) {
-      // Several storages: each one on its own (its ring, its bar, its power when the sensors can be matched), the total below
-      const cards = units.map((u) => {
-        const color = levelColor(u.soc);
-        const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
-        const until = u.hours != null && Number.isFinite(u.hours)
-          ? `<div class="eb-label until">${esc(this._t(u.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} ${esc(new Date(Date.now() + u.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }))} · ${esc(this._t("stIn", { dur: this._duration(u.hours) }))}</div>` : "";
-        const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
-        return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
-          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${power}${until}</div></div></div>`;
-      }).join("");
-      return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
-        <div class="storunits">${cards}</div>
-        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div><div class="tiles">${tiles.join("")}</div></div>`;
-    }
-    return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
-      <div class="storbody"><div class="storrings">${rings}</div>
-        <div class="storright"><div class="tiles">${tiles.join("")}</div></div></div></div>`;
-  }
-
   /**
    * The storages one by one: the charge level of each charge level sensor (the first one and the further ones) and,
    * when there are as many charge, discharge or combined power sensors as storages, what each one does (the
@@ -2492,20 +2419,6 @@ class EnergyAssistantPanel extends HTMLElement {
       }
     });
     return out;
-  }
-
-  /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
-  _storRing(level, color, min, small = false) {
-    const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
-    const tick = min > 0 ? (() => {
-      const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
-      return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
-    })() : "";
-    return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
-      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
-      <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
   /**
@@ -2830,14 +2743,6 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * What a kWh of the own solar power is worth when it is used in the house: the grid price, but at least the feed-in
-   * tariff (the revenue it would have brought), never below 0 (a negative price does not make own power worthless).
-   */
-  _ownValue(price, feed) {
-    return Math.max(price, feed != null && Number.isFinite(feed) ? feed : 0, 0);
-  }
-
-  /**
    * The round-trip efficiency of the storage as a factor (0-1) from PV Assistant (`storage_roundtrip_total`), or null
    * when there is no such sensor or the value is not usable (text, 0 or less, above 100 %). Nothing is guessed.
    */
@@ -2848,16 +2753,20 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * What the own solar power saved in a period: the part that was not fed in, minus what the storage lost on the way
-   * (what was discharged, divided by the efficiency, minus what was discharged), in kWh and money. Own power is worth
-   * the grid price, at least the feed-in tariff; the fed in part brings the tariff. `x` has solar, exp and dis (kWh).
+   * What the own solar power saved in a period, in kWh and money. The kWh are what the house used of its own power:
+   * the solar power used directly plus what came out of the storage (consumption minus grid import minus discharge
+   * is the direct part; without a consumption: production minus feed-in minus charge). Own power is not free: every
+   * kWh used directly costs the feed-in revenue it would have brought, every kWh from the storage costs that revenue
+   * divided by the round-trip efficiency of the storage (the storage charges from solar only). The saving is the
+   * price of the grid minus that cost for each kWh, never below 0. `x` has solar, exp, chg, dis, imp, cons (kWh).
    */
   _savedBy(x, price, feed) {
+    const dis = x.dis > 0 ? x.dis : 0;
+    const direct = x.cons != null && x.imp != null ? Math.max(0, x.cons - x.imp - dis) : Math.max(0, (x.solar ?? 0) - (x.exp ?? 0) - (x.chg ?? 0));
+    const fi = feed != null && Number.isFinite(feed) ? Math.max(0, feed) : 0;
     const eta = this._roundtrip();
-    const loss = eta != null && x.dis > 0 ? x.dis * (1 / eta - 1) : 0;
-    const kwh = Math.max(0, x.solar - (x.exp ?? 0) - loss);
-    const money = kwh * this._ownValue(price, feed) + (x.exp != null && feed != null ? x.exp * feed : 0);
-    return { kwh, money };
+    const money = Math.max(0, direct * (price - fi) + dis * (price - (eta != null ? fi / eta : fi)));
+    return { kwh: direct + dis, money, direct, dis };
   }
 
   /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
@@ -3361,6 +3270,56 @@ class EnergyAssistantPanel extends HTMLElement {
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
+  /**
+   * A dial of the card of the Power tab: a donut with an icon in the middle, beside it the caption, the value and a line
+   * below it (the status of a storage). The same style for the self-sufficiency and the storages. `segments` are the
+   * parts of the donut.
+   */
+  _liveDial(segments, icon, value, caption, sub = "") {
+    return `<div class="resself live"><div class="resring">${this._donut(segments, "", "")}<span class="mid">${icon}</span></div>
+      <div class="dtext"><div class="reslab2">${esc(caption)}</div><div class="resbig">${value}<small>%</small></div>${sub}</div></div>`;
+  }
+
+  /**
+   * The battery card between the power and the savings in the card of the Power tab: a small ring for each storage
+   * (up to four), the status, the power and when it is empty or full. Empty without a charge level.
+   */
+  _liveBattery(cur) {
+    const st = this._storage(cur);
+    if (!st) return "";
+    const lang = this._hass?.language || "en";
+    const units = this._storageUnits().slice(0, 4);
+    const levels = units.length ? units.map((u) => u.soc) : [st.soc];
+    // A battery icon filled up to the level, in the style of the house icon of the self-sufficiency
+    const battery = (v) => {
+      const h = Math.round((Math.max(0, Math.min(100, v)) / 100) * 16);
+      return `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="9" y="7" width="14" height="21" rx="3"/><path d="M13 4h6"/>${h > 0 ? `<rect class="batfill" x="11.5" y="${25.5 - h}" width="9" height="${h}" rx="1.5" fill="${levelColor(v)}" stroke="none"/>` : ""}</svg>`;
+    };
+    // The minimum level sits at the start of the donut as its own gray part (set off like the grid share of the self-sufficiency), then the usable part in the color of the level
+    const parts = (v) => {
+      const lvl = Math.round(v), min = Math.min(Math.round(st.min), lvl);
+      return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
+    };
+    const perUnit = units.length <= 1 || units.every((u) => u.mode);
+    // Under the value stands the power of the storage in the color of what it does (teal discharging, pink charging),
+    // below it when it is empty or full (several storages: the time of each one)
+    const timeAt = (hours) => new Date(Date.now() + hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
+    const modeText = (mode, power, hours = null) => {
+      if (!mode) return "";
+      const when = hours != null && Number.isFinite(hours) ? `<div class="dwhen">${esc(this._t(mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(timeAt(hours))}</b></div>` : "";
+      return `<div class="dstat ${mode}">${esc(fmtPower(mode !== "idle" && power > 0 ? power : 0).join(" "))}</div>${when}`;
+    };
+    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power, units[i]?.hours) : "") : modeText(st.mode, st.power))).join("");
+    // When the sensors cannot be matched to several storages, the power stands once below, in the color of the mode
+    let line = units.length > 1 && !perUnit && st.mode !== "idle" ? modeText(st.mode, st.power) : "";
+    let until = "";
+    if (st.hours != null && Number.isFinite(st.hours) && !(units.length > 1 && perUnit)) {
+      const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
+      until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
+    }
+    return `<div class="resm"><div class="dials">${dials}</div>${line}${until}</div>`;
+  }
+
   /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
   _evLive() {
     let total = 0, charging = false;
@@ -3393,16 +3352,25 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const levels = this._storageLevels();
     // Where the power comes from: four bars, in the colors of the flows
-    const sources = [["grid", cur.gridIn, "var(--eb-grid)"], ["solarDirect", cur.direct, "var(--eb-solar)"], ["storage", cur.discharge, "var(--ea-bout)"]].filter(([, w]) => w != null && Number.isFinite(w));
-    const top = Math.max(...sources.map(([, w]) => w), 1);
+    // With several storages whose sensors match them, each storage has its own part (its discharge power) in shades of teal
+    const unitsLive = this._storageUnits().slice(0, 4);
+    const nStores = this._storageIds().length;
+    const dischargeMatched = ["battery_discharge", "battery_power"].some((k) => (this._cfg[k] || []).length === nStores);
+    const perStorage = unitsLive.length > 1 && dischargeMatched && unitsLive.every((u) => u.mode);
+    const shades = ["#4db6ac", "#80cbc4", "#26a69a", "#b2dfdb"];
+    const storageSources = perStorage
+      ? unitsLive.map((u, i) => [this._t("stUnit", { n: i + 1 }), u.mode === "discharging" ? u.power : 0, shades[i]])
+      : [[this._t("storage"), cur.discharge, "var(--ea-bout)"]];
+    const sources = [[this._t("grid"), cur.gridIn, "var(--eb-grid)"], [this._t("solarDirect"), cur.direct, "var(--eb-solar)"], ...storageSources].filter(([, w]) => w != null && Number.isFinite(w));
     // One bar for all sources, in the colors of the picture (solar, from storage = teal like everywhere else, grid): the width of each part is its share of the consumption
     const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
-    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>
-      <div class="stackleg">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(this._t(label))} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
+    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${l} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: label, r: [[color, kw(w), label]] }))}"></i>`).join("")}</div>
+      <div class="stackleg${sources.length > 3 ? " many" : ""}">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(label)} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
+    const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
-    const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
-      <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
+    // The self-sufficiency as a dial: green is what you cover yourself, blue the share from the grid
+    const ring = autarky != null ? this._liveDial([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], RES_ART.house, autarky, this._t("autarky")) : "";
     // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
     // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();
@@ -3415,24 +3383,22 @@ class EnergyAssistantPanel extends HTMLElement {
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     } else if (price && cur.solar != null) {
-      const perHour = ((cur.direct || 0) / 1000) * this._ownValue(price.value, feed) + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
-      const [n, sym] = this._money(perHour, price.currency, 2);
+      const perHour = ((cur.direct || 0) / 1000) * (price.value - (feed ?? 0)) + ((cur.discharge || 0) / 1000) * (price.value - (feed ?? 0) / (this._roundtrip() ?? 1));
+      const [n, sym] = this._money(Math.max(0, perHour), price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     }
-    const drive = ev != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("liveCharging"))}</div><div class="resdk"><b>${esc(kw(ev))}</b></div></div></div>` : "";
     let foot = "";
-    if (ev != null) foot = this._t("liveFootEv", { p: kw(ev) });
-    else if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
+    if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
     else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows, cur.solar != null && !(cur.solar >= PIC_FLOW_W))}</div>
-      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
-      <div class="resgrid">
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span></div>
+      <div class="resgrid${battery ? " three" : ""}">
         <div class="resl">
           <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${ring}</div>
           <div class="hbars">${bars}</div></div>
-        <div class="resr">${savings}</div>
+        ${battery}<div class="resr">${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
 
@@ -4951,45 +4917,6 @@ class EnergyAssistantPanel extends HTMLElement {
     return Math.max(0, Math.min(d, solar, house ?? solar));
   }
 
-  /**
-   * Where the solar production goes, in whole percent that add up to 100: straight to the house, into the
-   * storage (solar share of the charging) and into the grid. Parts that round to 0 % are left out, the house
-   * part always stays. Null without production.
-   */
-  _pvSplit({ solar, gridOut, charge, gridCharge }, direct) {
-    if (solar == null || !(solar > 0) || direct == null) return null;
-    const parts = [
-      { key: "house", w: Math.max(0, direct) },
-      { key: "storage", w: Math.max(0, (charge ?? 0) - (gridCharge ?? 0)) },
-      { key: "grid", w: Math.max(0, gridOut ?? 0) },
-    ];
-    const total = parts.reduce((a, p) => a + p.w, 0);
-    if (!(total > 0)) return null;
-    // Largest remainder: whole percentages that add up to exactly 100.
-    for (const p of parts) {
-      p.exact = (p.w / total) * 100;
-      p.pct = Math.floor(p.exact);
-    }
-    let missing = 100 - parts.reduce((a, p) => a + p.pct, 0);
-    for (const p of [...parts].sort((a, b) => b.exact - b.pct - (a.exact - a.pct))) {
-      if (missing <= 0) break;
-      p.pct += 1;
-      missing -= 1;
-    }
-    return parts.filter((p) => p.key === "house" || p.pct > 0).map((p) => ({ key: p.key, pct: p.pct }));
-  }
-
-  /** Source of consumption as shares (solar, storage, grid). */
-  _mix({ house, gridIn, discharge, direct }) {
-    if (!house || house <= 0) return null;
-    const g = Math.max(0, gridIn ?? 0);
-    const b = Math.max(0, discharge ?? 0);
-    // Solar share = directly used solar, else what remains after grid import and storage.
-    const s = direct != null ? direct : Math.max(0, house - g - b);
-    const sum = g + b + s || 1;
-    return { solar: s / sum, battery: b / sum, grid: g / sum };
-  }
-
   async _maybeLoadHistory() {
     const now = Date.now();
     if (!this._hass || !this._ready || this._loading || now - this._lastHistory < 5 * 60 * 1000) return;
@@ -5222,17 +5149,6 @@ class EnergyAssistantPanel extends HTMLElement {
     if (!this._cfg.house_power && !(this._cfg.grid_import || []).length && !(this._cfg.grid_power || []).length) {
       return `<div class="eb-card"><div class="empty">${this._t("notConfigured")}</div></div>`;
     }
-    const [val, unit] = fmtPower(cur.house);
-    const mix = this._mix(cur);
-    const split = this._pvSplit(cur, cur.direct);
-    const sharePv = split ? ` <div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(split.map((p) => `${p.pct} % ${this._t(p.key)}`).join(" · "))}</div>` : "";
-    // The tiles come from the configured sensors only, never from the current values: the card keeps its size
-    // and nothing appears or disappears during the day.
-    const tile = (label, w, extra = "") => {
-      if (w == null) return "";
-      const [v, u] = fmtPower(Math.abs(w));
-      return `<div class="eb-tile"><div class="eb-label">${label}</div><div class="eb-value">${v}<small>${u}</small></div>${extra}</div>`;
-    };
     const limit = this._collapsedLimit();
     const areas = this._renderAreas(cur.house, limit);
     const labels = this._renderLabels(cur.house, limit);
@@ -5243,29 +5159,10 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="grid">
       ${this._renderAlerts()}
       ${this._renderLiveResults(cur)}
-      <div class="eb-card eb-card--glow">
-        <div class="row"><span class="eb-title">${this._t("house")}</span>
-          <span class="eb-chip">${cur.house == null ? this._t("noData") : this._t("live")}</span></div>
-        <div class="big"><b>${val}</b><span>${unit}</span></div>
-        ${mix ? `<div class="eb-bar bar">
-            <div class="eb-solar" style="width:${mix.solar * 100}%"></div>
-            <div style="width:${mix.battery * 100}%;background:var(--eb-violet)"></div>
-            <div class="eb-grid" style="width:${mix.grid * 100}%"></div></div>
-          <div class="legend">
-            <span><i style="background:var(--eb-solar)"></i>PV ${Math.round(mix.solar * 100)} %</span>
-            ${cur.discharge != null ? `<span><i style="background:var(--eb-violet)"></i>${this._t("storage")} ${Math.round(mix.battery * 100)} %</span>` : ""}
-            <span><i style="background:var(--eb-grid)"></i>${this._t("grid")} ${Math.round(mix.grid * 100)} %</span></div>` : ""}
-        <div class="tiles compact">
-          ${cur.autarky == null ? "" : `<div class="eb-tile"><div class="eb-label">${this._t("autarky")}</div><div class="eb-value">${Math.round(cur.autarky)}<small>%</small></div></div>`}
-          ${tile(this._t("solar"), cur.solar)}${tile(this._t("solarDirect"), cur.direct, sharePv)}${tile(this._t("gridImport"), cur.gridIn)}${tile(this._t("gridExport"), cur.gridOut)}
-          ${tile(this._t("fromStorage"), cur.discharge)}${tile(this._t("toStorage"), cur.charge)}${tile(this._t("storageFromGrid"), cur.gridCharge)}
-        </div>
-      </div>
-      <div class="eb-card">
+      <div class="eb-card fullrow">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
-      ${this._renderStorage(cur)}
       ${lists ? `<div class="trio">${lists}</div>` : ""}</div>`;
   }
 

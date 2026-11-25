@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-11-25
+
+### Changed
+
+- **House and Storage cards removed:** the Power tab no longer has the *House* card (power with the tiles) and the big *Storage* card; the card *Right now* above has all of it (power, self-sufficiency, sources, storages with their dials and times); the history chart now spans the full width. The code, the texts and the styles that only these cards used are removed.
+- **Battery card in the *Right now* card:** between the power and the savings there is a battery card with a ring for each storage (up to four), the status, the power and when it is empty or full. The columns get narrower with it, the piggy bank is left out then. Without a charge level the card keeps its two columns. The text block of a storage dial (caption, value, power, left-aligned inside) stands in the middle between the donut and the divider on the right. With several storages whose power sensors match them, the storage part of the source bar is split: each storage has its own part (its discharge power) in a shade of teal and its own entry in the legend. Each of several storages also shows when it is empty or full under its power (the capacity is shared equally between the storages). The line *Empty at* of the storage stands on the same height as the legend of the sources. The self-sufficiency and every storage are shown as the same kind of dial (a donut with an icon in the middle, a battery filled up to the level for a storage; beside it the caption above the value and, for a storage, its power under the value in the color of what it does: teal discharging, pink charging), on the same height; the rest of the self-sufficiency is blue, the share from the grid. The minimum level of the storage is the first part of its dial, in gray.
+- **Savings of the day, new calculation:** the kWh in the savings box are what the house used of its own power today: the solar power used directly plus what came out of the storage. A kWh used directly costs the feed-in revenue it would have brought, a kWh from the storage costs that revenue divided by the round-trip efficiency of the storage (`storage_roundtrip_total` of PV Assistant, the storage is assumed to charge from solar only; without the sensor the storage part costs the feed-in tariff). The saving is the price of the grid minus that cost for each kWh, never below 0; the fed-in energy is no longer counted in it. The same calculation is used for the savings of the results card.
+- **No electric car in the *Right now* card:** the box with the charging power and the sentence about the charging car are gone from the card of the Power tab; the car stays in the picture, with its flow into the garage.
+
 ## [0.39.0] - 2026-11-25
 
 ### Changed
@@ -563,7 +572,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.39.0...HEAD
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.40.0...HEAD
+[0.40.0]: https://github.com/weskona/energy_assistant/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/weskona/energy_assistant/compare/v0.38.0...v0.39.0
 [0.5.0]: https://github.com/weskona/energy_assistant/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/weskona/energy_assistant/compare/v0.3.0...v0.4.0
