@@ -3136,11 +3136,11 @@ test("storage: without a charge level there is no card, without a capacity only 
   assert.equal(clamped._storage(clamped._cur).soc, 100);
 });
 
-test("storage: the card shows the status, the bar with the minimum and the tiles", () => {
+test("storage: the card shows the status, the ring with the minimum and the tiles", () => {
   const p = storagePanel({ cur: { discharge: 1000 } });
   const html = p._renderStorage(p._cur);
   assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip stat discharging">Discharging<\/span>/);
-  assert.match(html, /class="segbar discharging" style="--seg:var\(--ea-bout\)"[^>]*>(<i class="on"><\/i>){12}(<i><\/i>){8}<b style="left:10%"><\/b>/); // 60 % = 12 of 20 segments, the minimum marked
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
   assert.match(html, /<text class="sv"[^>]*>60<\/text>/); // the ring with the level
   assert.match(html, /stroke-dasharray="[\d.]+ [\d.]+"/);
   assert.match(html, /Stored<\/div><div class="eb-value">6\.0<small>kWh/);
@@ -3157,7 +3157,6 @@ test("storage: the card shows the status, the bar with the minimum and the tiles
   assert.doesNotMatch(c, /Usable/); // without a minimum usable equals stored
   assert.doesNotMatch(c, /<b style/); // and no marker
   assert.match(c, /class="eb-chip stat charging"/);
-  assert.match(c, /--seg:var\(--ea-bin\)/);
   const de = storagePanel({ cur: { charge: 2000 }, lang: "de" });
   assert.match(de._renderStorage(de._cur), /Lädt[\s\S]*Voll um/);
 });
@@ -5432,9 +5431,8 @@ test("storage: several storages are shown one by one, with their own power when 
   assert.match(html, /<span class="eb-label" title="[^"]*">Storage 2<\/span><span class="eb-chip stat charging">Charging<\/span>/);
   assert.match(html, /<div class="eb-value">900<small>W<\/small><\/div>/);
   assert.match(html, /<div class="eb-value">650<small>W<\/small><\/div>/);
-  // each bar has its own segments (60 % = 6 of 10, 20 % = 2 of 10) in the color of its mode
-  assert.match(html, /class="segbar mini discharging" style="--seg:var\(--ea-bout\)">(<i class="on"><\/i>){6}(<i><\/i>){4}/);
-  assert.match(html, /class="segbar mini charging" style="--seg:var\(--ea-bin\)">(<i class="on"><\/i>){2}(<i><\/i>){8}/);
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
+  assert.doesNotMatch(html, /segbar/); // the ring shows the level, no second display
   // the total comes after the storages
   assert.ok(html.indexOf("Storage 2") < html.indexOf(">Total<"));
   assert.match(html, /Charge level<\/div><div class="eb-value">40<small>%<\/small>/);

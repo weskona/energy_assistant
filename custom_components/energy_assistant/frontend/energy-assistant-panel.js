@@ -48,10 +48,6 @@ const STYLE = `
 .storring .sv{font:800 30px var(--eb-font);fill:var(--eb-text)}
 .storring .su{font:600 13px var(--eb-font);fill:var(--eb-muted)}
 .storright{flex:1;min-width:260px}
-.segbar{position:relative;display:flex;gap:3px;height:16px;margin:6px 0 16px}
-.segbar i{flex:1;border-radius:4px;background:var(--eb-line)}
-.segbar i.on{background:var(--seg);box-shadow:0 0 9px -1px var(--seg)}
-.segbar b{position:absolute;top:-4px;width:2px;height:24px;background:var(--eb-text);opacity:.65;border-radius:1px}
 .eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
 .eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
 .eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
@@ -61,8 +57,6 @@ const STYLE = `
 .storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
 .storunit .unright{flex:1;min-width:0}
 .storunit .until{margin-top:2px;text-transform:none;letter-spacing:0}
-.segbar.mini{height:12px;margin:0 0 10px}
-.segbar.mini b{top:-3px;height:18px}
 .stsum{margin-top:18px}
 @media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
 .socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
@@ -2412,38 +2406,29 @@ class EnergyAssistantPanel extends HTMLElement {
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
     // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
     const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)");
-    const modeColor = st.mode === "charging" ? "var(--ea-bin)" : st.mode === "discharging" ? "var(--ea-bout)" : levelColor(st.soc);
     // One ring for every storage (the mean level in the tiles), the minimum level as a tick
     const levels = this._storageLevels().slice(0, 4);
     const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
     const units = this._storageUnits().slice(0, 4);
     if (units.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
-    // The bar of 20 segments: lit up to the level, the minimum marked
-    const lit = Math.round(st.soc / 5);
-    const seg = Array.from({ length: 20 }, (_, i) => `<i${i < lit ? ' class="on"' : ""}></i>`).join("");
-    const sumBar = `<div class="segbar ${st.mode}" style="--seg:${modeColor}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %">${seg}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>`;
     if (units.length > 1) {
       // Several storages: each one on its own (its ring, its bar, its power when the sensors can be matched), the total below
       const cards = units.map((u) => {
         const color = levelColor(u.soc);
-        const unitColor = u.mode === "charging" ? "var(--ea-bin)" : u.mode === "discharging" ? "var(--ea-bout)" : color;
-        const lit10 = Math.round(u.soc / 10);
-        const bar = `<div class="segbar mini ${u.mode || "idle"}" style="--seg:${unitColor}">${Array.from({ length: 10 }, (_, i) => `<i${i < lit10 ? ' class="on"' : ""}></i>`).join("")}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>`;
         const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
         const until = u.hours != null && Number.isFinite(u.hours)
           ? `<div class="eb-label until">${esc(this._t(u.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} ${esc(new Date(Date.now() + u.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }))} · ${esc(this._t("stIn", { dur: this._duration(u.hours) }))}</div>` : "";
         const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
         return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
-          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${bar}${power}${until}</div></div></div>`;
+          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${power}${until}</div></div></div>`;
       }).join("");
       return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
         <div class="storunits">${cards}</div>
-        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div>${sumBar}<div class="tiles">${tiles.join("")}</div></div>`;
+        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div><div class="tiles">${tiles.join("")}</div></div>`;
     }
     return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
       <div class="storbody"><div class="storrings">${rings}</div>
-        <div class="storright"><div class="segbar ${st.mode}" style="--seg:${modeColor}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %">${seg}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
-          <div class="tiles">${tiles.join("")}</div></div></div></div>`;
+        <div class="storright"><div class="tiles">${tiles.join("")}</div></div></div></div>`;
   }
 
   /**
