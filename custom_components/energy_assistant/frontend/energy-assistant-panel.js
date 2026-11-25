@@ -5736,8 +5736,10 @@ class EnergyAssistantPanel extends HTMLElement {
       const svg = hero.querySelector(".resillu svg");
       if (!svg) continue;
       const pad = parseFloat(hero.style.paddingTop) || 0;
-      const over = hero.getBoundingClientRect().top + pad - svg.getBoundingClientRect().top;
-      const want = over > 0 ? Math.ceil(over) + 4 : 0;
+      const box = svg.getBoundingClientRect();
+      // The top of the drawing (the rays of the sun) starts a little below the top of the picture: no space for that part
+      const over = hero.getBoundingClientRect().top + pad - box.top - box.height * 0.045;
+      const want = over > 0 ? Math.ceil(over) + 2 : 0;
       if (Math.abs(want - pad) >= 1) hero.style.paddingTop = want ? `${want}px` : "";
     }
   }
