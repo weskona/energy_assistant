@@ -60,6 +60,7 @@ const STYLE = `
 .storunit .row{align-items:center}
 .storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
 .storunit .unright{flex:1;min-width:0}
+.storunit .until{margin-top:2px;text-transform:none;letter-spacing:0}
 .segbar.mini{height:12px;margin:0 0 10px}
 .segbar.mini b{top:-3px;height:18px}
 .stsum{margin-top:18px}
@@ -2429,9 +2430,11 @@ class EnergyAssistantPanel extends HTMLElement {
         const lit10 = Math.round(u.soc / 10);
         const bar = `<div class="segbar mini ${u.mode || "idle"}" style="--seg:${unitColor}">${Array.from({ length: 10 }, (_, i) => `<i${i < lit10 ? ' class="on"' : ""}></i>`).join("")}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>`;
         const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
+        const until = u.hours != null && Number.isFinite(u.hours)
+          ? `<div class="eb-label until">${esc(this._t(u.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} ${esc(new Date(Date.now() + u.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() }))} · ${esc(this._t("stIn", { dur: this._duration(u.hours) }))}</div>` : "";
         const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
         return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
-          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${bar}${power}</div></div></div>`;
+          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${bar}${power}${until}</div></div></div>`;
       }).join("");
       return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
         <div class="storunits">${cards}</div>
@@ -2472,6 +2475,15 @@ class EnergyAssistantPanel extends HTMLElement {
         id, name: this._t("stUnit", { n: i + 1 }), tip: this._hass?.states?.[id]?.attributes?.friendly_name || id,
         soc: Math.max(0, Math.min(100, raw)), mode, power: mode === "discharging" ? from : mode === "charging" ? into : 0,
       });
+      // When it is empty (discharging, down to the minimum level) or full (charging): the capacity is shared equally
+      const u = out[out.length - 1];
+      const cap = this._cfg.battery_capacity > 0 ? this._cfg.battery_capacity / ids.length : null;
+      const min = Math.max(0, Math.min(100, this._cfg.battery_min_soc ?? 0));
+      u.hours = null;
+      if (cap != null && u.power >= FLOW_W) {
+        if (mode === "discharging") u.hours = (cap * Math.max(0, u.soc - min)) / 100 / (u.power / 1000);
+        else if (mode === "charging") u.hours = (cap * Math.max(0, 100 - u.soc)) / 100 / (u.power / 1000);
+      }
     });
     return out;
   }

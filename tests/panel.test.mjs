@@ -5454,3 +5454,20 @@ test("storage: several storages are shown one by one, with their own power when 
   assert.equal(p._storageUnits().length, 1);
   assert.doesNotMatch(p._renderStorage(p._cur), /class="storunit"/);
 });
+
+test("storage: every storage shows when it is empty or full, from its own power and its share of the capacity", () => {
+  const p = storagePanel({ cur: { discharge: 1500 } });
+  p._config = { ...p._config, battery_capacity: 10, battery_min_soc: 10, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"], battery_discharge: ["sensor.bd1", "sensor.bd2"], battery_charge: ["sensor.bc1", "sensor.bc2"] };
+  const set = (id, v, unit = "W") => { p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: unit } }; };
+  set("sensor.soc", 60, "%"); set("sensor.soc2", 20, "%");
+  set("sensor.bd1", 900); set("sensor.bd2", 0); set("sensor.bc1", 0); set("sensor.bc2", 500);
+  const [a, b] = p._storageUnits();
+  assert.ok(Math.abs(a.hours - (5 * 0.5) / 0.9) < 1e-9); // 5 kWh each, 50 % usable down to 10 %
+  assert.ok(Math.abs(b.hours - (5 * 0.8) / 0.5) < 1e-9); // 80 % still to charge
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="eb-label until"/g) || []).length, 2);
+  assert.match(html, /until">Empty at /);
+  assert.match(html, /until">Full at /);
+  set("sensor.bd1", 0); set("sensor.bc2", 0);
+  assert.equal(p._storageUnits()[0].hours, null); // idle: no time
+});
