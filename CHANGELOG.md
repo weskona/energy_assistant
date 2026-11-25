@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Fixed columns in the card *Right now*:** the left part (power, self-sufficiency, sources) is narrower and has a fixed width (360 px), the storage part too (270 px); the columns no longer widen and shrink with the values.
+
 ## [0.40.1] - 2026-11-25
 
 ### Changed

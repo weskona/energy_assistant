@@ -107,7 +107,7 @@ const STYLE = `
 .resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:20px}
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
 .resgrid{align-items:start}
-.resgrid.three{grid-template-columns:minmax(0,1.7fr) auto minmax(0,.9fr)}
+.resgrid.three{grid-template-columns:360px 270px minmax(0,1fr)}
 .resself.live{padding-bottom:0;gap:12px}
 .resself.live .resring,.resself.live .resring .donut{width:72px;height:72px}
 .resself.live .resbig{font-size:28px}
@@ -5779,7 +5779,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const height = (cardBox.top - pad - tabsTop + cardBox.height + 8) / (1 - frac);
       const ratio = (svg.viewBox?.baseVal?.width || 424) / 290;
       const resx = parseFloat(hero.style.getPropertyValue("--resx")) || 1;
-      const room = hero.clientWidth - 730;
+      const room = hero.clientWidth - 880;
       const pic = Math.max(240, Math.min((height * ratio + 30) / 1.24, room)) / resx;
       const cur = parseFloat(hero.style.getPropertyValue("--pic")) || 0;
       if (Math.abs(pic - cur) >= 2) hero.style.setProperty("--pic", `${pic.toFixed(1)}px`);
