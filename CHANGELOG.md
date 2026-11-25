@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The picture is scaled so that the top of its sun or moon stands on the same height as the top of the tab bar; the house and the grass reach to the card as in the first design, and the card keeps a minimum width, so on narrow windows the picture gives way. Room is made above only when it would reach above the top of the page. The time until the storage is empty or full no longer shows the duration beside it (it is in the tooltip).
+- **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The picture is scaled so that the top of its sun or moon stands on the same height as the top of the tab bar; the grass goes under the edge of the card while the house ends about 25 px before it, so the border of the card stays visible, and the card keeps a minimum width, so on narrow windows the picture gives way. Room is made above only when it would reach above the top of the page. The time until the storage is empty or full no longer shows the duration beside it (it is in the tooltip).
 
 ## [0.40.0] - 2026-11-25
 

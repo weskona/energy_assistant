@@ -179,7 +179,7 @@ const STYLE = `
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
 .reshero{grid-template-columns:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1)) minmax(0,1fr);align-items:stretch;width:100%}
-.resillu{display:block;position:relative;z-index:2;margin-right:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1) * -.24);pointer-events:none}
+.resillu{display:block;position:relative;z-index:2;margin-right:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1) * -.24 + 30px);pointer-events:none}
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:0;right:0;bottom:-8px;width:100%;height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
@@ -5774,13 +5774,13 @@ class EnergyAssistantPanel extends HTMLElement {
       const cardBox = card.getBoundingClientRect();
       const frac = (parseFloat(svg.dataset.top) || 12.4) / 290;
       // The height of the picture that puts its top on the top of the tab bar. The picture is as wide as its column plus the
-      // 24 % of it that reaches into the card (the grass and the house reach to the card, like in the first design), and as
-      // high as its drawing allows. The card beside it keeps a minimum width, so the picture gives way when needed.
+      // 24 % of it (less 30 px) that reaches into the card: the grass goes under the edge of the card, the house ends a little
+      // before it, so the border of the card stays visible. It is as high as its drawing allows. The card beside it keeps a minimum width, so the picture gives way when needed.
       const height = (cardBox.top - pad - tabsTop + cardBox.height + 8) / (1 - frac);
       const ratio = (svg.viewBox?.baseVal?.width || 424) / 290;
       const resx = parseFloat(hero.style.getPropertyValue("--resx")) || 1;
       const room = hero.clientWidth - 730;
-      const pic = Math.max(240, Math.min((height * ratio) / 1.24, room)) / resx;
+      const pic = Math.max(240, Math.min((height * ratio + 30) / 1.24, room)) / resx;
       const cur = parseFloat(hero.style.getPropertyValue("--pic")) || 0;
       if (Math.abs(pic - cur) >= 2) hero.style.setProperty("--pic", `${pic.toFixed(1)}px`);
       // Where the size was limited: keep the drawing below the top of the page
