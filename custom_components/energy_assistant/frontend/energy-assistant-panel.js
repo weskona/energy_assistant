@@ -2504,14 +2504,14 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
-  _storRing(level, color, min, small = false, bolt = true) {
+  _storRing(level, color, min, small = false, bolt = true, track = "var(--eb-line)") {
     const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
     const tick = min > 0 ? (() => {
       const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
       return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
     })() : "";
     return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${track}" stroke-width="12"/>
       <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
       ${bolt ? `<path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>` : ""}
       <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
@@ -3433,7 +3433,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     // The self-sufficiency as a ring in the style of the storage rings (same size, same height)
-    const ring = autarky != null ? `<div class="resself live"><div class="reslab">${esc(this._t("autarky"))}</div>${this._storRing(autarky, "var(--eb-green)", 0, true, false)}</div>` : "";
+    const ring = autarky != null ? `<div class="resself live"><div class="reslab">${esc(this._t("autarky"))}</div>${this._storRing(autarky, "var(--eb-green)", 0, true, false, "var(--eb-blue)")}</div>` : "";
     // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
     // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();

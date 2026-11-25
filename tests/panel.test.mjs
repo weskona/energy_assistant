@@ -5499,6 +5499,7 @@ test("power tab: the self-sufficiency stands next to the power, not in the right
   assert.match(num, /class="resself live"/);
   assert.match(num, /Self-sufficiency/);
   assert.match(num, /class="storring small"/); // the same ring style as the storage
+  assert.match(num, /stroke="var\(--eb-blue\)" stroke-width="12"/); // the rest of the ring is the grid share, in blue
   assert.match(num, /<text class="sv"[^>]*>97<\/text>|<text class="sv"[^>]*>\d+<\/text>/);
   const right = html.slice(html.indexOf('class="resr"'));
   assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself/);
