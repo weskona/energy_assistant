@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **No electric car in the *Right now* card:** the box with the charging power and the sentence about the charging car are gone from the card of the Power tab; the car stays in the picture, with its flow into the garage.
+
 ## [0.39.0] - 2026-11-25
 
 ### Changed

@@ -411,8 +411,6 @@ const STRINGS = {
     liveFeed: "Feed-in",
     resPerHour: "per hour",
     resToday: "today",
-    liveCharging: "Charging",
-    liveFootEv: "Your electric car is charging at home with **{p}**.",
     liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
     liveFootToday: "You have covered **{pct} %** of your electricity needs with solar today.",
     resTitle: "Your results",
@@ -834,8 +832,6 @@ const STRINGS = {
     liveFeed: "Einsp.",
     resPerHour: "pro Stunde",
     resToday: "heute",
-    liveCharging: "Laden",
-    liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
     liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
     liveFootToday: "Du hast heute **{pct} %** deines Strombedarfs durch PV gedeckt.",
     resTitle: "Ihre Ergebnisse",
@@ -3420,14 +3416,12 @@ class EnergyAssistantPanel extends HTMLElement {
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     }
-    const drive = ev != null ? `<div class="resdrive"><span class="car">${RES_ART.car}</span><div><div class="resub">${esc(this._t("liveCharging"))}</div><div class="resdk"><b>${esc(kw(ev))}</b></div></div></div>` : "";
     let foot = "";
-    if (ev != null) foot = this._t("liveFootEv", { p: kw(ev) });
-    else if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
+    if (this._today?.autarky != null) foot = this._t("liveFootToday", { pct: Math.round(this._today.autarky) });
     else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows, cur.solar != null && !(cur.solar >= PIC_FLOW_W))}</div>
-      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span></div>
       <div class="resgrid">
         <div class="resl">
           <div class="resnum"><span class="rn">${val}<small>${unit}</small></span>${ring}</div>

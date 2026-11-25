@@ -5133,8 +5133,8 @@ test("power tab: the picture shows the power of now in watts, below the notices 
   assert.match(live, />900 W</);
   assert.match(live, />7,400 W</);
   assert.doesNotMatch(live, /kW/);
-  assert.match(html, /<div class="resdk"><b>7,400 W<\/b>/); // the car is charging
-  assert.match(html, /<div class="resfoot">Your electric car is charging at home with <b>7,400 W<\/b>\.<\/div>/);
+  // the car is only in the picture (the flow into the garage), not as a box or a sentence in the card
+  assert.doesNotMatch(html, /class="resdrive"|class="resdk"|electric car is charging/);
   assert.match(html, /<span class="resper">per hour<\/span>/); // what the sun saves per hour
   assert.match(html, /class="unit" data-soc="50"/); // the storage with its live level
 });
@@ -5529,11 +5529,12 @@ test("power tab: the sentence says what solar covered of the electricity needs t
   assert.match(p._renderHouse(), /<div class="resfoot">You have covered <b>72 %<\/b> of your electricity needs with solar today\.<\/div>/);
   p._hass.language = "de";
   assert.match(p._renderHouse(), /Du hast heute <b>72 %<\/b> deines Strombedarfs durch PV gedeckt\./);
-  // a charging car still comes first
+  // a charging car changes nothing in the sentence
   const car = livePanel({}, { pv: st(0) }, { ev_assistant: { vehicles: [{ name: "EV", live: "sensor.evlive" }] } });
   car._hass.states["sensor.evlive"] = { state: "on", attributes: { evcc_live: { charging: true, charge_power: 7.4 } } };
   car._today = { autarky: 50, at: Date.now() };
-  assert.match(car._renderHouse(), /electric car is charging/);
+  assert.match(car._renderHouse(), /with solar today/);
+  assert.doesNotMatch(car._renderHouse(), /electric car is charging|class="resdrive"/);
 });
 
 test("power tab: the savings card shows what the sun saved today in kWh and money, the hourly value only until today is loaded", () => {
