@@ -5477,14 +5477,18 @@ test("power tab: a small grid import of a few watts is drawn as a flow in the pi
   assert.match(html, />7 W</);
 });
 
-test("power tab: the card shows where the consumption comes from as one vertical bar: grid, solar direct, storage", () => {
+test("power tab: the card shows where the consumption comes from as horizontal bars: grid, solar direct, storage", () => {
   const p = livePanel({}, { h: st(1400), pv: st(3200), gi: st(300), ge: st(2100), bc: st(0), bd: st(500) });
   const html = p._renderHouse();
-  const bar = html.slice(html.indexOf('class="srcbar"'), html.indexOf('class="rbars"'));
-  assert.equal((bar.match(/<i /g) || []).length, 3);
-  assert.ok(bar.indexOf("Grid") < bar.indexOf("Solar direct") && bar.indexOf("Solar direct") < bar.indexOf("Storage"));
-  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="rbars"')), /stackbadge/);
-  // without any source the bar is left out
+  const bars = html.slice(html.indexOf('class="hbars"'), html.indexOf('class="resr"'));
+  assert.equal((bars.match(/class="hbar"/g) || []).length, 3);
+  assert.ok(bars.indexOf("Grid") < bars.indexOf("Solar direct") && bars.indexOf("Solar direct") < bars.indexOf("Storage"));
+  assert.match(bars, /class="hv">300 W</);
+  assert.match(bars, /class="hv">500 W</);
+  assert.doesNotMatch(html, /class="srcbar"/);
+  // no vertical columns for solar and feed-in any more
+  assert.doesNotMatch(html.slice(html.indexOf("Right now"), html.indexOf('class="resr"')), /class="rbar"|Feed-in/);
+  // a source without power has an empty bar
   const none = livePanel({}, { h: st(0), pv: st(0), gi: st(0), ge: st(0), bc: st(0), bd: st(0) });
-  assert.doesNotMatch(none._renderHouse(), /class="srcbar"/);
+  assert.match(none._renderHouse(), /class="htrack"><i style="width:0%/);
 });
