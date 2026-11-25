@@ -5493,14 +5493,13 @@ test("power tab: the card shows where the consumption comes from in one bar: gri
   assert.equal((n.slice(n.indexOf('class="stackh"'), n.indexOf('class="stackleg"')).match(/<i /g) || []).length, 0);
 });
 
-test("power tab: the self-sufficiency stands next to the power, not in the right column", () => {
+test("power tab: the self-sufficiency is a dial next to the power, not in the right column, with the grid share in blue", () => {
   const html = livePanel({}, { h: st(1400), pv: st(3200), gi: st(300), ge: st(2100), bc: st(0), bd: st(500) })._renderHouse();
   const num = html.slice(html.indexOf('class="resnum"'), html.indexOf('class="hbars"'));
   assert.match(num, /class="resself live"/);
-  assert.match(num, /Self-sufficiency/);
-  assert.match(num, /class="storring small"/); // the same ring style as the storage
-  assert.match(num, /stroke="var\(--eb-blue\)" stroke-width="12"/); // the rest of the ring is the grid share, in blue
-  assert.match(num, /<text class="sv"[^>]*>97<\/text>|<text class="sv"[^>]*>\d+<\/text>/);
+  assert.match(num, /class="donut"/);
+  assert.match(num, /var\(--eb-green\)[\s\S]*var\(--eb-blue\)/); // green is yours, blue the share from the grid
+  assert.match(num, /<div class="reslab2">Self-sufficiency<\/div>/);
   const right = html.slice(html.indexOf('class="resr"'));
   assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself/);
   assert.doesNotMatch(html, /stackbadge/); // the little bars are gone
@@ -5599,7 +5598,7 @@ test("savings: the example 0.30 EUR grid price, 0.10 EUR feed-in, 90 % round tri
   assert.equal(Math.round(store.money * 100) / 100, 1.89);
 });
 
-test("power tab: a battery card sits between the power and the savings, with a ring for every storage, the status and the time", () => {
+test("power tab: a battery card sits between the power and the savings, with a dial for every storage in the style of the self-sufficiency, the status and the time", () => {
   const p = livePanel({ battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_capacity: 10, battery_min_soc: 10 }, { soc: st(64, "%"), soc2: st(28, "%"), bc: st(0), bd: st(900) });
   const html = p._renderHouse();
   assert.match(html, /class="resgrid three"/);
@@ -5607,11 +5606,15 @@ test("power tab: a battery card sits between the power and the savings, with a r
   const iL = grid.indexOf('class="resl"'), iM = grid.indexOf('class="resm"'), iR = grid.indexOf('class="resr"');
   assert.ok(iL < iM && iM < iR); // power, battery, savings
   const mid = grid.slice(iM, iR);
-  assert.equal((mid.match(/class="storring small"/g) || []).length, 2);
-  assert.match(mid, /<text class="sv"[^>]*>64<\/text>/);
-  assert.match(mid, /<text class="sv"[^>]*>28<\/text>/);
+  assert.equal((mid.match(/class="resself live"/g) || []).length, 2); // the same dial as the self-sufficiency
+  assert.equal((mid.match(/class="donut"/g) || []).length, 2);
+  assert.match(mid, /<div class="resbig">64<small>%<\/small><\/div><div class="reslab2">Storage 1<\/div>/);
+  assert.match(mid, /<div class="resbig">28<small>%<\/small><\/div><div class="reslab2">Storage 2<\/div>/);
   assert.match(mid, /class="eb-chip stat discharging">Discharging<\/span><b>900 W<\/b>/);
   assert.match(mid, /Empty at <b>/);
+  // one storage: the caption is just the name of the card
+  const one = livePanel({ battery_soc: ["soc"], battery_soc_more: [] }, { soc: st(64, "%") })._renderHouse();
+  assert.match(one.slice(one.indexOf('class="resm"')), /<div class="reslab2">Storage<\/div>/);
   // without a charge level there is no battery card and two columns as before
   const none = livePanel({ battery_soc: [] }, {})._renderHouse();
   assert.doesNotMatch(none, /class="resm"|resgrid three/);

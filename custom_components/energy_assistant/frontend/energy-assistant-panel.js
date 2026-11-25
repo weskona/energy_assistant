@@ -129,19 +129,19 @@ const STYLE = `
 .resl{padding-right:28px;border-right:1px solid var(--eb-line)}
 .resgrid{align-items:start}
 .resgrid.three{grid-template-columns:minmax(0,1.7fr) auto minmax(0,.9fr)}
-.resself.live{flex-direction:column;align-items:flex-start;gap:8px;padding-bottom:0;margin-left:auto}
-.resself.live .storring.small{width:72px;height:72px}
-.resself.live .reslab,.resm .reslab{line-height:1.3;margin:0}
+.resself.live{padding-bottom:0;gap:12px}
+.resself.live .resring,.resself.live .resring .donut{width:72px;height:72px}
+.resself.live .resbig{font-size:28px}
+.resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500}
 .resr{align-self:stretch}
 .resgrid.three .resl{padding-right:22px}
 .resgrid.three .resr{padding-left:22px}
-.resgrid.three .resnum{font-size:44px;margin-top:0}
+.resgrid.three .resnum{font-size:44px;margin-top:0;gap:16px}
 .resgrid.three .resnum small{font-size:16px}
 .resgrid.three .pig{display:none}
 .resgrid.three .ressave .resbig{font-size:26px}
 .resm{padding:0 22px;border-right:1px solid var(--eb-line);display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0}
-.resm .rings{display:flex;gap:6px}
-.resm .storring.small{width:72px;height:72px}
+.resm .dials{display:flex;flex-direction:column;gap:10px}
 .resm .bline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--eb-dim)}
 .resm .bline b{font-size:15px;color:var(--eb-text)}
 .resr{padding-left:28px;display:flex;flex-direction:column;justify-content:center;min-width:0}
@@ -2504,16 +2504,16 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
-  _storRing(level, color, min, small = false, bolt = true, track = "var(--eb-line)") {
+  _storRing(level, color, min, small = false) {
     const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
     const tick = min > 0 ? (() => {
       const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
       return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
     })() : "";
     return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
-      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${track}" stroke-width="12"/>
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
       <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
-      ${bolt ? `<path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>` : ""}
+      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
       <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
@@ -3367,6 +3367,15 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
+   * A dial of the card of the Power tab: a donut with an icon in the middle, the value beside it and a caption. The same
+   * style for the self-sufficiency and the storages. `segments` are the parts of the donut.
+   */
+  _liveDial(segments, icon, value, caption) {
+    return `<div class="resself live"><div class="resring">${this._donut(segments, "", "")}<span class="mid">${icon}</span></div>
+      <div><div class="resbig">${value}<small>%</small></div><div class="reslab2">${esc(caption)}</div></div></div>`;
+  }
+
+  /**
    * The battery card between the power and the savings in the card of the Power tab: a small ring for each storage
    * (up to four), the status, the power and when it is empty or full. Empty without a charge level.
    */
@@ -3376,7 +3385,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const lang = this._hass?.language || "en";
     const units = this._storageUnits().slice(0, 4);
     const levels = units.length ? units.map((u) => u.soc) : [st.soc];
-    const rings = levels.map((v) => this._storRing(v, levelColor(v), st.min, true)).join("");
+    const bolt = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M13 2 5 14h6l-1 8 8-12h-6z" fill="var(--eb-gold)"/></svg>`;
+    const dials = levels.map((v, i) => this._liveDial([{ value: Math.round(v), color: levelColor(v) }, { value: 100 - Math.round(v), color: "var(--eb-line)" }], bolt, Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"))).join("");
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
     let line = `<span class="eb-chip stat ${st.mode}">${esc(status)}</span>`;
     if (st.mode !== "idle") {
@@ -3388,7 +3398,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
       until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
     }
-    return `<div class="resm"><div class="reslab">${esc(this._t("stTitle"))}</div><div class="rings">${rings}</div><div class="bline">${line}</div>${until}</div>`;
+    return `<div class="resm"><div class="dials">${dials}</div><div class="bline">${line}</div>${until}</div>`;
   }
 
   /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
@@ -3432,8 +3442,8 @@ class EnergyAssistantPanel extends HTMLElement {
     const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
-    // The self-sufficiency as a ring in the style of the storage rings (same size, same height)
-    const ring = autarky != null ? `<div class="resself live"><div class="reslab">${esc(this._t("autarky"))}</div>${this._storRing(autarky, "var(--eb-green)", 0, true, false, "var(--eb-blue)")}</div>` : "";
+    // The self-sufficiency as a dial: green is what you cover yourself, blue the share from the grid
+    const ring = autarky != null ? this._liveDial([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], RES_ART.house, autarky, this._t("autarky")) : "";
     // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
     // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();
