@@ -3325,7 +3325,6 @@ class EnergyAssistantPanel extends HTMLElement {
     const sources = [["solar", cur.solar, RES_FLOW.pv], ["grid", cur.gridIn, RES_FLOW.in], ["storage", cur.discharge, RES_FLOW.discharge], ["liveFeed", cur.gridOut, RES_FLOW.out]].filter(([, w]) => w != null);
     const top = Math.max(...sources.map(([, w]) => w), 1);
     const bars = sources.map(([label, w, color]) => `<div class="rbar"><div class="rcol"><i style="height:${Math.max(3, Math.round((w / top) * 100))}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i></div><span>${esc(this._t(label))}</span></div>`).join("");
-    const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
       <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
@@ -3344,11 +3343,9 @@ class EnergyAssistantPanel extends HTMLElement {
     else if (autarky != null) foot = this._t("liveFootSelf", { pct: autarky });
     const footHtml = esc(foot).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
     return `<div class="reshero fullrow" style="--resx:${(424 + resExtra(levels)) / 400}"><div class="resillu" aria-hidden="true"><div class="resghost"></div>${RES_ART.hero(levels, flows)}</div>
-      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span><span class="eb-chip">${this._t(cur.house == null ? "noData" : "live")}</span>${drive}</div>
+      <div class="eb-card eb-card--glow res"><div class="row"><span class="eb-title">${esc(this._t("liveTitle"))}</span>${drive}</div>
       <div class="resgrid">
-        <div class="resl"><div class="reslab">${esc(this._t("liveHouse"))}</div>
-          <div class="resnum"><span class="rn">${val}<small>${unit}</small></span><span class="stackbadge" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
-          <div class="rbars">${bars}</div></div>
+        <div class="resl"><div class="rbars">${bars}</div></div>
         <div class="resr">${ring}${savings}</div>
       </div>${foot ? `<div class="resfoot">${footHtml}</div>` : ""}</div></div>`;
   }
