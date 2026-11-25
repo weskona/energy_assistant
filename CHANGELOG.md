@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-11-25
+
 ### Changed
 
 - **Storage losses in the savings:** with the sensor `storage_roundtrip_total` of PV Assistant (round-trip efficiency in %) the energy the storage loses on the way (what was discharged divided by the efficiency, minus what was discharged) is deducted from the self-used solar energy in the savings of the Power tab and of the results card. Without the sensor or with a value that is text, 0 or less, or above 100 % nothing is deducted.
@@ -561,7 +563,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/weskona/energy_assistant/compare/v0.38.0...v0.39.0
 [0.5.0]: https://github.com/weskona/energy_assistant/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/weskona/energy_assistant/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/weskona/energy_assistant/compare/v0.2.2...v0.3.0
