@@ -5227,7 +5227,7 @@ class EnergyAssistantPanel extends HTMLElement {
     return `<div class="grid">
       ${this._renderAlerts()}
       ${this._renderLiveResults(cur)}
-      <div class="eb-card">
+      <div class="eb-card fullrow">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
         ${hist}
       </div>
