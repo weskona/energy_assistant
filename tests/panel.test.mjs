@@ -5417,3 +5417,40 @@ test("storage: with several storages every one has its own ring, the mean level 
   const one = storagePanel();
   assert.equal((one._renderStorage(one._cur).match(/class="storring"/g) || []).length, 1);
 });
+
+test("storage: several storages are shown one by one, with their own power when the sensors match, and the total below", () => {
+  const p = storagePanel({ cur: { discharge: 1500 } });
+  p._config = { ...p._config, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"], battery_discharge: ["sensor.bd1", "sensor.bd2"], battery_charge: ["sensor.bc1", "sensor.bc2"] };
+  const set = (id, v, unit = "W") => { p._hass.states[id] = { state: String(v), attributes: { unit_of_measurement: unit } }; };
+  set("sensor.soc2", 20, "%");
+  set("sensor.bd1", 900); set("sensor.bd2", 0); set("sensor.bc1", 0); set("sensor.bc2", 650);
+  const units = p._storageUnits();
+  assert.deepEqual(units.map((u) => [u.name, u.soc, u.mode, u.power]), [["Storage 1", 60, "discharging", 900], ["Storage 2", 20, "charging", 650]]);
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="storunit"/g) || []).length, 2); // each one on its own
+  assert.match(html, /<span class="eb-label" title="[^"]*">Storage 1<\/span><span class="eb-chip stat discharging">Discharging<\/span>/);
+  assert.match(html, /<span class="eb-label" title="[^"]*">Storage 2<\/span><span class="eb-chip stat charging">Charging<\/span>/);
+  assert.match(html, /<div class="eb-value">900<small>W<\/small><\/div>/);
+  assert.match(html, /<div class="eb-value">650<small>W<\/small><\/div>/);
+  // each bar has its own segments (60 % = 6 of 10, 20 % = 2 of 10) in the color of its mode
+  assert.match(html, /class="segbar mini discharging" style="--seg:var\(--ea-bout\)">(<i class="on"><\/i>){6}(<i><\/i>){4}/);
+  assert.match(html, /class="segbar mini charging" style="--seg:var\(--ea-bin\)">(<i class="on"><\/i>){2}(<i><\/i>){8}/);
+  // the total comes after the storages
+  assert.ok(html.indexOf("Storage 2") < html.indexOf(">Total<"));
+  assert.match(html, /Charge level<\/div><div class="eb-value">40<small>%<\/small>/);
+  // power sensors that cannot be matched (a different number): no mode and no power per storage
+  p._config = { ...p._config, battery_discharge: ["sensor.bd1"], battery_charge: [] };
+  const plain = p._storageUnits();
+  assert.deepEqual(plain.map((u) => u.mode), [null, null]);
+  const html2 = p._renderStorage(p._cur);
+  assert.equal((html2.match(/class="storunit"/g) || []).length, 2);
+  assert.doesNotMatch(html2.slice(html2.indexOf("storunits"), html2.indexOf(">Total<")), /eb-chip stat/);
+  // combined signed sensors, one for each storage
+  p._config = { ...p._config, battery_discharge: [], battery_charge: [], battery_power: ["sensor.bp1", "sensor.bp2"], invert_battery: false };
+  set("sensor.bp1", 400); set("sensor.bp2", -300);
+  assert.deepEqual(p._storageUnits().map((u) => [u.mode, u.power]), [["discharging", 400], ["charging", 300]]);
+  // a storage without a value is left out; one storage keeps the single card
+  p._hass.states["sensor.soc2"] = { state: "unavailable", attributes: {} };
+  assert.equal(p._storageUnits().length, 1);
+  assert.doesNotMatch(p._renderStorage(p._cur), /class="storunit"/);
+});

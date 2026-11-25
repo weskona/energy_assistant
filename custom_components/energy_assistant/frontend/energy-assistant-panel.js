@@ -55,6 +55,14 @@ const STYLE = `
 .eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
 .eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
 .eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
+.storunits{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:14px}
+.storunit{background:var(--eb-tile);border:1px solid var(--eb-tile-border);border-radius:var(--eb-radius-tile);padding:12px 14px}
+.storunit .row{align-items:center}
+.storunit .unbody{display:flex;align-items:center;gap:16px;margin-top:6px}
+.storunit .unright{flex:1;min-width:0}
+.segbar.mini{height:12px;margin:0 0 10px}
+.segbar.mini b{top:-3px;height:18px}
+.stsum{margin-top:18px}
 @media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
 .socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
 .socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
@@ -416,6 +424,8 @@ const STRINGS = {
     resSavingTip: "Self-used solar energy at the price of your contract plus the feed-in revenue",
     pvSoc: "Storage: charge level sensor{cap}",
     stTitle: "Storage",
+    stUnit: "Storage {n}",
+    stTotal: "Total",
     stCharging: "Charging",
     stDischarging: "Discharging",
     stIdle: "Idle",
@@ -834,6 +844,8 @@ const STRINGS = {
     resSavingTip: "Selbst genutzter Solarstrom zum Preis deines Vertrags plus Einspeisevergütung",
     pvSoc: "Speicher: Ladestand-Sensor{cap}",
     stTitle: "Speicher",
+    stUnit: "Speicher {n}",
+    stTotal: "Gesamt",
     stCharging: "Lädt",
     stDischarging: "Entlädt",
     stIdle: "Ruhe",
@@ -2402,15 +2414,66 @@ class EnergyAssistantPanel extends HTMLElement {
     const modeColor = st.mode === "charging" ? "var(--ea-bin)" : st.mode === "discharging" ? "var(--ea-bout)" : levelColor(st.soc);
     // One ring for every storage (the mean level in the tiles), the minimum level as a tick
     const levels = this._storageLevels().slice(0, 4);
-    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, levels.length > 1)).join("");
-    if (levels.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
+    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, false)).join("");
+    const units = this._storageUnits().slice(0, 4);
+    if (units.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
     // The bar of 20 segments: lit up to the level, the minimum marked
     const lit = Math.round(st.soc / 5);
     const seg = Array.from({ length: 20 }, (_, i) => `<i${i < lit ? ' class="on"' : ""}></i>`).join("");
+    const sumBar = `<div class="segbar ${st.mode}" style="--seg:${modeColor}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %">${seg}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>`;
+    if (units.length > 1) {
+      // Several storages: each one on its own (its ring, its bar, its power when the sensors can be matched), the total below
+      const cards = units.map((u) => {
+        const color = levelColor(u.soc);
+        const unitColor = u.mode === "charging" ? "var(--ea-bin)" : u.mode === "discharging" ? "var(--ea-bout)" : color;
+        const lit10 = Math.round(u.soc / 10);
+        const bar = `<div class="segbar mini ${u.mode || "idle"}" style="--seg:${unitColor}">${Array.from({ length: 10 }, (_, i) => `<i${i < lit10 ? ' class="on"' : ""}></i>`).join("")}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>`;
+        const power = u.mode && u.mode !== "idle" ? `<div class="eb-value">${fmtPower(u.power)[0]}<small>${fmtPower(u.power)[1]}</small></div>` : "";
+        const chip = u.mode ? `<span class="eb-chip stat ${u.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[u.mode]))}</span>` : "";
+        return `<div class="storunit"><div class="row"><span class="eb-label" title="${esc(u.tip)}">${esc(u.name)}</span>${chip}</div>
+          <div class="unbody">${this._storRing(u.soc, color, st.min, true)}<div class="unright">${bar}${power}</div></div></div>`;
+      }).join("");
+      return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
+        <div class="storunits">${cards}</div>
+        <div class="eb-label stsum">${esc(this._t("stTotal"))}</div>${sumBar}<div class="tiles">${tiles.join("")}</div></div>`;
+    }
     return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
       <div class="storbody"><div class="storrings">${rings}</div>
         <div class="storright"><div class="segbar ${st.mode}" style="--seg:${modeColor}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %">${seg}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
           <div class="tiles">${tiles.join("")}</div></div></div></div>`;
+  }
+
+  /**
+   * The storages one by one: the charge level of each charge level sensor (the first one and the further ones) and,
+   * when there are as many charge, discharge or combined power sensors as storages, what each one does (the
+   * sensors are matched in the order of the settings, like the energy counters).
+   */
+  _storageUnits() {
+    const ids = this._storageIds();
+    const same = (key) => ((this._cfg[key] || []).length === ids.length ? this._cfg[key] : null);
+    const charge = same("battery_charge"), discharge = same("battery_discharge"), combined = same("battery_power");
+    const out = [];
+    ids.forEach((id, i) => {
+      const raw = this._num(id);
+      if (raw == null) return;
+      let into = charge ? Math.abs(this._watts(charge[i]) ?? 0) : null;
+      let from = discharge ? Math.abs(this._watts(discharge[i]) ?? 0) : null;
+      if (into == null && from == null && combined) {
+        let v = this._watts(combined[i]);
+        if (v != null) {
+          if (this._cfg.invert_battery) v = -v;
+          from = Math.max(0, v);
+          into = Math.max(0, -v);
+        }
+      }
+      const known = into != null || from != null;
+      const mode = !known ? null : (from ?? 0) >= FLOW_W ? "discharging" : (into ?? 0) >= FLOW_W ? "charging" : "idle";
+      out.push({
+        id, name: this._t("stUnit", { n: i + 1 }), tip: this._hass?.states?.[id]?.attributes?.friendly_name || id,
+        soc: Math.max(0, Math.min(100, raw)), mode, power: mode === "discharging" ? from : mode === "charging" ? into : 0,
+      });
+    });
+    return out;
   }
 
   /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
