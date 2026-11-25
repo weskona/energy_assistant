@@ -3386,10 +3386,10 @@ class EnergyAssistantPanel extends HTMLElement {
     const units = this._storageUnits().slice(0, 4);
     const levels = units.length ? units.map((u) => u.soc) : [st.soc];
     const bolt = `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M13 2 5 14h6l-1 8 8-12h-6z" fill="var(--eb-gold)"/></svg>`;
-    // The minimum level sits at the start of the donut as its own blue part (like the grid share of the self-sufficiency), then the usable part in the color of the level
+    // The minimum level sits at the start of the donut as its own gray part (set off like the grid share of the self-sufficiency), then the usable part in the color of the level
     const parts = (v) => {
       const lvl = Math.round(v), min = Math.min(Math.round(st.min), lvl);
-      return [...(min > 0 ? [{ value: min, color: "var(--eb-blue)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
+      return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
     };
     const dials = levels.map((v, i) => this._liveDial(parts(v), bolt, Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"))).join("");
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
