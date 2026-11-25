@@ -5502,3 +5502,17 @@ test("power tab: the self-sufficiency stands next to the power, not in the right
   assert.doesNotMatch(right.slice(0, right.indexOf("resfoot")), /class="resself"/);
   assert.doesNotMatch(html, /stackbadge/); // the little bars are gone
 });
+
+test("power tab: the picture shows a moon instead of the sun when nothing is produced any more", () => {
+  const day = livePanel({}, { pv: st(3200) })._renderHouse();
+  assert.match(day, /class="glows"/);
+  assert.doesNotMatch(day, /class="moon"/);
+  const night = livePanel({}, { pv: st(0) })._renderHouse();
+  assert.match(night, /class="moon"/);
+  assert.doesNotMatch(night, /class="glows"|class="beams"/);
+  // a few watts are still production
+  assert.match(livePanel({}, { pv: st(5) })._renderHouse(), /class="glows"/);
+  // without a solar sensor there is no statement about the sun: the picture keeps the sun
+  const none = livePanel({ solar_power: [] }, {})._renderHouse();
+  assert.doesNotMatch(none, /class="moon"/);
+});
