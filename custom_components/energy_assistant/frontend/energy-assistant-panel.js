@@ -137,12 +137,13 @@ const STYLE = `
 .stackbadge i:nth-child(2){background:var(--eb-blue);width:30px;box-shadow:0 0 8px rgba(96,165,250,.5)}
 .stackbadge i:nth-child(3){background:var(--eb-solar);width:34px;box-shadow:0 0 8px rgba(255,152,0,.5)}
 .stackbadge i:nth-child(4){background:var(--eb-cyan);width:24px;box-shadow:0 0 8px rgba(56,189,248,.5)}
-.hbars{display:flex;flex-direction:column;gap:12px;margin-top:22px}
-.hbar{display:grid;grid-template-columns:96px minmax(0,1fr) 70px;align-items:center;gap:12px}
-.hl{font-size:13px;color:var(--eb-dim);white-space:nowrap}
-.hv{font-size:14px;font-weight:700;text-align:right;color:var(--eb-text);white-space:nowrap}
-.htrack{height:14px;border-radius:7px;background:var(--eb-line);overflow:hidden}
-.htrack i{display:block;height:100%;border-radius:7px;box-shadow:0 0 12px -2px rgba(255,255,255,.25)}
+.hbars{margin-top:26px}
+.stackh{display:flex;gap:3px;height:22px;border-radius:11px;background:var(--eb-line);overflow:hidden}
+.stackh i{display:block;min-width:4px}
+.stackleg{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:13px;color:var(--eb-dim)}
+.stackleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.stackleg b{width:10px;height:10px;border-radius:3px}
+.stackleg em{font-style:normal;font-weight:700;color:var(--eb-text)}
 .rbars{display:flex;gap:14px;margin-top:20px}
 .rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
 .rcol{width:100%;height:96px;display:flex;align-items:flex-end;border-bottom:1px solid var(--eb-line)}
@@ -3330,7 +3331,11 @@ class EnergyAssistantPanel extends HTMLElement {
     // Where the power comes from: four bars, in the colors of the flows
     const sources = [["grid", cur.gridIn, RES_FLOW.in], ["solarDirect", cur.direct, RES_FLOW.pv], ["storage", cur.discharge, RES_FLOW.discharge]].filter(([, w]) => w != null && Number.isFinite(w));
     const top = Math.max(...sources.map(([, w]) => w), 1);
-    const bars = sources.map(([label, w, color]) => `<div class="hbar"><span class="hl">${esc(this._t(label))}</span><div class="htrack"><i style="width:${w >= PIC_FLOW_W ? Math.max(2, Math.round((w / top) * 100)) : 0}%;background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i></div><span class="hv">${esc(kw(w))}</span></div>`).join("");
+    // One bar for all sources: the width of each part is its share of the consumption
+    const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
+    const partSum = parts.reduce((a, [, w]) => a + w, 0);
+    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>
+      <div class="stackleg">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(this._t(label))} <em>${esc(kw(w))}</em>${partSum > 0 && w >= PIC_FLOW_W ? ` · ${Math.round((w / partSum) * 100)} %` : ""}</span>`).join("")}</div>`;
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
