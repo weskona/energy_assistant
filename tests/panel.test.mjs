@@ -5608,6 +5608,8 @@ test("power tab: a battery card sits between the power and the savings, with a d
   const mid = grid.slice(iM, iR);
   assert.equal((mid.match(/class="resself live"/g) || []).length, 2); // the same dial as the self-sufficiency
   assert.equal((mid.match(/class="donut"/g) || []).length, 2);
+  assert.equal((mid.match(/class="batfill"/g) || []).length, 2); // a battery icon, filled up to the level, instead of a bolt
+  assert.doesNotMatch(mid, /M13 2 5 14h6/);
   assert.match(mid, /<div class="resbig">64<small>%<\/small><\/div><div class="reslab2">Storage 1<\/div>/);
   assert.match(mid, /<div class="resbig">28<small>%<\/small><\/div><div class="reslab2">Storage 2<\/div>/);
   assert.match(mid, /class="eb-chip stat discharging">Discharging<\/span><b>900 W<\/b>/);
