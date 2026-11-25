@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The picture may now reach up beside the top bar (its left side is empty); room is made above only when it would reach above the top of the page.
+- **Sun and moon cut off:** the picture of the Power tab is taller than the card *Right now* and reached above it, so the sun or the moon was cut off at the top of the page when there was no notice above. The picture may now reach up beside the top bar (its left side is empty); it shrinks a little when its sun would stand above the top of the tab bar, and room is made above only when it would reach above the top of the page. It is never bigger than its normal size, so it does not reach further into the card.
 
 ## [0.40.0] - 2026-11-25
 
