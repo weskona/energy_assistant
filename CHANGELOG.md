@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Savings of the day, new calculation:** the kWh in the savings box are what the house used of its own power today: the solar power used directly plus what came out of the storage. A kWh used directly costs the feed-in revenue it would have brought, a kWh from the storage costs that revenue divided by the round-trip efficiency of the storage (`storage_roundtrip_total` of PV Assistant, the storage is assumed to charge from solar only; without the sensor the storage part costs the feed-in tariff). The saving is the price of the grid minus that cost for each kWh, never below 0; the fed-in energy is no longer counted in it. The same calculation is used for the savings of the results card.
 - **No electric car in the *Right now* card:** the box with the charging power and the sentence about the charging car are gone from the card of the Power tab; the car stays in the picture, with its flow into the garage.
 
 ## [0.39.0] - 2026-11-25
