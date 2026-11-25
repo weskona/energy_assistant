@@ -135,7 +135,9 @@ const STYLE = `
 .resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500;line-height:1.3}
 .resself.live .resbig{line-height:1.1}
 .resself.live{align-items:flex-start}
-.resself.live .dtext{display:flex;flex-direction:column;gap:2px;padding-top:6px}
+.resself.live .dtext{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding-top:6px}
+.resm .resself.live{justify-content:center}
+.resm .bline{justify-content:center}
 .dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
 .dwhen{font-size:12px;color:var(--eb-dim)}
 .dwhen b{color:var(--eb-text);font-weight:600}
