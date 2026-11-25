@@ -410,6 +410,7 @@ const STRINGS = {
     liveHouse: "Consumption now",
     liveFeed: "Feed-in",
     resPerHour: "per hour",
+    resToday: "today",
     liveCharging: "Charging",
     liveFootEv: "Your electric car is charging at home with **{p}**.",
     liveFootSelf: "Right now you cover **{pct} %** of your electricity needs yourself.",
@@ -831,6 +832,7 @@ const STRINGS = {
     liveHouse: "Verbrauch jetzt",
     liveFeed: "Einsp.",
     resPerHour: "pro Stunde",
+    resToday: "heute",
     liveCharging: "Laden",
     liveFootEv: "Ihr Elektroauto lädt gerade mit **{p}** zu Hause.",
     liveFootSelf: "Gerade decken Sie **{pct} %** Ihres Strombedarfs selbst.",
@@ -2833,7 +2835,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const win = this._balWindow("day", 0);
       const cur = await this._balFetch(win);
       const totals = cur != null ? this._balCompute(this._balBuckets(win, cur), win).totals : null;
-      this._today = { autarky: totals?.autarky ?? null, at: Date.now() };
+      this._today = { autarky: totals?.autarky ?? null, totals, at: Date.now() };
     } finally {
       this._todayLoading = false;
       this._render();
@@ -3368,10 +3370,18 @@ class EnergyAssistantPanel extends HTMLElement {
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
     const ring = autarky != null ? `<div class="resself"><div class="resring">${this._donut([{ value: autarky, color: "var(--eb-green)" }, { value: 100 - autarky, color: "var(--eb-blue)" }], "", "")}<span class="mid">${RES_ART.house}</span></div>
       <div><div class="resbig">${autarky}<small>%</small></div><div class="reslab2">${esc(this._t("autarky"))}</div></div></div>` : "";
-    // What the sun saves per hour right now (Tariffy): the directly used power at the price plus the feed-in
+    // What the sun saved today (Tariffy): the self-used solar energy at the price plus the feed-in revenue, in kWh and money;
+    // until the statistics of today are loaded what it saves per hour right now
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
-    if (price && cur.solar != null) {
+    const day = this._today?.totals;
+    if (price && day?.solar != null) {
+      const self = Math.max(0, day.solar - (day.exp ?? 0));
+      const [n, sym] = this._money(self * price.value + (day.exp != null && feed != null ? day.exp * feed : 0), price.currency, 2);
+      const kwhTxt = self.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
+        <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
+    } else if (price && cur.solar != null) {
       const perHour = ((cur.direct || 0) / 1000) * price.value + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
       const [n, sym] = this._money(perHour, price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>

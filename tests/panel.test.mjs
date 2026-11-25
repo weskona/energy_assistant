@@ -5535,3 +5535,15 @@ test("power tab: the sentence says what solar covered of the electricity needs t
   car._today = { autarky: 50, at: Date.now() };
   assert.match(car._renderHouse(), /electric car is charging/);
 });
+
+test("power tab: the savings card shows what the sun saved today in kWh and money, the hourly value only until today is loaded", () => {
+  const states = { pv: st(1000), "sensor.t_preis": { state: "0.30", attributes: { unit_of_measurement: "EUR/kWh" } }, "sensor.t_einsp": { state: "0.08", attributes: { unit_of_measurement: "EUR/kWh" } } };
+  const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" } });
+  assert.match(p._renderHouse(), /<span class="resper">per hour<\/span>/); // today is not loaded yet
+  p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
+  const html = p._renderHouse();
+  assert.match(html, /Savings today/);
+  // 12 kWh used themselves at 0.30 plus 8 kWh fed in at 0.08
+  assert.match(html, /<div class="resbig">4[.,]24 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.doesNotMatch(html, /per hour/);
+});

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Savings of the day:** the savings box of the Power tab shows what the sun saved today in money and kWh (the self-used solar energy at the current price plus the feed-in revenue, like the results card) instead of the value per hour. Until the statistics of today are loaded the value per hour is shown.
 - **Sentence of the Power tab:** the line below the picture now says what solar covered of your electricity needs today ("You have covered 72 % of your electricity needs with solar today."), from the statistics of today (the share that did not come from the grid, storage included). Until they are loaded the live value is shown; a charging electric car still comes first.
 - **Moon at night:** the picture of the Power tab shows a moon with a few stars instead of the sun (and without the rays on the panels) when the solar power is below 1 W. Without a solar sensor the sun stays.
 - **Lean *Right now* card:** the card above the house in the Power tab no longer shows the caption *Consumption now* and the *Live consumption* badge; the power in watts stays. The vertical columns below the power are replaced by one horizontal bar that shows where the consumption comes from: grid (blue), solar used directly (orange) and from storage (teal), with a one-line legend of the power. The self-sufficiency moves up next to the power, where the small bars were.
