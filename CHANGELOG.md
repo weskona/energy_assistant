@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Storage card redesigned:** the *Storage* card of the Power tab shows a glowing ring with the charge level for every storage (the minimum level as a tick, the level colored green from 60 %, amber from 25 % and red below), a bar of 20 segments in the color of what the storage does (pink while charging, teal while discharging) with the minimum marked, and the tiles with the mean level, stored and usable energy, power and the time when it is empty or full. The status chip has the same colors.
+
 ### Fixed
 
 - **Not assigned in the Devices tab:** the part of the consumption that no category explains (*not assigned*) disappeared for a running day, week, month or year, because it was only calculated when every hour of the period had a consumption of the house, and the hours to come have none yet. It is now calculated for the hours that have data (the hours without data count as nothing), so it also shows for today.

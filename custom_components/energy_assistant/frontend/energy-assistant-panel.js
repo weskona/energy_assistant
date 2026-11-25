@@ -40,6 +40,22 @@ const STYLE = `
 .big span{font-size:22px;color:var(--eb-muted);font-weight:500}
 .eb-label.costs{margin-top:18px}
 .fullrow{grid-column:1/-1}
+.stor .storbody{display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.storrings{display:flex;gap:14px;flex:none}
+.storring{width:128px;height:128px}
+.storring.small{width:100px;height:100px}
+.storring svg{width:100%;height:100%;display:block}
+.storring .sv{font:800 30px var(--eb-font);fill:var(--eb-text)}
+.storring .su{font:600 13px var(--eb-font);fill:var(--eb-muted)}
+.storright{flex:1;min-width:260px}
+.segbar{position:relative;display:flex;gap:3px;height:16px;margin:6px 0 16px}
+.segbar i{flex:1;border-radius:4px;background:var(--eb-line)}
+.segbar i.on{background:var(--seg);box-shadow:0 0 9px -1px var(--seg)}
+.segbar b{position:absolute;top:-4px;width:2px;height:24px;background:var(--eb-text);opacity:.65;border-radius:1px}
+.eb-chip.stat.charging{background:rgba(240,98,146,.16);color:var(--ea-bin)}
+.eb-chip.stat.discharging{background:rgba(77,182,172,.16);color:var(--ea-bout)}
+.eb-chip.stat.idle{background:var(--eb-tile);color:var(--eb-muted);border:1px solid var(--eb-tile-border)}
+@media (max-width:640px){.storring{width:104px;height:104px}.storring.small{width:84px;height:84px}.stor .storbody{gap:16px}}
 .socbar{position:relative;height:12px;border-radius:6px;background:var(--eb-line);margin:14px 0 4px;overflow:visible}
 .socbar i{display:block;height:100%;border-radius:6px;background:var(--eb-dim);transition:width .6s}
 .socbar.charging i{background:var(--ea-bin)}
@@ -2381,9 +2397,34 @@ class EnergyAssistantPanel extends HTMLElement {
       tiles.push(tile(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"), esc(at), "", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`));
     }
     const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
-    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip">${esc(status)}</span></div>
-      <div class="socbar ${st.mode}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %"><i style="width:${st.soc}%"></i>${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
-      <div class="tiles">${tiles.join("")}</div></div>`;
+    // The level has its color (green from 60 %, amber from 25 %, red below); charging and discharging get theirs
+    const levelColor = (v) => (v >= 60 ? "var(--eb-green)" : v >= 25 ? "var(--eb-gold)" : "var(--eb-red)");
+    const modeColor = st.mode === "charging" ? "var(--ea-bin)" : st.mode === "discharging" ? "var(--ea-bout)" : levelColor(st.soc);
+    // One ring for every storage (the mean level in the tiles), the minimum level as a tick
+    const levels = this._storageLevels().slice(0, 4);
+    const rings = (levels.length ? levels : [st.soc]).map((v) => this._storRing(v, levelColor(v), st.min, levels.length > 1)).join("");
+    if (levels.length > 1) tiles[0] = tile(this._t("stSoc"), Math.round(st.soc), "%", `<div class="eb-label" style="margin-top:2px;text-transform:none;letter-spacing:0">${esc(levels.map((v) => `${Math.round(v)} %`).join(" · "))}</div>`);
+    // The bar of 20 segments: lit up to the level, the minimum marked
+    const lit = Math.round(st.soc / 5);
+    const seg = Array.from({ length: 20 }, (_, i) => `<i${i < lit ? ' class="on"' : ""}></i>`).join("");
+    return `<div class="eb-card fullrow stor"><div class="row"><span class="eb-title">${esc(this._t("stTitle"))}</span><span class="eb-chip stat ${st.mode}">${esc(status)}</span></div>
+      <div class="storbody"><div class="storrings">${rings}</div>
+        <div class="storright"><div class="segbar ${st.mode}" style="--seg:${modeColor}" role="img" aria-label="${esc(this._t("stSoc"))} ${Math.round(st.soc)} %">${seg}${st.min > 0 ? `<b style="left:${st.min}%"></b>` : ""}</div>
+          <div class="tiles">${tiles.join("")}</div></div></div></div>`;
+  }
+
+  /** A ring with the charge level in the middle (a bolt above it), the minimum level as a small tick. */
+  _storRing(level, color, min, small = false) {
+    const R = 46, C = 2 * Math.PI * R, len = (Math.max(0, Math.min(100, level)) / 100) * C;
+    const tick = min > 0 ? (() => {
+      const a = (-90 + (min / 100) * 360) * (Math.PI / 180);
+      return `<line x1="${(60 + 38 * Math.cos(a)).toFixed(1)}" y1="${(60 + 38 * Math.sin(a)).toFixed(1)}" x2="${(60 + 54 * Math.cos(a)).toFixed(1)}" y2="${(60 + 54 * Math.sin(a)).toFixed(1)}" stroke="var(--eb-text)" stroke-opacity=".7" stroke-width="2.2" stroke-linecap="round"/>`;
+    })() : "";
+    return `<div class="storring${small ? " small" : ""}"><svg viewBox="0 0 120 120" role="img" aria-hidden="true">
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--eb-line)" stroke-width="12"/>
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${color})"/>${tick}
+      <path d="M61 24l-6 9h5l-2 7 7-10h-5z" fill="var(--eb-gold)"/>
+      <text class="sv" x="60" y="72" text-anchor="middle">${Math.round(level)}</text><text class="su" x="60" y="88" text-anchor="middle">%</text></svg></div>`;
   }
 
   /**

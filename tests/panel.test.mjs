@@ -3139,20 +3139,25 @@ test("storage: without a charge level there is no card, without a capacity only 
 test("storage: the card shows the status, the bar with the minimum and the tiles", () => {
   const p = storagePanel({ cur: { discharge: 1000 } });
   const html = p._renderStorage(p._cur);
-  assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip">Discharging<\/span>/);
-  assert.match(html, /class="socbar discharging"[^>]*><i style="width:60%"><\/i><b style="left:10%"><\/b>/);
+  assert.match(html, /<span class="eb-title">Storage<\/span><span class="eb-chip stat discharging">Discharging<\/span>/);
+  assert.match(html, /class="segbar discharging" style="--seg:var\(--ea-bout\)"[^>]*>(<i class="on"><\/i>){12}(<i><\/i>){8}<b style="left:10%"><\/b>/); // 60 % = 12 of 20 segments, the minimum marked
+  assert.match(html, /<text class="sv"[^>]*>60<\/text>/); // the ring with the level
+  assert.match(html, /stroke-dasharray="[\d.]+ [\d.]+"/);
   assert.match(html, /Stored<\/div><div class="eb-value">6\.0<small>kWh/);
   assert.match(html, /Usable<\/div><div class="eb-value">5\.0<small>kWh/);
   assert.match(html, /Power<\/div><div class="eb-value">1[.,]?000<small>W/);
   assert.match(html, /Empty at<\/div>[\s\S]*in 5 h 0 min/);
   const idle = storagePanel();
   assert.match(idle._renderStorage(idle._cur), /Idle/);
+  assert.match(idle._renderStorage(idle._cur), /class="eb-chip stat idle"/);
   assert.doesNotMatch(idle._renderStorage(idle._cur), /Power<\/div>|Empty at|Full at/);
   const charging = storagePanel({ cur: { charge: 2000 }, cfg: { battery_min_soc: null } });
   const c = charging._renderStorage(charging._cur);
   assert.match(c, /Full at<\/div>[\s\S]*in 2 h 0 min/);
   assert.doesNotMatch(c, /Usable/); // without a minimum usable equals stored
   assert.doesNotMatch(c, /<b style/); // and no marker
+  assert.match(c, /class="eb-chip stat charging"/);
+  assert.match(c, /--seg:var\(--ea-bin\)/);
   const de = storagePanel({ cur: { charge: 2000 }, lang: "de" });
   assert.match(de._renderStorage(de._cur), /Lädt[\s\S]*Voll um/);
 });
@@ -5393,4 +5398,22 @@ test("devices tab: a running day still has a part that is not assigned, for the 
   p._bal = { range: "day", off: 0, failed: false, rows: Array.from({ length: 24 }, () => ({ cons: null })), totals: {} };
   assert.equal(p._devModel().house, null);
   assert.equal(p._devModel().unassigned, 0);
+});
+
+
+test("storage: with several storages every one has its own ring, the mean level is in the tiles", () => {
+  const p = storagePanel({ cur: { discharge: 1000 } });
+  p._config = { ...p._config, battery_soc: ["sensor.soc"], battery_soc_more: ["sensor.soc2"] };
+  p._hass.states["sensor.soc2"] = { state: "20", attributes: { unit_of_measurement: "%" } };
+  const html = p._renderStorage(p._cur);
+  assert.equal((html.match(/class="storring small"/g) || []).length, 2);
+  assert.match(html, /<text class="sv"[^>]*>60<\/text>/);
+  assert.match(html, /<text class="sv"[^>]*>20<\/text>/);
+  assert.match(html, /Charge level<\/div><div class="eb-value">40<small>%<\/small><\/div>[\s\S]*60 % · 20 %/); // the mean and each one
+  // the colors of the level: green from 60 %, amber from 25 %, red below
+  assert.match(html, /stroke="var\(--eb-green\)"/);
+  assert.match(html, /stroke="var\(--eb-red\)"/);
+  // one storage: one big ring
+  const one = storagePanel();
+  assert.equal((one._renderStorage(one._cur).match(/class="storring"/g) || []).length, 1);
 });
