@@ -3329,9 +3329,9 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const levels = this._storageLevels();
     // Where the power comes from: four bars, in the colors of the flows
-    const sources = [["grid", cur.gridIn, RES_FLOW.in], ["solarDirect", cur.direct, RES_FLOW.pv], ["storage", cur.discharge, RES_FLOW.discharge]].filter(([, w]) => w != null && Number.isFinite(w));
+    const sources = [["solarDirect", cur.direct, "var(--eb-solar)"], ["storage", cur.discharge, "var(--eb-violet)"], ["grid", cur.gridIn, "var(--eb-grid)"]].filter(([, w]) => w != null && Number.isFinite(w));
     const top = Math.max(...sources.map(([, w]) => w), 1);
-    // One bar for all sources: the width of each part is its share of the consumption
+    // One bar for all sources, in the colors of the bar of the House card (solar, storage, grid): the width of each part is its share of the consumption
     const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
     const partSum = parts.reduce((a, [, w]) => a + w, 0);
     const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>

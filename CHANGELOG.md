@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Lean *Right now* card:** the card above the house in the Power tab no longer shows the caption *Consumption now* and the *Live consumption* badge; the power in watts stays. The vertical columns below the power are replaced by one horizontal bar that shows where the consumption comes from: grid, solar used directly and from storage, with a legend of power and share.
+- **Lean *Right now* card:** the card above the house in the Power tab no longer shows the caption *Consumption now* and the *Live consumption* badge; the power in watts stays. The vertical columns below the power are replaced by one horizontal bar that shows where the consumption comes from: solar used directly, storage and grid in the colors of the *House* card, with a legend of power and share.
 - **Storage card redesigned:** the *Storage* card of the Power tab shows a glowing ring with the charge level for every storage (the minimum level as a tick, the level colored green from 60 %, amber from 25 % and red below), the tiles with the mean level, stored and usable energy, power and the time when it is empty or full. The status chip has the same colors.
 - **Several storages shown one by one:** with two or more storages (up to four) the *Storage* card has a small card for each of them (name, status chip, ring with the level and the power) and the total with the mean level below. Mode and power per storage appear when the charge, discharge or combined power sensors are as many as the storages, matched by order; otherwise only the level is shown. Each storage that is charging or discharging also shows when it is full or empty (the capacity shared equally, down to the minimum level).
 
