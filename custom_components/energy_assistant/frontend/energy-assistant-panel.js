@@ -133,6 +133,10 @@ const STYLE = `
 .resself.live .resring,.resself.live .resring .donut{width:72px;height:72px}
 .resself.live .resbig{font-size:28px}
 .resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500}
+.resself.live .dtext{display:flex;flex-direction:column;gap:2px}
+.dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
+.dstat.discharging{color:var(--ea-bout)}
+.dstat.charging{color:var(--ea-bin)}
 .resr{align-self:stretch}
 .resgrid.three .resl{padding-right:22px}
 .resgrid.three .resr{padding-left:22px}
@@ -3367,12 +3371,13 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * A dial of the card of the Power tab: a donut with an icon in the middle, the value beside it and a caption. The same
-   * style for the self-sufficiency and the storages. `segments` are the parts of the donut.
+   * A dial of the card of the Power tab: a donut with an icon in the middle, beside it the caption, the value and a line
+   * below it (the status of a storage). The same style for the self-sufficiency and the storages. `segments` are the
+   * parts of the donut.
    */
-  _liveDial(segments, icon, value, caption) {
+  _liveDial(segments, icon, value, caption, sub = "") {
     return `<div class="resself live"><div class="resring">${this._donut(segments, "", "")}<span class="mid">${icon}</span></div>
-      <div><div class="resbig">${value}<small>%</small></div><div class="reslab2">${esc(caption)}</div></div></div>`;
+      <div class="dtext"><div class="reslab2">${esc(caption)}</div><div class="resbig">${value}<small>%</small></div>${sub}</div></div>`;
   }
 
   /**
@@ -3395,9 +3400,11 @@ class EnergyAssistantPanel extends HTMLElement {
       const lvl = Math.round(v), min = Math.min(Math.round(st.min), lvl);
       return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
     };
-    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"))).join("");
-    const status = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]);
-    let line = `<span class="eb-chip stat ${st.mode}">${esc(status)}</span>`;
+    const perUnit = units.length <= 1 || units.every((u) => u.mode);
+    const modeText = (mode) => (mode ? `<div class="dstat ${mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[mode]))}</div>` : "");
+    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), modeText(units.length > 1 ? (perUnit ? units[i]?.mode : null) : st.mode))).join("");
+    // The status stands under the value of each storage; when the sensors cannot be matched to the storages it stands once below
+    let line = perUnit ? "" : `<span class="dstat ${st.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]))}</span>`;
     if (st.mode !== "idle") {
       const [v, u] = fmtPower(st.power);
       line += `<b>${v} ${u}</b>`;
@@ -3407,7 +3414,7 @@ class EnergyAssistantPanel extends HTMLElement {
       const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
       until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
     }
-    return `<div class="resm"><div class="dials">${dials}</div><div class="bline">${line}</div>${until}</div>`;
+    return `<div class="resm"><div class="dials">${dials}</div>${line ? `<div class="bline">${line}</div>` : ""}${until}</div>`;
   }
 
   /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
