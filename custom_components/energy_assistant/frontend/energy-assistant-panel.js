@@ -3470,7 +3470,7 @@ class EnergyAssistantPanel extends HTMLElement {
     // One bar for all sources, in the colors of the picture (solar, from storage = teal like everywhere else, grid): the width of each part is its share of the consumption
     const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
     const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${l} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: label, r: [[color, kw(w), label]] }))}"></i>`).join("")}</div>
-      <div class="stackleg${sources.length > 4 ? " many" : ""}">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(label)} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
+      <div class="stackleg${sources.length > 3 ? " many" : ""}">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(label)} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
     const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;
