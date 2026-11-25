@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-11-25
+
 ### Changed
 
 - **Notice bar in the top bar:** the notices (plant fault, negative price, unusual devices) no longer take a card on top of the Power tab. The most important one (warnings before information) is a pill between the tabs and the gear, with the count of the others; a click opens the list of all of them. On narrow screens only the icon and the count are shown.
@@ -580,7 +582,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub workflows: CI (Hassfest, HACS validation, Ruff, pytest, Node tests), changelog check,
   automatic tag and release on merge when the version in `manifest.json` is new, Dependabot.
 
-[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.40.0...HEAD
+[Unreleased]: https://github.com/weskona/energy_assistant/compare/v0.40.1...HEAD
+[0.40.1]: https://github.com/weskona/energy_assistant/compare/v0.40.0...v0.40.1
 [0.40.0]: https://github.com/weskona/energy_assistant/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/weskona/energy_assistant/compare/v0.38.0...v0.39.0
 [0.5.0]: https://github.com/weskona/energy_assistant/compare/v0.4.0...v0.5.0
