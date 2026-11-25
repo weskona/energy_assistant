@@ -150,7 +150,7 @@ With a **charge level sensor** (percent) in the settings (section *Solar and sto
 
 ### Notices
 
-A card **Notices** at the top of the Power tab appears when something needs attention, otherwise it is not there:
+A **notice bar** in the top bar, between the tabs and the gear, appears when something needs attention, otherwise it is not there. It shows the most important notice (warnings before information) and the count of the others; a click opens the list of all of them:
 
 - a **plant fault** reported by PV Assistant (with the plants),
 - a **negative electricity price** of a dynamic tariff in Tariffy (information: using power now pays),

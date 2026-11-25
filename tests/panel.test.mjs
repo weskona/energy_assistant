@@ -3140,7 +3140,6 @@ test("notices: nothing to say shows no card", () => {
   const p = alertPanel();
   assert.deepEqual(p._alerts(), []);
   assert.equal(p._renderAlerts(), "");
-  assert.doesNotMatch(p._renderHouse(), /class="alert/);
 });
 
 test("notices: a plant fault of PV Assistant, with the plants", () => {
@@ -3254,16 +3253,28 @@ test("notices: the statistics of the house power are asked for once an hour, onl
   assert.equal(failing._baseRef.w, null);
 });
 
-test("notices: the card on the Power tab shows warnings and information, escaped", () => {
+test("notices: the bar in the top bar shows the warning first with a count, the list shows all of them, escaped", () => {
   const p = alertPanel({ "binary_sensor.pv_fault": { state: "on", attributes: { plants: ["<b>x</b>"] } }, "sensor.t_preis": { state: "0.28", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: -0.01 } } });
   p._int = { pv_assistant: { entities: { string_fault: "binary_sensor.pv_fault" } }, tariffy: { price: "sensor.t_preis" } };
-  const html = p._renderHouse();
-  assert.match(html, /<span class="eb-title">Notices<\/span>/);
-  assert.match(html, /<div class="alert">⚠ Plant fault: &lt;b&gt;x&lt;\/b&gt;<\/div>/);
-  assert.match(html, /<div class="alert info">ℹ The electricity price is negative/);
-  assert.ok(html.indexOf("Notices") < html.indexOf("eb-card--glow")); // above the house card
+  // closed: one pill with the most important notice (the warning) and the count of the others
+  const bar = p._renderAlerts();
+  assert.match(bar, /<button class="apill" data-alerts aria-expanded="false"/);
+  assert.match(bar, /<span class="aic">⚠<\/span><span class="atext">Plant fault: &lt;b&gt;x&lt;\/b&gt;<\/span><span class="acount">\+1<\/span>/);
+  assert.doesNotMatch(bar, /class="alist"/);
+  // open: all notices, escaped
+  p._alertsOpen = true;
+  const open = p._renderAlerts();
+  assert.match(open, /aria-expanded="true"/);
+  assert.match(open, /<div class="alert">⚠ Plant fault: &lt;b&gt;x&lt;\/b&gt;<\/div>/);
+  assert.match(open, /<div class="alert info">ℹ The electricity price is negative/);
+  // the Power tab itself has no notice card any more
+  assert.doesNotMatch(p._renderHouse(), /class="alert|<span class="eb-title">Notices<\/span>/);
   p._hass.language = "de";
-  assert.match(p._renderHouse(), /Anlagenstörung/);
+  assert.match(p._renderAlerts(), /Anlagenstörung/);
+  // only information: the pill is green
+  const info = alertPanel({ "sensor.t_preis": { state: "0.28", attributes: { unit_of_measurement: "EUR/kWh", arbeitspreis_aktuell: -0.021 } } });
+  info._int = { tariffy: { price: "sensor.t_preis" } };
+  assert.match(info._renderAlerts(), /class="apill info"/);
 });
 
 // --- the period picker of the consumption tab -----------------------------------------------------

@@ -18,7 +18,13 @@ const STYLE = `
 *{box-sizing:border-box}
 .wrap{padding:16px 24px}
 .top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:16px}
-.top .right{justify-self:end}
+.top .right{justify-self:end;display:flex;align-items:center;gap:10px;min-width:0;max-width:100%}
+.topalerts{position:relative;display:flex;min-width:0}
+.apill{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;padding:8px 14px;border-radius:12px;border:1px solid #f59e0b;background:rgba(245,158,11,.12);color:var(--eb-text);font:inherit;font-size:13px;cursor:pointer}
+.apill.info{border-color:var(--eb-green);background:rgba(52,211,153,.12)}
+.apill .atext{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.apill .acount{flex:none;padding:1px 7px;border-radius:9px;background:rgba(255,255,255,.12);font-weight:700}
+.alist{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:max-content;min-width:260px;max-width:min(520px,86vw);padding:4px 12px 12px;border-radius:14px;background:var(--eb-panel);border:1px solid var(--eb-line);box-shadow:0 14px 34px rgba(0,0,0,.5)}
 .menu{background:none;border:0;color:var(--eb-muted);cursor:pointer;padding:6px}
 .tabs{display:flex;gap:4px;padding:4px;background:var(--eb-panel);border:1px solid var(--eb-line);border-radius:14px}
 .gear{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--eb-line);background:var(--eb-panel);color:var(--eb-muted);cursor:pointer;padding:0}
@@ -172,8 +178,8 @@ const STYLE = `
 .resfoot{margin:22px -28px -24px;padding:16px 28px;border-radius:0 0 var(--eb-radius-card) var(--eb-radius-card);background:var(--eb-tile);border-top:1px solid var(--eb-tile-border);color:var(--eb-muted);font-size:14.5px}
 .resfoot b{color:var(--eb-text)}
 @media (min-width:960px){
-.reshero{grid-template-columns:calc(clamp(300px,28vw,460px) * var(--resx,1)) minmax(0,1fr);align-items:stretch;width:100%}
-.resillu{display:block;position:relative;z-index:2;margin-right:-96px;pointer-events:none}
+.reshero{grid-template-columns:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1)) minmax(0,1fr);align-items:stretch;width:100%}
+.resillu{display:block;position:relative;z-index:2;margin-right:calc(var(--pic, clamp(300px,28vw,460px)) * var(--resx,1) * -.24 + 30px);pointer-events:none}
 .resghost{position:absolute;left:0;right:150px;top:56px;bottom:52px;border-radius:var(--eb-radius-card);background:var(--eb-panel);border:1px solid var(--eb-tile-border);opacity:.92;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .resillu::before{content:"";position:absolute;left:-10%;right:10%;bottom:-6%;height:70%;background:radial-gradient(60% 60% at 50% 100%,rgba(52,211,153,.22),transparent 70%)}
 .resillu svg{position:absolute;left:0;right:0;bottom:-8px;width:100%;height:auto;filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
@@ -186,7 +192,7 @@ const STYLE = `
 .resillu .glowa{filter:drop-shadow(0 0 9px rgba(255,200,100,.8))}
 .resfoot{padding-left:112px}
 }
-@media (max-width:640px){.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
+@media (max-width:640px){.apill .atext{display:none}.apill{padding:8px 10px}.resgrid,.resgrid.three{grid-template-columns:minmax(0,1fr);row-gap:20px}.resl{padding-right:0;border-right:0}.resm{padding:0;border-right:0}.resr{padding-left:0}.resdrive{margin-left:0;flex-basis:100%}.resnum{font-size:40px}.eb-card.res{padding:18px}.resfoot{margin:18px -18px -18px;padding:14px 18px}}
 .tiles.compact{grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:12px}
 .tiles.compact .eb-tile{padding:8px 10px}
 .tiles.compact .eb-label{font-size:10.5px}
@@ -1381,7 +1387,7 @@ const RES_ART = {
   car: `<svg viewBox="0 0 56 32" width="46" height="27" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22v-5l5-1.5 5-8h20l7 8 8 1.5v5"/><path d="M5 22h46"/><path d="M17 15.5l3-5.5h13l5 5.5z"/><circle cx="16" cy="23" r="3.8" fill="#14171e"/><circle cx="40" cy="23" r="3.8" fill="#14171e"/></svg>`,
   house: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="#dfe6f2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 15 16 5l12 10"/><path d="M7 13v13h18V13"/><path d="M17 12l-4 6h5l-3 6" stroke="#f7b733"/></svg>`,
   pig: `<svg viewBox="0 0 80 62" width="84" height="65" aria-hidden="true"><path d="M10 10l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#f7b733"/><circle cx="38" cy="9" r="7" fill="#f7b733" stroke="#ffd36b" stroke-width="2"/><path d="M38 5v8" stroke="#b9801a" stroke-width="2" stroke-linecap="round"/><g transform="translate(4 0)"><ellipse cx="34" cy="36" rx="25" ry="17" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5"/><path d="M20 22 24 13 31 20" fill="#1f6f4a" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="57" cy="35" rx="7" ry="6" fill="#2a8a5e" stroke="#34d399" stroke-width="2.5"/><circle cx="54" cy="27" r="1.8" fill="#d7fbea"/><rect x="19" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><rect x="40" y="48" width="7" height="9" rx="3" fill="#1b5e3f" stroke="#34d399" stroke-width="2"/><path d="M9 33c-5-1-6-6-3-8" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/></g></svg>`,
-  hero: (socs = [], flows = null, night = false) => `<svg viewBox="-24 0 ${424 + resExtra(socs)} 290" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resCar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d95c8"/><stop offset="1" stop-color="#455781"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${188 + resExtra(socs) / 2}" cy="266" rx="${210 + resExtra(socs) / 2}" ry="22.5" fill="#1d4a30"/><ellipse cx="${200 + resExtra(socs) / 2}" cy="261" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/>${resPole()}<rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g>${night ? RES_MOON : `<g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g>`}<rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="255" rx="38" ry="4" fill="#080b12" opacity=".7"/><rect x="92.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><rect x="144.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><path d="M96 243v11M99 243v11M102 243v11M148 243v11M151 243v11M154 243v11" stroke="#3d4760" stroke-width="1"/><path d="M98 224C99 214 103 209 106 207H144C147 209 151 214 152 224Z" fill="#5a73a6"/><path d="M103 222C104 215 107 211.5 109.5 210H140.5C143 211.5 146 215 147 222Z" fill="#1d2539"/><path d="M109 220 113 211.5h6l-4.5 8.5z" fill="#fff" opacity=".1"/><rect x="92" y="220" width="66" height="26" rx="8" fill="url(#resCar)"/><rect x="93" y="221" width="64" height="4.5" rx="2.2" fill="#a4b7e0" opacity=".3"/><rect class="glowr" x="96" y="227" width="58" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="96" y="243" width="58" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}${resFlows(flows, socs)}</svg>`,
+  hero: (socs = [], flows = null, night = false) => `<svg viewBox="-24 0 ${424 + resExtra(socs)} 290" data-top="${night ? 27 : 12.4}" width="100%" aria-hidden="true"><defs><radialGradient id="resSunGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd36b" stop-opacity=".75"/><stop offset=".45" stop-color="#f7b733" stop-opacity=".22"/><stop offset="1" stop-color="#f7b733" stop-opacity="0"/></radialGradient><linearGradient id="resBeam" gradientUnits="userSpaceOnUse" x1="78" y1="44" x2="200" y2="104"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity=".05"/></linearGradient><linearGradient id="resCar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d95c8"/><stop offset="1" stop-color="#455781"/></linearGradient><linearGradient id="resSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity=".0"/><stop offset="1" stop-color="#34d399" stop-opacity=".16"/></linearGradient></defs><ellipse cx="${188 + resExtra(socs) / 2}" cy="266" rx="${210 + resExtra(socs) / 2}" ry="22.5" fill="#1d4a30"/><ellipse cx="${200 + resExtra(socs) / 2}" cy="261" rx="${150 + resExtra(socs) / 2}" ry="12" fill="#2b6a42"/>${resPole()}<rect x="82" y="150" width="228" height="108" fill="#2b3142"/><rect x="82" y="150" width="228" height="8" fill="#232938"/><polygon points="52,156 150,64 318,64 318,156" fill="#131a2a"/><polygon points="52,156 150,64 160,64 66,156" fill="#222c44"/><g class="glowp" transform="translate(150 72) skewX(-38)"><rect x="0" y="0" width="112" height="62" fill="#2866b0"/><path d="M28 0v62M56 0v62M84 0v62M0 20.5h112M0 41h112" stroke="#8fbdf0" stroke-width="2"/></g>${night ? RES_MOON : `<g class="beams"><polygon points="82,50 128,86 160,70" fill="url(#resBeam)"/><polygon points="84,54 150,112 192,86" fill="url(#resBeam)"/><polygon points="86,58 176,124 226,100" fill="url(#resBeam)"/></g><g class="glows"><circle cx="72" cy="44" r="42" fill="url(#resSunGlow)"/><g stroke="#ffd36b" stroke-width="3.2" stroke-linecap="round"><path d="M72 14v8M72 66v8M42 44h8M94 44h8M51 23l5.6 5.6M87.4 59.4 93 65M93 23l-5.6 5.6M56.6 59.4 51 65"/></g><circle cx="72" cy="44" r="15" fill="#ffd36b" stroke="#f7b733" stroke-width="3"/></g>`}<rect x="82" y="182" width="86" height="76" fill="#1c2233"/><rect x="82" y="182" width="86" height="7" fill="#2d3548"/><ellipse cx="125" cy="255" rx="38" ry="4" fill="#080b12" opacity=".7"/><rect x="92.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><rect x="144.5" y="238" width="13" height="19" rx="5" fill="#2a3144" stroke="#4a5570" stroke-width="1.2"/><path d="M96 243v11M99 243v11M102 243v11M148 243v11M151 243v11M154 243v11" stroke="#3d4760" stroke-width="1"/><path d="M98 224C99 214 103 209 106 207H144C147 209 151 214 152 224Z" fill="#5a73a6"/><path d="M103 222C104 215 107 211.5 109.5 210H140.5C143 211.5 146 215 147 222Z" fill="#1d2539"/><path d="M109 220 113 211.5h6l-4.5 8.5z" fill="#fff" opacity=".1"/><rect x="92" y="220" width="66" height="26" rx="8" fill="url(#resCar)"/><rect x="93" y="221" width="64" height="4.5" rx="2.2" fill="#a4b7e0" opacity=".3"/><rect class="glowr" x="96" y="227" width="58" height="3.6" rx="1.8" fill="#ff5a5a"/><rect x="115" y="234" width="20" height="7" rx="1.5" fill="#e8edf5"/><path d="M118 237.5h14" stroke="#9aa6bb" stroke-width="1.4"/><rect x="96" y="243" width="58" height="6" rx="3" fill="#2a3248"/><rect class="glowa" x="198" y="178" width="46" height="44" fill="#ffd87a" stroke="#1b2130" stroke-width="4"/><path d="M221 178v44M198 200h46" stroke="#1b2130" stroke-width="3"/>${socs.length ? resBatteries(socs) : `<rect x="258" y="184" width="30" height="74" fill="#46506a"/><rect x="262" y="190" width="22" height="26" fill="#ffd87a" opacity=".85"/>`}<circle cx="46" cy="252" r="20" fill="#2f7a45"/><circle cx="68" cy="258" r="14" fill="#3d9657"/>${socs.length ? "" : `<circle cx="336" cy="256" r="16" fill="#2f7a45"/><circle cx="352" cy="260" r="11" fill="#3d9657"/>`}${resFlows(flows, socs)}</svg>`,
 };
 
 const SETTINGS_SECTIONS = [
@@ -2583,11 +2589,29 @@ class EnergyAssistantPanel extends HTMLElement {
     return out;
   }
 
+  /**
+   * The notice bar in the top bar, between the tabs and the gear: the most important notice (warnings before
+   * information) as a pill with a count of the others; a click opens the list of all of them. Empty without notices.
+   */
   _renderAlerts() {
-    const list = this._alerts();
+    const list = [...this._alerts()].sort((a, b) => (a.level === "warn" ? 0 : 1) - (b.level === "warn" ? 0 : 1));
     if (!list.length) return "";
-    return `<div class="eb-card fullrow"><div class="row"><span class="eb-title">${esc(this._t("alTitle"))}</span></div>
-      ${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${a.level === "info" ? "ℹ" : "⚠"} ${esc(a.text)}</div>`).join("")}</div>`;
+    const icon = (a) => (a.level === "info" ? "ℹ" : "⚠");
+    const first = list[0], more = list.length - 1;
+    const open = !!this._alertsOpen;
+    return `<button class="apill${first.level === "info" ? " info" : ""}" data-alerts aria-expanded="${open}" title="${esc(list.map((a) => `${icon(a)} ${a.text}`).join("\n"))}"><span class="aic">${icon(first)}</span><span class="atext">${esc(first.text)}</span>${more ? `<span class="acount">+${more}</span>` : ""}</button>${open ? `<div class="alist">${list.map((a) => `<div class="alert${a.level === "info" ? " info" : ""}">${icon(a)} ${esc(a.text)}</div>`).join("")}</div>` : ""}`;
+  }
+
+  /** Put the notice bar into its place in the top bar (only when it changed, so an open list is not rebuilt for nothing). */
+  _updateTopAlerts() {
+    const slot = this.shadowRoot?.getElementById?.("topalerts");
+    if (!slot) return;
+    const html = this._renderAlerts();
+    if (html !== this._alertsHtml) {
+      this._alertsHtml = html;
+      slot.innerHTML = html;
+    }
+    if (!html) this._alertsOpen = false;
   }
 
   /** The time zone of the Home Assistant instance; the browser's if it is unknown or not usable. */
@@ -3315,7 +3339,7 @@ class EnergyAssistantPanel extends HTMLElement {
     let until = "";
     if (st.hours != null && Number.isFinite(st.hours) && !(units.length > 1 && perUnit)) {
       const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
-      until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
+      until = `<div class="bline" title="${esc(this._t("stIn", { dur: this._duration(st.hours) }))}">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b></div>`;
     }
     return `<div class="resm"><div class="dials">${dials}</div>${line}${until}</div>`;
   }
@@ -5157,7 +5181,6 @@ class EnergyAssistantPanel extends HTMLElement {
     const lists = `${devices}${areas}${labels}`;
     const hist = this._history ? this._historyChart(this._history) : `<div class="empty">${this._t("historyLoading")}</div>`;
     return `<div class="grid">
-      ${this._renderAlerts()}
       ${this._renderLiveResults(cur)}
       <div class="eb-card fullrow">
         <div class="row"><span class="eb-title">${this._t("history")}</span><span class="eb-label">24 h</span></div>
@@ -5410,7 +5433,7 @@ class EnergyAssistantPanel extends HTMLElement {
           <div class="top">
             <div class="left"><button class="menu" aria-label="Menu" hidden>☰</button></div>
             <div class="tabs"><button class="tab active" data-tab="house">Power</button></div>
-            <div class="right"><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
+            <div class="right"><div id="topalerts" class="topalerts"></div><button class="gear" data-tab="settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
           </div>
           <div id="content"></div></div>
         <div class="tip gtip" hidden></div>`;
@@ -5418,6 +5441,13 @@ class EnergyAssistantPanel extends HTMLElement {
       this.shadowRoot.querySelector(".menu").addEventListener("click", () =>
         this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })));
       const content = this.shadowRoot.getElementById("content");
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this._fitPicture()).observe(content);
+      this.shadowRoot.getElementById("topalerts").addEventListener("click", (e) => {
+        if (!e.target.closest?.("[data-alerts]")) return;
+        this._alertsOpen = !this._alertsOpen;
+        this._alertsHtml = null;
+        this._updateTopAlerts();
+      });
       content.addEventListener("click", (e) => this._onClick(e));
       content.addEventListener("change", (e) => this._onChange(e));
       content.addEventListener("input", (e) => this._onInput(e));
@@ -5505,10 +5535,12 @@ class EnergyAssistantPanel extends HTMLElement {
       if (this._balEnabled()) this._maybeLoadBalance();
     }
     if (this._tab === "house") { this._maybeLoadBaseRef(); this._maybeLoadDevRef(); if (this._balEnabled()) this._maybeLoadToday(); }
+    this._updateTopAlerts();
     const html = this._renderPage();
     if (html !== this._html) {
       this._html = html;
       this._swapMarkup(content, html);
+      this._fitPicture();
       this._wireChart(content);
       this._wireBalance(content);
       this._wireDevChart(content);
@@ -5722,6 +5754,43 @@ class EnergyAssistantPanel extends HTMLElement {
    * Replace the markup of the page. Home Assistant sends new values all the time, so this happens
    * often. The scroll position of the expanded lists is kept, otherwise they jump back to the top.
    */
+  /**
+   * The picture beside the card *Right now* is taller than the card and reaches up beside the top bar. Its size is
+   * chosen so that the top of the sun (or of the moon) stands on the same height as the top of the tab bar: the picture
+   * is as high as the card plus the distance between the card and the tab bar, as long as the card keeps its minimum
+   * width beside it. Where the room is too small, the sun stays a little lower; room is made above only where the
+   * picture would reach above the top of the page.
+   * Measured after the layout and again when the size changes.
+   */
+  _fitPicture() {
+    const heroes = this.shadowRoot?.querySelectorAll?.(".reshero");
+    const tabsTop = this.shadowRoot?.querySelector?.(".tabs")?.getBoundingClientRect().top;
+    if (!heroes || tabsTop == null) return;
+    for (const hero of heroes) {
+      const svg = hero.querySelector(".resillu svg");
+      const card = hero.querySelector(".eb-card");
+      if (!svg || !card || !(svg.getBoundingClientRect().width > 0)) continue;
+      const pad = parseFloat(hero.style.paddingTop) || 0;
+      const cardBox = card.getBoundingClientRect();
+      const frac = (parseFloat(svg.dataset.top) || 12.4) / 290;
+      // The height of the picture that puts its top on the top of the tab bar. The picture is as wide as its column plus the
+      // 24 % of it (less 30 px) that reaches into the card: the grass goes under the edge of the card, the house ends a little
+      // before it, so the border of the card stays visible. It is as high as its drawing allows. The card beside it keeps a minimum width, so the picture gives way when needed.
+      const height = (cardBox.top - pad - tabsTop + cardBox.height + 8) / (1 - frac);
+      const ratio = (svg.viewBox?.baseVal?.width || 424) / 290;
+      const resx = parseFloat(hero.style.getPropertyValue("--resx")) || 1;
+      const room = hero.clientWidth - 730;
+      const pic = Math.max(240, Math.min((height * ratio + 30) / 1.24, room)) / resx;
+      const cur = parseFloat(hero.style.getPropertyValue("--pic")) || 0;
+      if (Math.abs(pic - cur) >= 2) hero.style.setProperty("--pic", `${pic.toFixed(1)}px`);
+      // Where the size was limited: keep the drawing below the top of the page
+      const box = svg.getBoundingClientRect();
+      const sunTop = box.top + box.height * frac;
+      const want = Math.max(0, Math.ceil(pad + tabsTop - sunTop));
+      if (Math.abs(want - pad) >= 1) hero.style.paddingTop = want ? `${want}px` : "";
+    }
+  }
+
   _swapMarkup(content, html) {
     // Keyed by the title of the card, so the positions stay with their list when lists come and go.
     const key = (el) => el.closest(".eb-card")?.querySelector(".eb-title")?.textContent;
