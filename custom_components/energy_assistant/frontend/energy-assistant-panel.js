@@ -136,6 +136,8 @@ const STYLE = `
 .resself.live .resbig{line-height:1.1}
 .resself.live{align-items:flex-start}
 .resself.live .dtext{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding-top:6px}
+.resm .resself.live{width:100%}
+.resm .resself.live .dtext{flex:1;min-width:0}
 .dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
 .dwhen{font-size:12px;color:var(--eb-dim)}
 .dwhen b{color:var(--eb-text);font-weight:600}
