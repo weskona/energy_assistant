@@ -132,8 +132,10 @@ const STYLE = `
 .resself.live{padding-bottom:0;gap:12px}
 .resself.live .resring,.resself.live .resring .donut{width:72px;height:72px}
 .resself.live .resbig{font-size:28px}
-.resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500}
-.resself.live .dtext{display:flex;flex-direction:column;gap:2px}
+.resself.live .reslab2{font-size:13px;margin-top:0;font-weight:500;line-height:1.3}
+.resself.live .resbig{line-height:1.1}
+.resself.live{align-items:flex-start}
+.resself.live .dtext{display:flex;flex-direction:column;gap:2px;padding-top:6px}
 .dstat{font-size:13px;font-weight:600;color:var(--eb-muted)}
 .dstat.discharging{color:var(--ea-bout)}
 .dstat.charging{color:var(--ea-bin)}
