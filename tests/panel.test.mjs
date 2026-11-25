@@ -5614,21 +5614,21 @@ test("power tab: a battery card sits between the power and the savings, with a d
   assert.match(mid, /<div class="reslab2">Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div>/);
   assert.match(mid, /<div class="reslab2">Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div>/);
   // two storages and one discharge sensor: the sensors cannot be matched, so the status stands once below with the power
-  assert.match(mid, /<span class="dstat discharging">Discharging<\/span><b>900 W<\/b>/);
-  assert.doesNotMatch(mid.slice(0, mid.indexOf('class="bline"')), /class="dstat/);
+  assert.match(mid, /<div class="dstat discharging">900 W<\/div>/);
+  assert.doesNotMatch(mid.slice(0, mid.indexOf('Empty at')).split('class="dials"')[1].split('</div></div></div>').slice(0, 2).join(''), /class="dstat/);
   assert.match(mid, /Empty at <b>/);
   // the minimum level (10 %) is the first part of every donut, in gray, then the level in its color
   assert.equal((mid.match(/stroke="var\(--eb-muted\)"/g) || []).length, 2);
   assert.match(mid, /stroke="var\(--eb-muted\)"[^>]*\/><circle[^>]*stroke="var\(--eb-green\)"/);
   // one storage: the caption is just the name of the card, the status stands under the value
   const one = livePanel({ battery_soc: ["soc"], battery_soc_more: [] }, { soc: st(64, "%"), bd: st(900), bc: st(0) })._renderHouse();
-  assert.match(one.slice(one.indexOf('class="resm"')), /<div class="reslab2">Storage<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">Discharging<\/div>/);
+  assert.match(one.slice(one.indexOf('class="resm"')), /<div class="reslab2">Storage<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">900 W<\/div>/);
   // two storages with a discharge and a charge sensor each: every storage has its own status under its value
   const two = livePanel({ battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_discharge: ["bd", "bd2"], battery_charge: ["bc", "bc2"] }, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(900), bd2: st(0), bc: st(0), bc2: st(650) })._renderHouse();
   const mid2 = two.slice(two.indexOf('class="resm"'), two.indexOf('class="resr"'));
-  assert.match(mid2, /Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">Discharging · 900 W<\/div>/);
-  assert.match(mid2, /Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div><div class="dstat charging">Charging · 650 W<\/div>/);
-  assert.doesNotMatch(mid2, /class="bline"/); // each storage has its own power, so no common line below
+  assert.match(mid2, /Storage 1<\/div><div class="resbig">64<small>%<\/small><\/div><div class="dstat discharging">900 W<\/div>/);
+  assert.match(mid2, /Storage 2<\/div><div class="resbig">28<small>%<\/small><\/div><div class="dstat charging">650 W<\/div>/);
+  assert.doesNotMatch(mid2, /class="bline"|Empty at/); // each storage has its own power, so no common line below
   // the self-sufficiency also has its caption above the value
   assert.match(two, /<div class="reslab2">Self-sufficiency<\/div><div class="resbig">\d+<small>%<\/small><\/div>/);
   // without a charge level there is no battery card and two columns as before

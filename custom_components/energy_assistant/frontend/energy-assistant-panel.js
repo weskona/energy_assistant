@@ -3401,25 +3401,20 @@ class EnergyAssistantPanel extends HTMLElement {
       return [...(min > 0 ? [{ value: min, color: "var(--eb-muted)" }] : []), { value: lvl - min, color: levelColor(v) }, { value: 100 - lvl, color: "var(--eb-line)" }];
     };
     const perUnit = units.length <= 1 || units.every((u) => u.mode);
+    // Under the value stands the power of the storage in the color of what it does (teal discharging, pink charging)
     const modeText = (mode, power) => {
       if (!mode) return "";
-      const label = this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[mode]);
-      const w = mode !== "idle" && power > 0 ? ` · ${fmtPower(power).join(" ")}` : "";
-      return `<div class="dstat ${mode}">${esc(label + w)}</div>`;
+      return `<div class="dstat ${mode}">${esc(fmtPower(mode !== "idle" && power > 0 ? power : 0).join(" "))}</div>`;
     };
-    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power) : "") : modeText(st.mode, 0))).join("");
-    // The status stands under the value of each storage; when the sensors cannot be matched to the storages it stands once below
-    let line = perUnit ? "" : `<span class="dstat ${st.mode}">${esc(this._t({ charging: "stCharging", discharging: "stDischarging", idle: "stIdle" }[st.mode]))}</span>`;
-    if (st.mode !== "idle" && !(units.length > 1 && perUnit)) {
-      const [v, u] = fmtPower(st.power);
-      line += `<b>${v} ${u}</b>`;
-    }
+    const dials = levels.map((v, i) => this._liveDial(parts(v), battery(v), Math.round(v), levels.length > 1 ? this._t("stUnit", { n: i + 1 }) : this._t("stTitle"), units.length > 1 ? (perUnit ? modeText(units[i]?.mode, units[i]?.power) : "") : modeText(st.mode, st.power))).join("");
+    // When the sensors cannot be matched to several storages, the power stands once below, in the color of the mode
+    let line = units.length > 1 && !perUnit && st.mode !== "idle" ? modeText(st.mode, st.power) : "";
     let until = "";
     if (st.hours != null && Number.isFinite(st.hours) && !(units.length > 1 && perUnit)) {
       const at = new Date(Date.now() + st.hours * 3600000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", timeZone: this._tz() });
       until = `<div class="bline">${esc(this._t(st.mode === "discharging" ? "stEmptyAt" : "stFullAt"))} <b>${esc(at)}</b> · ${esc(this._t("stIn", { dur: this._duration(st.hours) }))}</div>`;
     }
-    return `<div class="resm"><div class="dials">${dials}</div>${line ? `<div class="bline">${line}</div>` : ""}${until}</div>`;
+    return `<div class="resm"><div class="dials">${dials}</div>${line}${until}</div>`;
   }
 
   /** The power with which the wallboxes of EV Assistant charge right now (W), or null when none is charging. */
