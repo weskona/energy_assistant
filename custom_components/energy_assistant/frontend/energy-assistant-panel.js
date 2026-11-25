@@ -171,6 +171,7 @@ const STYLE = `
 .stackleg{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:10px;margin-top:10px;font-size:12px;overflow:hidden;color:var(--eb-dim)}
 .stackleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .stackleg b{width:10px;height:10px;border-radius:3px}
+.stackleg.many{flex-wrap:wrap}
 .stackleg em{font-style:normal;font-weight:700;color:var(--eb-text)}
 .rbars{display:flex;gap:14px;margin-top:20px}
 .rbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -3456,12 +3457,20 @@ class EnergyAssistantPanel extends HTMLElement {
     }
     const levels = this._storageLevels();
     // Where the power comes from: four bars, in the colors of the flows
-    const sources = [["grid", cur.gridIn, "var(--eb-grid)"], ["solarDirect", cur.direct, "var(--eb-solar)"], ["storage", cur.discharge, "var(--ea-bout)"]].filter(([, w]) => w != null && Number.isFinite(w));
-    const top = Math.max(...sources.map(([, w]) => w), 1);
+    // With several storages whose sensors match them, each storage has its own part (its discharge power) in shades of teal
+    const unitsLive = this._storageUnits().slice(0, 4);
+    const nStores = this._storageIds().length;
+    const dischargeMatched = ["battery_discharge", "battery_power"].some((k) => (this._cfg[k] || []).length === nStores);
+    const perStorage = unitsLive.length > 1 && dischargeMatched && unitsLive.every((u) => u.mode);
+    const shades = ["#4db6ac", "#80cbc4", "#26a69a", "#b2dfdb"];
+    const storageSources = perStorage
+      ? unitsLive.map((u, i) => [this._t("stUnit", { n: i + 1 }), u.mode === "discharging" ? u.power : 0, shades[i]])
+      : [[this._t("storage"), cur.discharge, "var(--ea-bout)"]];
+    const sources = [[this._t("grid"), cur.gridIn, "var(--eb-grid)"], [this._t("solarDirect"), cur.direct, "var(--eb-solar)"], ...storageSources].filter(([, w]) => w != null && Number.isFinite(w));
     // One bar for all sources, in the colors of the picture (solar, from storage = teal like everywhere else, grid): the width of each part is its share of the consumption
     const parts = sources.filter(([, w]) => w >= PIC_FLOW_W);
-    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${this._t(l)} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: this._t(label), r: [[color, kw(w), this._t(label)]] }))}"></i>`).join("")}</div>
-      <div class="stackleg">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(this._t(label))} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
+    const bars = `<div class="stackh" role="img" aria-label="${esc(parts.map(([l, w]) => `${l} ${kw(w)}`).join(", "))}">${parts.map(([label, w, color]) => `<i style="flex:${w.toFixed(2)};background:${color}" data-tipj="${esc(JSON.stringify({ t: label, r: [[color, kw(w), label]] }))}"></i>`).join("")}</div>
+      <div class="stackleg${sources.length > 4 ? " many" : ""}">${sources.map(([label, w, color]) => `<span><b style="background:${color}"></b>${esc(label)} <em>${esc(kw(w))}</em></span>`).join("")}</div>`;
     const battery = this._liveBattery(cur);
     const [val, unit] = fmtPower(cur.house);
     const autarky = cur.autarky != null ? Math.round(cur.autarky) : null;

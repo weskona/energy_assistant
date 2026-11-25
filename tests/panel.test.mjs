@@ -5635,3 +5635,25 @@ test("power tab: a battery card sits between the power and the savings, with a d
   const none = livePanel({ battery_soc: [] }, {})._renderHouse();
   assert.doesNotMatch(none, /class="resm"|resgrid three/);
 });
+
+test("power tab: with several storages the storage part of the source bar is split, each storage with its own discharge power", () => {
+  const cfg = { battery_soc: ["soc"], battery_soc_more: ["soc2"], battery_discharge: ["bd", "bd2"], battery_charge: ["bc", "bc2"] };
+  const p = livePanel(cfg, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(600), bd2: st(300), bc: st(0), bc2: st(0) });
+  const html = p._renderHouse();
+  const bar = html.slice(html.indexOf('class="stackh"'), html.indexOf('class="resm"'));
+  const parts = bar.slice(0, bar.indexOf('class="stackleg')).match(/<i /g) || [];
+  assert.ok(parts.length >= 3); // solar direct (if any), storage 1, storage 2
+  assert.match(bar, /Storage 1 <em>600 W<\/em>/);
+  assert.match(bar, /Storage 2 <em>300 W<\/em>/);
+  assert.doesNotMatch(bar, /Storage <em>/); // no combined storage entry
+  assert.match(bar, /flex:600\.00;background:#4db6ac/);
+  assert.match(bar, /flex:300\.00;background:#80cbc4/);
+  // a storage that does not discharge stays in the legend with 0 W and has no part
+  const q = livePanel(cfg, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(600), bd2: st(0), bc: st(0), bc2: st(500) })._renderHouse();
+  assert.match(q, /Storage 2 <em>0 W<\/em>/);
+  assert.doesNotMatch(q, /flex:0\.00/);
+  // sensors that cannot be matched (one discharge sensor for two storages): one combined part as before
+  const one = livePanel({ ...cfg, battery_discharge: ["bd"] }, { soc: st(64, "%"), soc2: st(28, "%"), bd: st(900), bc: st(0), bc2: st(0) })._renderHouse();
+  assert.match(one, /Storage <em>900 W<\/em>/);
+  assert.doesNotMatch(one, /Storage 1 <em>/);
+});
