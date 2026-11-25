@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Storage losses in the savings:** with the sensor `storage_roundtrip_total` of PV Assistant (round-trip efficiency in %) the energy the storage loses on the way (what was discharged divided by the efficiency, minus what was discharged) is deducted from the self-used solar energy in the savings of the Power tab and of the results card. Without the sensor or with a value that is text, 0 or less, or above 100 % nothing is deducted.
 - **Savings of the day:** the savings box of the Power tab shows what the sun saved today in money and kWh (the self-used solar energy at the current price plus the feed-in revenue, like the results card) instead of the value per hour. Until the statistics of today are loaded the value per hour is shown.
 - **Sentence of the Power tab:** the line below the picture now says what solar covered of your electricity needs today ("You have covered 72 % of your electricity needs with solar today."), from the statistics of today (the share that did not come from the grid, storage included). Until they are loaded the live value is shown; a charging electric car still comes first.
 - **Moon at night:** the picture of the Power tab shows a moon with a few stars instead of the sun (and without the rays on the panels) when the solar power is below 1 W. Without a solar sensor the sun stays.
@@ -18,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Savings never negative:** own solar power that is used in the house is worth at least the feed-in tariff (the revenue it would have brought) and never less than 0, so a very low or negative electricity price no longer makes the savings of the Power tab and of the results card negative or 0. The loss of a storage (round trip) is not deducted.
+- **Savings never negative:** own solar power that is used in the house is worth at least the feed-in tariff (the revenue it would have brought) and never less than 0, so a very low or negative electricity price no longer makes the savings of the Power tab and of the results card negative or 0.
 - **Small flows in the picture:** the picture of the Power tab hid every flow below 20 W, so a grid import of 7 W did not show at the pole. Flows now show from 1 W on (the storage status still switches at 20 W).
 - **Not assigned in the Devices tab:** the part of the consumption that no category explains (*not assigned*) disappeared for a running day, week, month or year, because it was only calculated when every hour of the period had a consumption of the house, and the hours to come have none yet. It is now calculated for the hours that have data (the hours without data count as nothing), so it also shows for today.
 

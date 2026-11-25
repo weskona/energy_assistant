@@ -39,7 +39,7 @@ and `pv_assistant.py` have to follow.
   `general.battery_min_soc`).
 - Sensors by translation key: `production_today`, `feed_in_today`, `self_consumption_rate_today`, `autarky_today`,
   `benefit_today`, `forecast_reached_today`, `expected_feed_in_tomorrow`, `best_window_tomorrow` (attribute `end`),
-  `storage_usable`, `storage_empty_at`, binary sensor `string_fault` (attribute `plants`).
+  `storage_usable`, `storage_empty_at`, `storage_roundtrip_total` (the round-trip efficiency of the storage in %, optional), binary sensor `string_fault` (attribute `plants`).
 
 **Tariffy** (`tariffy`), sensors by translation key
 - `arbeitspreis` (attributes `sparte`, `arbeitspreis_aktuell`; only electricity contracts) - every electricity contract is offered as a price for the tariff choice per label, the first one is the default, `einspeiseverguetung`,

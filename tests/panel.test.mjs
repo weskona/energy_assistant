@@ -5565,3 +5565,27 @@ test("savings: own solar power is worth at least the feed-in tariff, never below
   assert.match(none, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
   assert.doesNotMatch(none.slice(none.indexOf("Savings today")), /-0[.,]\d\d/);
 });
+
+test("savings: what the storage loses on the way (round trip from PV Assistant) is deducted, bad values are ignored", () => {
+  const st2 = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR/kWh" } });
+  const make = (eta) => {
+    const states = { pv: st(1000), "sensor.t_preis": st2(0.4), "sensor.t_einsp": st2(0.1), ...(eta != null ? { "sensor.rt": { state: String(eta), attributes: { unit_of_measurement: "%" } } } : {}) };
+    const int = { tariffy: { price: "sensor.t_preis", feed_in: "sensor.t_einsp" }, ...(eta != null ? { pv_assistant: { entities: { storage_roundtrip_total: "sensor.rt" } } } : {}) };
+    const p = livePanel({}, states, int);
+    p._today = { autarky: 60, totals: { solar: 20, exp: 8, dis: 5 }, at: Date.now() };
+    return p;
+  };
+  // without the sensor: 12 kWh at 0.40 plus 8 kWh at 0.10
+  assert.match(make(null)._renderHouse(), /<div class="resbig">5[.,]60 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.equal(make(null)._roundtrip(), null);
+  // 80 %: 5 kWh discharged mean 6.25 kWh charged, so 1.25 kWh are lost: 10.75 kWh at 0.40 plus 0.80
+  assert.match(make(80)._renderHouse(), /<div class="resbig">5[.,]10 €? ?[^<]*<span class="resper">10\.8 kWh<\/span>/);
+  assert.equal(make(80)._roundtrip(), 0.8);
+  // unusable values change nothing: text, 0, negative, above 100 %
+  for (const bad of ["unknown", "abc", 0, -5, 140]) assert.equal(make(bad)._roundtrip(), null, String(bad));
+  // the results card of a period uses it too
+  const p = make(80);
+  assert.equal(p._savedBy({ solar: 20, exp: 8, dis: 5 }, 0.4, 0.1).kwh, 10.75);
+  assert.equal(p._savedBy({ solar: 20, exp: 8, dis: 0 }, 0.4, 0.1).kwh, 12);
+  assert.equal(p._savedBy({ solar: 1, exp: 0, dis: 10 }, 0.4, 0.1).kwh, 0); // never below 0
+});

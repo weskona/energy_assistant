@@ -199,6 +199,7 @@ async def test_pv_assistant_day_entities_by_translation_key(hass) -> None:
     prod = _pv_sensor(hass, entry, "production_today")
     fc = _pv_sensor(hass, entry, "best_window_tomorrow")
     fault = _pv_sensor(hass, entry, "string_fault", domain="binary_sensor")
+    roundtrip = _pv_sensor(hass, entry, "storage_roundtrip_total")
     _pv_sensor(hass, entry, "pv_power")  # not a day value: not offered here
     _pv_sensor(hass, entry, "autarky_today", disabled=True)
     offer = pv_assistant(hass)
@@ -206,6 +207,7 @@ async def test_pv_assistant_day_entities_by_translation_key(hass) -> None:
         "entities": {
             "production_today": prod,
             "best_window_tomorrow": fc,
+            "storage_roundtrip_total": roundtrip,
             "string_fault": fault,
         }
     }

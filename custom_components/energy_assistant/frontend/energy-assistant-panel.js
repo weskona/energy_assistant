@@ -782,6 +782,7 @@ const STRINGS = {
     src_expected_feed_in_tomorrow: "Expected feed-in tomorrow",
     src_best_window_tomorrow: "Best window tomorrow",
     src_storage_usable: "Usable storage energy",
+    src_storage_roundtrip_total: "Storage round-trip efficiency",
     src_storage_empty_at: "Storage empty at",
     src_string_fault: "Plant fault",
     src_einsparung: "Savings total",
@@ -1204,6 +1205,7 @@ const STRINGS = {
     src_expected_feed_in_tomorrow: "Erwartete Einspeisung morgen",
     src_best_window_tomorrow: "Bestes Fenster morgen",
     src_storage_usable: "Nutzbare Speicherenergie",
+    src_storage_roundtrip_total: "Speicher-Wirkungsgrad (Roundtrip)",
     src_storage_empty_at: "Speicher leer um",
     src_string_fault: "Anlagenstörung",
     src_einsparung: "Einsparung gesamt",
@@ -2835,6 +2837,29 @@ class EnergyAssistantPanel extends HTMLElement {
     return Math.max(price, feed != null && Number.isFinite(feed) ? feed : 0, 0);
   }
 
+  /**
+   * The round-trip efficiency of the storage as a factor (0-1) from PV Assistant (`storage_roundtrip_total`), or null
+   * when there is no such sensor or the value is not usable (text, 0 or less, above 100 %). Nothing is guessed.
+   */
+  _roundtrip() {
+    const id = this._int?.pv_assistant?.entities?.storage_roundtrip_total;
+    const v = id ? this._num(id) : null;
+    return v != null && Number.isFinite(v) && v > 0 && v <= 100 ? v / 100 : null;
+  }
+
+  /**
+   * What the own solar power saved in a period: the part that was not fed in, minus what the storage lost on the way
+   * (what was discharged, divided by the efficiency, minus what was discharged), in kWh and money. Own power is worth
+   * the grid price, at least the feed-in tariff; the fed in part brings the tariff. `x` has solar, exp and dis (kWh).
+   */
+  _savedBy(x, price, feed) {
+    const eta = this._roundtrip();
+    const loss = eta != null && x.dis > 0 ? x.dis * (1 / eta - 1) : 0;
+    const kwh = Math.max(0, x.solar - (x.exp ?? 0) - loss);
+    const money = kwh * this._ownValue(price, feed) + (x.exp != null && feed != null ? x.exp * feed : 0);
+    return { kwh, money };
+  }
+
   /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
   async _loadToday() {
     if (!this._hass || this._todayLoading) return;
@@ -3310,7 +3335,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
     if (price) {
-      const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * this._ownValue(price.value, feed) + (x.exp != null && feed != null ? x.exp * feed : 0);
+      const saving = (x) => this._savedBy(x, price.value, feed).money;
       const [n2, sym] = this._money(saving(t), price.currency, 0);
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n2} ${esc(sym)} <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
@@ -3384,9 +3409,9 @@ class EnergyAssistantPanel extends HTMLElement {
     let savings = "";
     const day = this._today?.totals;
     if (price && day?.solar != null) {
-      const self = Math.max(0, day.solar - (day.exp ?? 0));
-      const [n, sym] = this._money(self * this._ownValue(price.value, feed) + (day.exp != null && feed != null ? day.exp * feed : 0), price.currency, 2);
-      const kwhTxt = self.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      const saved = this._savedBy(day, price.value, feed);
+      const [n, sym] = this._money(saved.money, price.currency, 2);
+      const kwhTxt = saved.kwh.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     } else if (price && cur.solar != null) {
