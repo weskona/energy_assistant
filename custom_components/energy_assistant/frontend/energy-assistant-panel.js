@@ -2827,6 +2827,14 @@ class EnergyAssistantPanel extends HTMLElement {
     }
   }
 
+  /**
+   * What a kWh of the own solar power is worth when it is used in the house: the grid price, but at least the feed-in
+   * tariff (the revenue it would have brought), never below 0 (a negative price does not make own power worthless).
+   */
+  _ownValue(price, feed) {
+    return Math.max(price, feed != null && Number.isFinite(feed) ? feed : 0, 0);
+  }
+
   /** The self-sufficiency of today for the sentence of the Power tab (the statistics of today in hours), reloaded every five minutes. */
   async _loadToday() {
     if (!this._hass || this._todayLoading) return;
@@ -3302,7 +3310,7 @@ class EnergyAssistantPanel extends HTMLElement {
     const price = this._price(), feed = this._feedInTariff();
     let savings = "";
     if (price) {
-      const saving = (x) => Math.max(0, Math.max(0, x.solar - (x.exp ?? 0)) * price.value + (x.exp != null && feed != null ? x.exp * feed : 0)); // savings are never negative
+      const saving = (x) => Math.max(0, x.solar - (x.exp ?? 0)) * this._ownValue(price.value, feed) + (x.exp != null && feed != null ? x.exp * feed : 0);
       const [n2, sym] = this._money(saving(t), price.currency, 0);
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n2} ${esc(sym)} <span class="resper">${esc(this._t(`resPer_${range}`))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
@@ -3377,13 +3385,13 @@ class EnergyAssistantPanel extends HTMLElement {
     const day = this._today?.totals;
     if (price && day?.solar != null) {
       const self = Math.max(0, day.solar - (day.exp ?? 0));
-      const [n, sym] = this._money(Math.max(0, self * price.value + (day.exp != null && feed != null ? day.exp * feed : 0)), price.currency, 2);
+      const [n, sym] = this._money(self * this._ownValue(price.value, feed) + (day.exp != null && feed != null ? day.exp * feed : 0), price.currency, 2);
       const kwhTxt = self.toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       savings = `<div class="ressave" title="${esc(this._t("resSavingTip"))}"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))} ${esc(this._t("resToday"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(kwhTxt)} kWh</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     } else if (price && cur.solar != null) {
-      const perHour = ((cur.direct || 0) / 1000) * price.value + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
-      const [n, sym] = this._money(Math.max(0, perHour), price.currency, 2);
+      const perHour = ((cur.direct || 0) / 1000) * this._ownValue(price.value, feed) + ((cur.gridOut || 0) / 1000) * (feed ?? 0);
+      const [n, sym] = this._money(perHour, price.currency, 2);
       savings = `<div class="ressave"><div><div class="reslab">${esc(this._t("resCost"))}</div><div class="resub">${esc(this._t("resSaving"))}</div>
         <div class="resbig">${n} ${esc(sym)} <span class="resper">${esc(this._t("resPerHour"))}</span></div></div><span class="pig">${RES_ART.pig}</span></div>`;
     }

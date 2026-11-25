@@ -5548,11 +5548,20 @@ test("power tab: the savings card shows what the sun saved today in kWh and mone
   assert.doesNotMatch(html, /per hour/);
 });
 
-test("savings are never negative, not even with a negative price", () => {
-  const states = { pv: st(1000), "sensor.t_preis": { state: "-0.05", attributes: { unit_of_measurement: "EUR/kWh" } } };
-  const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis" } });
-  p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
-  const html = p._renderHouse();
-  assert.match(html, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
-  assert.doesNotMatch(html.slice(html.indexOf("Savings today")), /-0[.,]\d\d/);
+test("savings: own solar power is worth at least the feed-in tariff, never below 0, also with a negative price", () => {
+  const st2 = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR/kWh" } });
+  const make = (price, feed) => {
+    const states = { pv: st(1000), "sensor.t_preis": st2(price), ...(feed != null ? { "sensor.t_einsp": st2(feed) } : {}) };
+    const p = livePanel({}, states, { tariffy: { price: "sensor.t_preis", ...(feed != null ? { feed_in: "sensor.t_einsp" } : {}) } });
+    p._today = { autarky: 60, totals: { solar: 20, exp: 8 }, at: Date.now() };
+    return p._renderHouse();
+  };
+  // 12 kWh used themselves, 8 kWh fed in; the price is negative: the 12 kWh count with the feed-in tariff 0.08
+  assert.match(make(-0.05, 0.08), /<div class="resbig">1[.,]60 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  // a price above the feed-in tariff counts as before: 12 * 0.30 + 8 * 0.08
+  assert.match(make(0.30, 0.08), /<div class="resbig">4[.,]24 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  // negative price and no feed-in tariff: nothing, but never a minus
+  const none = make(-0.05, null);
+  assert.match(none, /<div class="resbig">0[.,]00 €? ?[^<]*<span class="resper">12\.0 kWh<\/span>/);
+  assert.doesNotMatch(none.slice(none.indexOf("Savings today")), /-0[.,]\d\d/);
 });
