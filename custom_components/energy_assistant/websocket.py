@@ -37,7 +37,7 @@ from .const import (
 from .energy_prefs import async_energy_suggestion
 from .providers import available, sources
 from .pv_assistant import suggestion
-from .sensor import COST, PERIODS, unique_id
+from .sensor import COST, ENERGY, unique_id
 from .settings import has_source, normalize, to_storage
 
 _CONFIG_SCHEMA = vol.Schema(
@@ -157,21 +157,20 @@ def ws_labels(
 
 
 def _group_energy(hass: HomeAssistant, kind: str) -> dict[str, dict[str, str]]:
-    """The energy and cost sensors of the selected labels or areas: day, week, ..., cost_day, ..."""
+    """The energy total (`energy_total`, labels and areas) and the cost total (`cost_total`) sensors of what is selected."""
     registry = er.async_get(hass)
     result: dict[str, dict[str, str]] = {}
     for entry in hass.config_entries.async_entries(DOMAIN):
         selected = normalize({**entry.data, **entry.options})[f"{kind}_ids"]
         for group_id in selected:
             sensors = {
-                f"{prefix}{period}": entity_id
-                for prefix in ("", COST)
-                for period in PERIODS
+                key: entity_id
+                for key, what in (("energy_total", ENERGY), ("cost_total", COST))
                 if (
                     entity_id := registry.async_get_entity_id(
                         "sensor",
                         DOMAIN,
-                        unique_id(entry.entry_id, group_id, prefix + period, kind),
+                        unique_id(entry.entry_id, group_id, what, kind),
                     )
                 )
             }
@@ -187,7 +186,7 @@ def _group_energy(hass: HomeAssistant, kind: str) -> dict[str, dict[str, str]]:
 def ws_label_energy(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Return the energy and cost sensors of the selected labels.
+    """Return the energy total and cost total sensors of the selected labels.
 
     Only entity ids: the panel reads the values from the states.
     """
@@ -199,7 +198,7 @@ def ws_label_energy(
 def ws_area_energy(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Return the energy and cost sensors of the selected areas (like the ones of the labels)."""
+    """Return the energy total and cost total sensors of the selected areas (like the ones of the labels)."""
     connection.send_result(msg["id"], _group_energy(hass, "area"))
 
 
@@ -210,7 +209,7 @@ def ws_area_energy(
 def ws_device_energy(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Return the energy and cost sensors of the devices that have their own (like the ones of the labels)."""
+    """Return the cost total sensors of the selected devices (they have no energy total)."""
     connection.send_result(msg["id"], _group_energy(hass, "device"))
 
 
