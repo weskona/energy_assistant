@@ -2944,18 +2944,21 @@ test("usage: the labels card shows kWh only, the cost belongs to the Costs tab",
   assert.doesNotMatch(html.slice(html.indexOf('<span class="eb-title">Labels</span>')), /€/);
 });
 
+// What the cost totals counted in the running periods (the panel loads it from the long-term statistics)
+function putCosts(p, byEntity) {
+  p._evCosts = p._evCosts || new Map();
+  for (const [id, v] of Object.entries(byEntity)) {
+    for (const range of ["day", "week", "month", "year"]) if (v[range] != null) p._evCosts.set(`${id}|${range}|0`, { v: v[range], at: Date.now() });
+  }
+}
+
 function labelCostPanel() {
   const p = labelEnergyPanel();
   const eur = (v) => ({ state: v, attributes: { unit_of_measurement: "EUR" } });
-  Object.assign(p._hass.states, {
-    "sensor.c1_day": eur("0.40"), "sensor.c1_week": eur("2.10"), "sensor.c1_month": eur("8.00"), "sensor.c1_year": eur("95.5"),
-    "sensor.c2_day": eur("1.37"),
-  });
-  p._labelEnergy.klima.cost_day = "sensor.c1_day";
-  p._labelEnergy.klima.cost_week = "sensor.c1_week";
-  p._labelEnergy.klima.cost_month = "sensor.c1_month";
-  p._labelEnergy.klima.cost_year = "sensor.c1_year";
-  p._labelEnergy.licht.cost_day = "sensor.c2_day";
+  Object.assign(p._hass.states, { "sensor.c1": eur("0.40"), "sensor.c2": eur("1.37") });
+  p._labelEnergy.klima = { ...p._labelEnergy.klima, cost_total: "sensor.c1" };
+  p._labelEnergy.licht = { ...p._labelEnergy.licht, cost_total: "sensor.c2" };
+  putCosts(p, { "sensor.c1": { day: 0.4, week: 2.1, month: 8, year: 95.5 }, "sensor.c2": { day: 1.37 } });
   return p;
 }
 
@@ -3942,9 +3945,9 @@ test("area usage: the Areas card names the areas and sits next to the Labels car
 
 test("area cost: the Costs tab lists the cost sensors of the selected areas", () => {
   const p = areaGroupPanel();
-  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
-  p._hass.states["sensor.k_week"] = { state: "3.40", attributes: { unit_of_measurement: "EUR" } };
-  p._areaEnergy = { kueche: { cost_day: "sensor.k_day", cost_week: "sensor.k_week" } };
+  p._hass.states["sensor.k_total"] = { state: "9", attributes: { unit_of_measurement: "EUR" } };
+  p._areaEnergy = { kueche: { cost_total: "sensor.k_total" } };
+  putCosts(p, { "sensor.k_total": { day: 0.62, week: 3.4 } });
   const html = p._renderGroupCosts("area");
   assert.match(html, /Cost per area/);
   assert.match(html, /Küche[\s\S]*0[.,]62[^<]*€[\s\S]*3[.,]40[^<]*€/);
@@ -4017,9 +4020,9 @@ test("device sensors: the counter tells what the selection creates", () => {
   const p = matchPanel();
   assert.match(p._deviceCounter(), /Nothing is selected at first, so no sensors are created/);
   p._draft.device_ids = ["sensor.herd_leistung", "sensor.ofen_leistung"];
-  assert.match(p._deviceCounter(), /2 devices with their own sensors: 8 sensors/); // energy only
+  assert.match(p._deviceCounter(), /2 devices with their own cost sensor: 0 sensors/); // the cost total needs a price
   p._int = { tariffy: { price: "x" } };
-  assert.match(p._deviceCounter(), /16 sensors/); // with Tariffy the cost sensors too
+  assert.match(p._deviceCounter(), /2 sensors/); // with Tariffy one cost total for each device
 });
 
 test("device sensors: the name can be set before the sensors exist and the tariff per device", () => {
@@ -4055,8 +4058,9 @@ test("device sensors: the names in the Costs tab are the display names, else the
   p._cfg.device_names = { "sensor.ofen_leistung": "Backofen" };
   assert.equal(p._groupName("device", "sensor.herd_leistung"), "Herd");
   assert.equal(p._groupName("device", "sensor.ofen_leistung"), "Backofen");
-  p._hass.states["sensor.k_day"] = { state: "0.62", attributes: { unit_of_measurement: "EUR" } };
-  p._deviceEnergy = { "sensor.ofen_leistung": { cost_day: "sensor.k_day" } };
+  p._hass.states["sensor.k_total"] = { state: "9", attributes: { unit_of_measurement: "EUR" } };
+  p._deviceEnergy = { "sensor.ofen_leistung": { cost_total: "sensor.k_total" } };
+  putCosts(p, { "sensor.k_total": { day: 0.62 } });
   const html = p._renderGroupCosts("device");
   assert.match(html, /Cost per device/);
   assert.match(html, /Backofen[\s\S]*0[.,]62[^<]*€/);
@@ -4467,8 +4471,9 @@ test("cost tables: the biggest cost comes first (year, then month, week, day), n
   p._hass.areas = { kueche: { name: "Küche" }, wohnzimmer: { name: "Wohnzimmer" }, technik: { name: "Technik" }, keller: { name: "Keller" } };
   const eur = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR" } });
   const put = (id, day, week, month, year) => {
-    Object.assign(p._hass.states, { [`s.${id}d`]: eur(day), [`s.${id}w`]: eur(week), [`s.${id}m`]: eur(month), [`s.${id}y`]: eur(year) });
-    return { cost_day: `s.${id}d`, cost_week: `s.${id}w`, cost_month: `s.${id}m`, cost_year: `s.${id}y` };
+    p._hass.states[`s.${id}`] = eur(0);
+    putCosts(p, { [`s.${id}`]: { day, week, month, year } });
+    return { cost_total: `s.${id}` };
   };
   p._areaEnergy = {
     kueche: put("k", 0.1, 1, 2, 5), // small
@@ -4479,7 +4484,7 @@ test("cost tables: the biggest cost comes first (year, then month, week, day), n
   const names = (html) => [...html.matchAll(/class="nm" title="([^"]*)"/g)].map((m) => m[1]);
   assert.deepEqual(names(p._renderGroupCosts("area")), ["Wohnzimmer", "Keller", "Technik", "Küche"]);
   // equal costs: the name decides; a missing period counts as the smallest
-  p._areaEnergy = { kueche: put("a", 1, 1, 1, 1), wohnzimmer: put("b", 1, 1, 1, 1), technik: { cost_day: "s.ad" }, keller: put("c", 2, 2, 2, 2) };
+  p._areaEnergy = { kueche: put("a", 1, 1, 1, 1), wohnzimmer: put("b", 1, 1, 1, 1), technik: (() => { p._hass.states["s.t2"] = eur(0); putCosts(p, { "s.t2": { day: 1 } }); return { cost_total: "s.t2" }; })(), keller: put("c", 2, 2, 2, 2) };
   assert.deepEqual(names(p._renderGroupCosts("area")), ["Keller", "Küche", "Wohnzimmer", "Technik"]);
 });
 
@@ -4487,8 +4492,9 @@ test("cost tables: devices and labels are sorted the same way", () => {
   const p = devicesTabPanel({ label_ids: ["klima", "licht"], device_ids: ["sensor.klimaanlage_leistung", "sensor.licht_flur_leistung"] });
   const eur = (v) => ({ state: String(v), attributes: { unit_of_measurement: "EUR" } });
   Object.assign(p._hass.states, { "s.a": eur(1), "s.b": eur(9) });
-  p._labelEnergy = { klima: { cost_year: "s.a" }, licht: { cost_year: "s.b" } };
-  p._deviceEnergy = { "sensor.klimaanlage_leistung": { cost_year: "s.a" }, "sensor.licht_flur_leistung": { cost_year: "s.b" } };
+  putCosts(p, { "s.a": { year: 1 }, "s.b": { year: 9 } });
+  p._labelEnergy = { klima: { cost_total: "s.a" }, licht: { cost_total: "s.b" } };
+  p._deviceEnergy = { "sensor.klimaanlage_leistung": { cost_total: "s.a" }, "sensor.licht_flur_leistung": { cost_total: "s.b" } };
   const names = (html) => [...html.matchAll(/class="nm" title="([^"]*)"/g)].map((m) => m[1]);
   assert.deepEqual(names(p._renderGroupCosts("label")), ["Licht", "Klima"]);
   assert.deepEqual(names(p._renderGroupCosts("device")), ["Licht Flur", "Klimaanlage"]);
@@ -5194,10 +5200,11 @@ test("wallbox cost: the Costs tab shows the cost of EV Assistant for the wallbox
   const p = evCostPanel();
   p._cfg.device_ids = ["sensor.c", "sensor.a"];
   p._cfg.device_names = {};
-  p._hass.states["sensor.c_day"] = { state: "9.99", attributes: { unit_of_measurement: "EUR" } };
-  p._hass.states["sensor.a_day"] = { state: "0.33", attributes: { unit_of_measurement: "EUR" } };
-  p._deviceEnergy = { "sensor.c": { cost_day: "sensor.c_day" }, "sensor.a": { cost_day: "sensor.a_day" } };
+  p._hass.states["sensor.c_total"] = { state: "99", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.states["sensor.a_total"] = { state: "5", attributes: { unit_of_measurement: "EUR" } };
+  p._deviceEnergy = { "sensor.c": { cost_total: "sensor.c_total" }, "sensor.a": { cost_total: "sensor.a_total" } };
   p._evCosts = new Map([["sensor.ev_home_cost|day|0", { v: 1.25, at: Date.now() }], ["sensor.ev_home_cost|year|0", { v: 310, at: Date.now() }]]);
+  putCosts(p, { "sensor.c_total": { day: 9.99 }, "sensor.a_total": { day: 0.33 } });
   const html = p._renderGroupCosts("device");
   assert.match(html, /1[.,]25[^<]*€/); // the wallbox today
   assert.match(html, /310[^<]*€/); // and this year
@@ -5519,4 +5526,46 @@ test("power tab: with several storages each one shows when it is empty or full, 
   assert.doesNotMatch(idle.slice(idle.indexOf('class="resm"'), idle.indexOf('class="resr"')), /dwhen/);
   const noCap = livePanel({ ...cfg, battery_capacity: null }, { soc: st(60, "%"), soc2: st(20, "%"), bd: st(900), bd2: st(0), bc: st(0), bc2: st(500) })._renderHouse();
   assert.doesNotMatch(noCap.slice(noCap.indexOf('class="resm"'), noCap.indexOf('class="resr"')), /dwhen/);
+});
+
+// -- the cost totals: day, week, month and year come from the long-term statistics ---------------------
+
+test("cost totals: a period is the difference of the total at its end and at its start, a new sensor counts from 0", async () => {
+  const p = labelCostPanel();
+  const H = 3600000;
+  const win = { start: Date.now() - 5 * H, end: Date.now() + H }; // the running period
+  const stats = (rows) => async () => ({ "sensor.c1": rows });
+  // a total sensor: its state at the end of each hour; before the period it stood at 10, now (live) 12.5
+  p._hass.states["sensor.c1"] = { state: "12.5", attributes: { unit_of_measurement: "EUR" } };
+  p._hass.callWS = stats([{ start: win.start - 2 * H, state: 9 }, { start: win.start - H, state: 10 }, { start: win.start + H, state: 11 }]);
+  assert.equal(await p._evCostPeriod("sensor.c1", win, "day", true), 2.5);
+  // a past period: the last value inside minus the one before
+  const past = { start: Date.now() - 30 * H, end: Date.now() - 20 * H };
+  p._hass.callWS = stats([{ start: past.start - H, state: 4 }, { start: past.start + 2 * H, state: 5 }, { start: past.end - H, state: 7 }]);
+  assert.equal(await p._evCostPeriod("sensor.c1", past, "day", true), 3);
+  // no statistics yet: a new sensor of ours counted from 0, so the live value is the cost so far
+  p._hass.callWS = stats([]);
+  assert.equal(await p._evCostPeriod("sensor.c1", win, "day", true), 12.5);
+  // the same for a sensor that is not ours: nothing is guessed
+  assert.equal(await p._evCostPeriod("sensor.c1", win, "day", false), null);
+  // measurement sensors (EV Assistant) still work with max and min
+  p._hass.callWS = stats([{ start: win.start - H, max: 100, min: 90 }, { start: win.start + H, max: 130, min: 100 }]);
+  p._hass.states["sensor.c1"] = { state: "140", attributes: {} };
+  assert.equal(await p._evCostPeriod("sensor.c1", win, "day", false), 40);
+});
+
+test("cost totals: the loader asks for the totals of the labels, areas and devices", async () => {
+  const p = labelCostPanel();
+  p._evCosts = new Map(); // nothing loaded yet
+  p._tab = "costs";
+  p._ready = true;
+  p._cfg.area_ids = [];
+  p._cfg.device_ids = [];
+  assert.deepEqual(p._groupCostIds().sort(), ["sensor.c1", "sensor.c2"]);
+  const asked = [];
+  p._hass.callWS = async (m) => { asked.push(m.statistic_ids[0]); return {}; };
+  p._render = () => {};
+  await p._maybeLoadEvCost();
+  assert.ok(asked.includes("sensor.c1") && asked.includes("sensor.c2"));
+  assert.equal(p._evCosts.get("sensor.c1|year|0").v, 0.4); // new sensors without statistics: the live value
 });

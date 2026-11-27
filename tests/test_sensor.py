@@ -1,4 +1,4 @@
-"""Tests for the energy sensors of the selected labels."""
+"""Tests for the energy and cost totals of the selected labels, areas and devices."""
 
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,28 +11,21 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.energy_assistant.const import DOMAIN
 from custom_components.energy_assistant.sensor import (
-    PERIODS,
+    COST,
+    ENERGY,
+    GroupCostSensor,
     GroupEnergy,
-    period_start,
+    legacy_unique_ids,
     unique_id,
 )
 
 BERLIN = ZoneInfo("Europe/Berlin")
 
 
-def test_period_start_follows_the_calendar_of_the_time_zone() -> None:
-    now = datetime(2026, 11, 13, 15, 30, tzinfo=BERLIN)  # a Friday
-    assert period_start(now, "day") == datetime(2026, 11, 13, tzinfo=BERLIN)
-    assert period_start(now, "week") == datetime(2026, 11, 9, tzinfo=BERLIN)  # Monday
-    assert period_start(now, "month") == datetime(2026, 11, 1, tzinfo=BERLIN)
-    assert period_start(now, "year") == datetime(2026, 1, 1, tzinfo=BERLIN)
-
-
 def _tracker(hass: HomeAssistant) -> GroupEnergy:
     entry = MockConfigEntry(domain=DOMAIN, data={})
     tracker = GroupEnergy(hass, entry, "klima")
     tracker.last = datetime(2026, 11, 13, 10, 0, tzinfo=BERLIN)
-    tracker.starts = {p: period_start(tracker.last, p) for p in PERIODS}
     return tracker
 
 
@@ -42,24 +35,19 @@ def _run(tracker: GroupEnergy, minutes: int) -> None:
         tracker._integrate(tracker.last + timedelta(minutes=1))
 
 
-async def test_integrates_power_into_all_periods(hass: HomeAssistant) -> None:
+async def test_integrates_power_into_the_total(hass: HomeAssistant) -> None:
     tracker = _tracker(hass)
     tracker.powers = {"sensor.a": 1.0, "sensor.b": 0.5}  # 1.5 kW together
     _run(tracker, 120)
-    assert all(round(tracker.values[p], 6) == 3.0 for p in PERIODS)  # 1.5 kW x 2 h
+    assert round(tracker.kwh, 6) == 3.0  # 1.5 kW x 2 h
 
 
-async def test_day_restarts_at_midnight_and_keeps_the_other_periods(
-    hass: HomeAssistant,
-) -> None:
-    tracker = _tracker(hass)  # 10:00, day counter at 0
+async def test_the_total_does_not_restart_at_midnight(hass: HomeAssistant) -> None:
+    """The panel works out the periods from the statistics, the total just keeps growing."""
+    tracker = _tracker(hass)  # 10:00
     tracker.powers = {"sensor.a": 1.0}
     _run(tracker, 15 * 60)  # until 01:00 of the next day
-    # 14 h were on the old day, 1 h on the new one
-    assert round(tracker.values["day"], 6) == 1.0
-    assert tracker.starts["day"] == datetime(2026, 11, 14, tzinfo=BERLIN)
-    assert round(tracker.values["week"], 6) == 15.0  # still the same week (Mon 9th)
-    assert round(tracker.values["year"], 6) == 15.0
+    assert round(tracker.kwh, 6) == 15.0
 
 
 async def test_a_long_pause_is_not_integrated(hass: HomeAssistant) -> None:
@@ -67,16 +55,16 @@ async def test_a_long_pause_is_not_integrated(hass: HomeAssistant) -> None:
     tracker = _tracker(hass)
     tracker.powers = {"sensor.a": 2.0}
     tracker._integrate(tracker.last + timedelta(hours=3))
-    assert all(tracker.values[p] == 0.0 for p in PERIODS)
+    assert tracker.kwh == 0.0
     _run(tracker, 60)  # it carries on normally afterwards
-    assert round(tracker.values["day"], 6) == 2.0
+    assert round(tracker.kwh, 6) == 2.0
 
 
 async def test_time_going_backwards_adds_nothing(hass: HomeAssistant) -> None:
     tracker = _tracker(hass)
     tracker.powers = {"sensor.a": 2.0}
     tracker._integrate(tracker.last - timedelta(minutes=1))
-    assert all(tracker.values[p] == 0.0 for p in PERIODS)
+    assert tracker.kwh == 0.0
 
 
 def _power(hass: HomeAssistant, state: str, unit: str | None = "W", prev: float = 0.7):
@@ -110,26 +98,28 @@ async def test_a_spike_does_not_reach_the_counters(hass: HomeAssistant) -> None:
     )
     tracker.powers["sensor.x"] = tracker._power("sensor.x", tracker.powers["sensor.x"])
     _run(tracker, 60)
-    assert round(tracker.values["day"], 6) == 1.0  # 1 kW for 1 h, the spike was ignored
+    assert round(tracker.kwh, 6) == 1.0  # 1 kW for 1 h, the spike was ignored
 
 
-async def test_restore_only_takes_the_running_period(hass: HomeAssistant) -> None:
+async def test_restore_takes_the_stored_total_and_never_shrinks_it(
+    hass: HomeAssistant,
+) -> None:
     tracker = _tracker(hass)
-    tracker.restore("day", 4.2, tracker.starts["day"])
-    assert tracker.values["day"] == 4.2
-    tracker.restore(
-        "week", 9.0, tracker.starts["week"] - timedelta(days=7)
-    )  # last week
-    assert tracker.values["week"] == 0.0
+    tracker.restore(4.2)
+    assert tracker.kwh == 4.2
+    tracker.restore(1.0)  # a smaller value never lowers what is already counted
+    assert tracker.kwh == 4.2
+    tracker.restore(9.5, cost=True)
+    assert tracker.cost == 9.5
 
 
 async def test_restore_ignores_values_that_cannot_be_right(hass: HomeAssistant) -> None:
     tracker = _tracker(hass)
     for bad in (float("nan"), float("inf"), -3.0, 5e9):
-        tracker.restore("day", bad, tracker.starts["day"])
-        tracker.restore("month", bad, tracker.starts["month"], cost=True)
-    assert tracker.values["day"] == 0.0
-    assert tracker.costs["month"] == 0.0
+        tracker.restore(bad)
+        tracker.restore(bad, cost=True)
+    assert tracker.kwh == 0.0
+    assert tracker.cost == 0.0
 
 
 async def test_the_cost_is_priced_step_by_step_and_never_recalculated(
@@ -141,18 +131,16 @@ async def test_the_cost_is_priced_step_by_step_and_never_recalculated(
     _run(tracker, 60)  # 2 kWh at 0.30
     tracker.price = 0.50  # the tariff changes
     _run(tracker, 60)  # 2 kWh at 0.50
-    assert round(tracker.values["day"], 6) == 4.0
-    assert round(tracker.costs["day"], 6) == round(
-        2 * 0.30 + 2 * 0.50, 6
-    )  # 1.60, not 2.00
+    assert round(tracker.kwh, 6) == 4.0
+    assert round(tracker.cost, 6) == round(2 * 0.30 + 2 * 0.50, 6)  # 1.60, not 2.00
 
 
 async def test_without_a_price_nothing_is_costed(hass: HomeAssistant) -> None:
     tracker = _tracker(hass)
     tracker.powers = {"sensor.a": 2.0}
     _run(tracker, 60)
-    assert round(tracker.values["day"], 6) == 2.0
-    assert tracker.costs["day"] == 0.0
+    assert round(tracker.kwh, 6) == 2.0
+    assert tracker.cost == 0.0
 
 
 def _price(hass: HomeAssistant, state: str, **attrs):
@@ -207,12 +195,12 @@ async def _setup(hass: HomeAssistant, label_ids: list[str]) -> MockConfigEntry:
 def _ids(
     hass: HomeAssistant, entry: MockConfigEntry, label_id: str
 ) -> list[str | None]:
+    """The energy total of a label (as a list, so `all(...)` and `any(...)` read well)."""
     registry = er.async_get(hass)
     return [
         registry.async_get_entity_id(
-            "sensor", DOMAIN, unique_id(entry.entry_id, label_id, p)
+            "sensor", DOMAIN, unique_id(entry.entry_id, label_id, ENERGY)
         )
-        for p in PERIODS
     ]
 
 
@@ -220,12 +208,14 @@ async def test_sensors_exist_only_for_the_selected_labels(
     hass: HomeAssistant, mock_panel
 ) -> None:
     entry = await _setup(hass, ["klima"])
-    assert all(_ids(hass, entry, "klima"))  # day, week, month, year
+    assert all(_ids(hass, entry, "klima"))  # one running total
     assert not any(_ids(hass, entry, "licht"))
     state = hass.states.get(_ids(hass, entry, "klima")[0])
     assert state.state == "0.0"
     assert state.attributes["unit_of_measurement"] == "kWh"
     assert state.attributes["device_class"] == "energy"
+    assert state.attributes["state_class"] == "total_increasing"
+    assert "period_start" not in state.attributes
     assert state.attributes["sensors"] == ["sensor.heater_power"]
     assert "Klima" in state.attributes["friendly_name"]
 
@@ -248,8 +238,6 @@ async def test_selecting_a_label_creates_its_sensors_and_deselecting_removes_the
 async def test_cost_sensors_exist_only_with_a_price_and_are_monetary(
     hass: HomeAssistant, mock_panel
 ) -> None:
-    from custom_components.energy_assistant.sensor import COST
-
     hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
     with patch(
         "custom_components.energy_assistant.sensor.tariffy",
@@ -257,38 +245,29 @@ async def test_cost_sensors_exist_only_with_a_price_and_are_monetary(
     ):
         entry = await _setup(hass, ["klima"])
     registry = er.async_get(hass)
-    ids = [
-        registry.async_get_entity_id(
-            "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST + p)
-        )
-        for p in PERIODS
-    ]
-    assert all(ids)
-    state = hass.states.get(ids[0])
+    cost_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST)
+    )
+    assert cost_id
+    state = hass.states.get(cost_id)
     assert state.attributes["device_class"] == "monetary"
+    assert state.attributes["state_class"] == "total"
     assert state.attributes["unit_of_measurement"] == "EUR"
     assert state.attributes["price"] == 0.30
     assert state.state == "0.0"
 
 
 async def test_no_cost_sensors_without_tariffy(hass: HomeAssistant, mock_panel) -> None:
-    from custom_components.energy_assistant.sensor import COST
-
     entry = await _setup(hass, ["klima"])
     registry = er.async_get(hass)
-    assert not any(
-        registry.async_get_entity_id(
-            "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST + p)
-        )
-        for p in PERIODS
+    assert not registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST)
     )
 
 
 async def test_entity_ids_and_names_follow_the_language_of_home_assistant(
     hass: HomeAssistant, mock_panel
 ) -> None:
-    from custom_components.energy_assistant.sensor import COST
-
     hass.config.language = "de"
     hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
     with patch(
@@ -298,16 +277,16 @@ async def test_entity_ids_and_names_follow_the_language_of_home_assistant(
         entry = await _setup(hass, ["klima"])
     registry = er.async_get(hass)
     energy = registry.async_get_entity_id(
-        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", "day")
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", ENERGY)
     )
     cost = registry.async_get_entity_id(
-        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST + "week")
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST)
     )
-    assert energy == "sensor.energy_assistant_klima_verbrauch_taglich"
-    assert cost == "sensor.energy_assistant_klima_kosten_wochentlich"
+    assert energy == "sensor.energy_assistant_klima_verbrauch_gesamt"
+    assert cost == "sensor.energy_assistant_klima_kosten_gesamt"
     assert (
         hass.states.get(energy).attributes["friendly_name"]
-        == "Energy Assistant Klima Verbrauch täglich"
+        == "Energy Assistant Klima Verbrauch gesamt"
     )
 
 
@@ -377,7 +356,6 @@ async def test_changing_the_tariff_closes_the_running_interval_with_the_old_pric
         tracker = _tracker_for(hass, {})
         tracker.powers = {"sensor.a": 1.0}
         tracker.last = datetime.now(tz=BERLIN)
-        tracker.starts = {p: period_start(tracker.last, p) for p in PERIODS}
         tracker._refresh_price()
         _run(tracker, 60)  # 1 kWh at 0.30
         tracker.entry = MockConfigEntry(
@@ -387,7 +365,7 @@ async def test_changing_the_tariff_closes_the_running_interval_with_the_old_pric
         )
         tracker._refresh_price()
         _run(tracker, 60)  # 1 kWh at 0.10
-    assert round(tracker.costs["year"], 6) == 0.40
+    assert round(tracker.cost, 6) == 0.40
 
 
 async def _setup_areas(hass: HomeAssistant, area_ids: list[str]) -> MockConfigEntry:
@@ -434,13 +412,12 @@ async def _setup_areas(hass: HomeAssistant, area_ids: list[str]) -> MockConfigEn
     return entry
 
 
-def _area_ids(hass: HomeAssistant, entry: MockConfigEntry, area_id: str, prefix=""):
+def _area_ids(hass: HomeAssistant, entry: MockConfigEntry, area_id: str, what=ENERGY):
     registry = er.async_get(hass)
     return [
         registry.async_get_entity_id(
-            "sensor", DOMAIN, unique_id(entry.entry_id, area_id, prefix + p, "area")
+            "sensor", DOMAIN, unique_id(entry.entry_id, area_id, what, "area")
         )
-        for p in PERIODS
     ]
 
 
@@ -471,10 +448,9 @@ async def test_areas_and_labels_have_their_own_sensors_and_German_names(
     hass.config.language = "de"
     entry = await _setup_areas(hass, ["wohnzimmer"])
     ids = _area_ids(hass, entry, "wohnzimmer")
-    assert ids[0] == "sensor.energy_assistant_wohnzimmer_verbrauch_taglich"
-    assert ids[3] == "sensor.energy_assistant_wohnzimmer_verbrauch_jahrlich"
+    assert ids[0] == "sensor.energy_assistant_wohnzimmer_verbrauch_gesamt"
     # the unique ids of labels and areas never meet
-    assert unique_id("e", "x", "day") != unique_id("e", "x", "day", "area")
+    assert unique_id("e", "x", ENERGY) != unique_id("e", "x", ENERGY, "area")
 
 
 async def test_deselecting_an_area_removes_its_sensors_only(
@@ -586,24 +562,30 @@ async def _setup_devices(
                 "friendly_name": name,
             },
         )
+    hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={"grid_import": "sensor.import"},
         options={"device_ids": device_ids, **options},
     )
     entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    # A device only gets a cost total (no energy total), and that needs a price
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
     return entry
 
 
-def _device_ids(hass: HomeAssistant, entry: MockConfigEntry, device: str, prefix=""):
+def _device_ids(hass: HomeAssistant, entry: MockConfigEntry, device: str, what=COST):
+    """The cost total of a device (a device has no energy total), as a list."""
     registry = er.async_get(hass)
     return [
         registry.async_get_entity_id(
-            "sensor", DOMAIN, unique_id(entry.entry_id, device, prefix + p, "device")
+            "sensor", DOMAIN, unique_id(entry.entry_id, device, what, "device")
         )
-        for p in PERIODS
     ]
 
 
@@ -613,15 +595,16 @@ async def test_devices_get_sensors_only_when_selected_with_a_short_name(
     hass.config.language = "de"
     entry = await _setup_devices(hass, ["sensor.oven_power"])
     ids = _device_ids(hass, entry, "sensor.oven_power")
-    assert ids[0] == "sensor.energy_assistant_backofen_verbrauch_taglich"
+    assert ids[0] == "sensor.energy_assistant_backofen_kosten_gesamt"
     assert all(ids)
     assert not any(_device_ids(hass, entry, "sensor.tv_power"))  # not selected: nothing
+    # a device has no energy total
+    assert not any(_device_ids(hass, entry, "sensor.oven_power", ENERGY))
     state = hass.states.get(ids[0])
     assert state.attributes["device_id"] == "sensor.oven_power"
     assert state.attributes["sensors"] == ["sensor.oven_power"]
     assert (
-        state.attributes["friendly_name"]
-        == "Energy Assistant Backofen Verbrauch täglich"
+        state.attributes["friendly_name"] == "Energy Assistant Backofen Kosten gesamt"
     )
 
 
@@ -642,7 +625,7 @@ async def test_the_name_of_the_sensors_follows_a_new_display_name_but_not_the_id
     await hass.async_block_till_done()
     assert _device_ids(hass, entry, "sensor.oven_power")[0] == entity_id  # the id stays
     assert hass.states.get(entity_id).attributes["friendly_name"] == (
-        "Energy Assistant Ofen Verbrauch täglich"
+        "Energy Assistant Ofen Kosten gesamt"
     )
 
 
@@ -706,7 +689,7 @@ async def test_a_device_uses_the_tariff_chosen_for_it(hass: HomeAssistant) -> No
 async def test_saving_the_same_selection_again_never_creates_a_second_set(
     hass: HomeAssistant, mock_panel
 ) -> None:
-    """The unique id of a sensor is fixed by entry, device and period, so a repeated save finds the old ones."""
+    """The unique id of a sensor is fixed by entry, device and kind, so a repeated save finds the old ones."""
     entry = await _setup_devices(hass, ["sensor.oven_power"])
 
     def ours() -> list[str]:
@@ -717,7 +700,12 @@ async def test_saving_the_same_selection_again_never_creates_a_second_set(
         )
 
     first = ours()
-    assert len(first) == 4  # four energy sensors, no price source: no cost sensors
+    price = patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    )
+    price.start()  # the price source stays there while the selection is saved again
+    assert len(first) == 1  # one cost total, a device has no energy total
     for _ in range(3):
         hass.config_entries.async_update_entry(
             entry, options={"device_ids": ["sensor.oven_power"], "standby_normal": []}
@@ -733,6 +721,7 @@ async def test_saving_the_same_selection_again_never_creates_a_second_set(
     )
     await hass.async_block_till_done()
     assert ours() == first
+    price.stop()
 
 
 # -- the price of a kWh depends on what the grid delivers of the consumption -----------------------
@@ -742,7 +731,6 @@ def _mix_tracker(hass: HomeAssistant, options: dict | None = None) -> GroupEnerg
     entry = MockConfigEntry(domain=DOMAIN, data={}, options=options or {})
     tracker = GroupEnergy(hass, entry, "klima")
     tracker.last = datetime(2026, 11, 13, 10, 0, tzinfo=BERLIN)
-    tracker.starts = {p: period_start(tracker.last, p) for p in PERIODS}
     tracker.powers = {"sensor.a": 2.0}  # 2 kW: 2 kWh per hour
     tracker.price = 0.30
     return tracker
@@ -753,7 +741,7 @@ async def test_own_solar_power_costs_only_the_lost_feed_in(hass: HomeAssistant) 
     tracker.feed_in = 0.08
     tracker.share = 0.0  # a self-sufficiency of 100 %
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 6) == round(2 * 0.08, 6)  # not 2 x 0.30
+    assert round(tracker.cost, 6) == round(2 * 0.08, 6)  # not 2 x 0.30
     assert tracker.unit_price() == 0.08
 
 
@@ -762,7 +750,7 @@ async def test_a_mix_is_priced_by_the_share(hass: HomeAssistant) -> None:
     tracker.feed_in = 0.08
     tracker.share = 0.5
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 6) == round(2 * (0.5 * 0.30 + 0.5 * 0.08), 6)
+    assert round(tracker.cost, 6) == round(2 * (0.5 * 0.30 + 0.5 * 0.08), 6)
 
 
 async def test_without_a_share_the_grid_price_stays(hass: HomeAssistant) -> None:
@@ -770,7 +758,7 @@ async def test_without_a_share_the_grid_price_stays(hass: HomeAssistant) -> None
     tracker.feed_in = 0.08
     tracker.share = None  # no usable sensors: never a lower price by guessing
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 6) == round(2 * 0.30, 6)
+    assert round(tracker.cost, 6) == round(2 * 0.30, 6)
 
 
 async def test_without_a_feed_in_tariff_the_own_power_costs_nothing(
@@ -780,10 +768,10 @@ async def test_without_a_feed_in_tariff_the_own_power_costs_nothing(
     tracker.feed_in = None
     tracker.share = 0.0
     _run(tracker, 60)
-    assert tracker.costs["day"] == 0.0
+    assert tracker.cost == 0.0
     tracker.share = 0.25  # only the grid part is paid
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 6) == round(2 * 0.25 * 0.30, 6)
+    assert round(tracker.cost, 6) == round(2 * 0.25 * 0.30, 6)
 
 
 async def test_the_setting_prices_everything_at_the_grid_price(
@@ -795,7 +783,7 @@ async def test_the_setting_prices_everything_at_the_grid_price(
     tracker.share = 0.0
     tracker.feed_in = 0.08
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 6) == round(2 * 0.30, 6)
+    assert round(tracker.cost, 6) == round(2 * 0.30, 6)
 
 
 async def test_a_change_of_the_share_closes_the_running_interval_with_the_old_share(
@@ -811,7 +799,7 @@ async def test_a_change_of_the_share_closes_the_running_interval_with_the_old_sh
     tracker._refresh_mix()
     assert tracker.share == 0.0
     _run(tracker, 60)  # one hour at a share of 0: free
-    assert tracker.costs["day"] == 0.0
+    assert tracker.cost == 0.0
     # the grid takes over: the interval until now is closed with the old share, the new one counts afterwards
     hass.states.async_set("sensor.gi", "2000", {"unit_of_measurement": "W"})
     with patch(
@@ -819,14 +807,10 @@ async def test_a_change_of_the_share_closes_the_running_interval_with_the_old_sh
         return_value=tracker.last + timedelta(hours=1) - timedelta(seconds=1),
     ):
         tracker._on_mix(MagicMock())
-    assert (
-        round(tracker.costs["day"], 4) == 0.0
-    )  # the last stretch still had the old share
+    assert round(tracker.cost, 4) == 0.0  # the last stretch still had the old share
     assert tracker.share == 1.0
     _run(tracker, 60)
-    assert round(tracker.costs["day"], 3) == round(
-        2 * 0.30, 3
-    )  # an hour with the grid price
+    assert round(tracker.cost, 3) == round(2 * 0.30, 3)  # an hour with the grid price
 
 
 async def test_the_feed_in_tariff_is_read_checked_and_kept(hass: HomeAssistant) -> None:
@@ -853,17 +837,114 @@ async def test_the_feed_in_tariff_is_read_checked_and_kept(hass: HomeAssistant) 
 
 
 async def test_the_cost_sensor_shows_the_price_it_uses(hass: HomeAssistant) -> None:
-    from custom_components.energy_assistant.sensor import LabelCostSensor
-
     tracker = _mix_tracker(hass)
     tracker.feed_in = 0.08
     tracker.share = 0.5
     entry = MockConfigEntry(domain=DOMAIN, data={})
-    attrs = LabelCostSensor(entry, tracker, "Klima", "day").extra_state_attributes
+    attrs = GroupCostSensor(entry, tracker, "Klima").extra_state_attributes
     assert attrs["price"] == 0.30  # the grid price
     assert attrs["unit_price"] == 0.19  # what a kWh costs now
     assert attrs["grid_share"] == 0.5
     tracker.share = None
-    attrs = LabelCostSensor(entry, tracker, "Klima", "day").extra_state_attributes
+    attrs = GroupCostSensor(entry, tracker, "Klima").extra_state_attributes
     assert attrs["unit_price"] == 0.30
     assert attrs["grid_share"] is None
+
+
+# -- the sensors of the earlier versions are removed ---------------------------------------------
+
+
+async def test_the_sensors_of_the_earlier_versions_are_removed(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    """Before: four energy and four cost sensors for every label, area and device, and the energy of devices."""
+    registry = er.async_get(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"grid_import": "sensor.import"},
+        options={"label_ids": ["klima"], "device_ids": ["sensor.oven_power"]},
+    )
+    entry.add_to_hass(hass)
+    old = [
+        *legacy_unique_ids(entry.entry_id, "klima", "label"),
+        *legacy_unique_ids(entry.entry_id, "sensor.oven_power", "device"),
+    ]
+    assert len(old) == 16
+    for uid in old:
+        registry.async_get_or_create(
+            "sensor", DOMAIN, uid, config_entry=entry, suggested_object_id=f"old_{uid}"
+        )
+    labels = lr.async_get(hass)
+    labels.async_create("Klima")
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert not [e for e in registry.entities.values() if e.unique_id in old]
+    # what is selected has its totals now: the energy total of the label, no energy total of the device
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", ENERGY)
+    )
+    assert not registry.async_get_entity_id(
+        "sensor",
+        DOMAIN,
+        unique_id(entry.entry_id, "sensor.oven_power", ENERGY, "device"),
+    )
+
+
+async def test_deselecting_removes_the_totals_and_what_is_left_of_the_old_sensors(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    ):
+        entry = await _setup(hass, ["klima"])
+        registry = er.async_get(hass)
+        assert registry.async_get_entity_id(
+            "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST)
+        )
+        # an old sensor that came back (or was never removed) goes with the deselection
+        stray = unique_id(entry.entry_id, "klima", "week")
+        registry.async_get_or_create("sensor", DOMAIN, stray, config_entry=entry)
+        hass.config_entries.async_update_entry(entry, options={"label_ids": []})
+        await hass.async_block_till_done()
+    assert not [e for e in registry.entities.values() if e.platform == DOMAIN]
+
+
+async def test_the_totals_are_restored_after_a_restart(
+    hass: HomeAssistant, mock_panel
+) -> None:
+    from homeassistant.core import State
+    from pytest_homeassistant_custom_component.common import mock_restore_cache
+
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "sensor.energy_assistant_klima_energy_total",
+                "12.5",
+                {"label_id": "klima"},
+            ),
+            State(
+                "sensor.energy_assistant_klima_cost_total",
+                "3.4",
+                {"label_id": "klima"},
+            ),
+        ],
+    )
+    hass.states.async_set("sensor.t_preis", "0.30", {"unit_of_measurement": "EUR/kWh"})
+    with patch(
+        "custom_components.energy_assistant.sensor.tariffy",
+        return_value={"price": "sensor.t_preis"},
+    ):
+        entry = await _setup(hass, ["klima"])
+    registry = er.async_get(hass)
+    energy = registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", ENERGY)
+    )
+    cost = registry.async_get_entity_id(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", COST)
+    )
+    assert float(hass.states.get(energy).state) >= 12.5
+    assert float(hass.states.get(cost).state) >= 3.4

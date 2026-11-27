@@ -495,20 +495,20 @@ async def test_label_energy_lists_the_sensors_of_the_selected_labels(
 ) -> None:
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.energy_assistant.sensor import PERIODS, unique_id
+    from custom_components.energy_assistant.sensor import ENERGY, unique_id
 
     hass.config_entries.async_update_entry(entry, options={"label_ids": ["klima"]})
     registry = er.async_get(hass)
-    for period in PERIODS[:2]:  # only some sensors exist
-        registry.async_get_or_create(
-            "sensor", DOMAIN, unique_id(entry.entry_id, "klima", period)
-        )
+    # only the energy total exists (no price, so no cost total)
+    registry.async_get_or_create(
+        "sensor", DOMAIN, unique_id(entry.entry_id, "klima", ENERGY)
+    )
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "energy_assistant/label_energy"})
     msg = await client.receive_json()
     assert msg["success"]
-    assert set(msg["result"]["klima"]) == {"day", "week"}
-    assert msg["result"]["klima"]["day"].startswith("sensor.")
+    assert set(msg["result"]["klima"]) == {"energy_total"}
+    assert msg["result"]["klima"]["energy_total"].startswith("sensor.")
 
 
 async def test_update_config_stores_the_tariff_per_label(
@@ -532,22 +532,19 @@ async def test_area_energy_lists_the_sensors_of_the_selected_areas(
 ) -> None:
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.energy_assistant.sensor import COST, PERIODS, unique_id
+    from custom_components.energy_assistant.sensor import COST, ENERGY, unique_id
 
     hass.config_entries.async_update_entry(entry, options={"area_ids": ["wohnzimmer"]})
     registry = er.async_get(hass)
-    for period in PERIODS[:2]:
+    for what in (ENERGY, COST):
         registry.async_get_or_create(
-            "sensor", DOMAIN, unique_id(entry.entry_id, "wohnzimmer", period, "area")
+            "sensor", DOMAIN, unique_id(entry.entry_id, "wohnzimmer", what, "area")
         )
-    registry.async_get_or_create(
-        "sensor", DOMAIN, unique_id(entry.entry_id, "wohnzimmer", COST + "day", "area")
-    )
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "energy_assistant/area_energy"})
     msg = await client.receive_json()
     assert msg["success"]
-    assert set(msg["result"]["wohnzimmer"]) == {"day", "week", "cost_day"}
+    assert set(msg["result"]["wohnzimmer"]) == {"energy_total", "cost_total"}
     # the labels command does not see them
     await client.send_json_auto_id({"type": "energy_assistant/label_energy"})
     assert (await client.receive_json())["result"] == {}
@@ -574,23 +571,24 @@ async def test_device_energy_and_the_tariff_per_device(
 ) -> None:
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.energy_assistant.sensor import PERIODS, unique_id
+    from custom_components.energy_assistant.sensor import COST, unique_id
 
     hass.config_entries.async_update_entry(
         entry, options={"device_ids": ["sensor.wp_power"]}
     )
     registry = er.async_get(hass)
-    for period in PERIODS[:2]:
-        registry.async_get_or_create(
-            "sensor",
-            DOMAIN,
-            unique_id(entry.entry_id, "sensor.wp_power", period, "device"),
-        )
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        unique_id(entry.entry_id, "sensor.wp_power", COST, "device"),
+    )
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "energy_assistant/device_energy"})
     msg = await client.receive_json()
     assert msg["success"]
-    assert set(msg["result"]["sensor.wp_power"]) == {"day", "week"}
+    assert set(msg["result"]["sensor.wp_power"]) == {
+        "cost_total"
+    }  # a device has only a cost total
     await client.send_json_auto_id(
         {
             "type": "energy_assistant/update_config",

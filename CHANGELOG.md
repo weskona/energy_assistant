@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Totals instead of period sensors (new entity ids):** the consumption (kWh) of **labels and areas** is now **one running total** each (`sensor.energy_assistant_<name>_energy_total`, state class `total_increasing`) instead of four sensors for day, week, month and year, and **devices no longer have an energy sensor** (the panel works out the energy of a device from its power sensor). **Cost sensors exist for everything**: one cost total for every label, area and device (`..._cost_total`, state class `total`), priced step by step as before. The totals never go back to 0; the panel shows day, week, month and year of the cost from their long-term statistics (the difference of the total at the end and at the start of the period, the running period with the live value; a new sensor counts from 0). The sensors of the earlier versions (the four energy and four cost sensors of each label, area and device, and the energy of devices) are **removed when Energy Assistant starts**; dashboards or automations that use them have to use the new totals. The Costs tab loads the cost of a period from the statistics, the Consumption tab and the Devices tab are not affected.
+
 ## [0.40.2] - 2026-11-25
 
 ### Changed

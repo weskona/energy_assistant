@@ -456,11 +456,11 @@ const STRINGS = {
     uTopTitle: "Biggest consumers",
     uLabelsTitle: "Labels",
     costsPeriod: "Costs in the period",
-    f_device_ids: "Devices with their own sensors",
+    f_device_ids: "Devices with their own cost sensor",
     devSensorsBtn: "Sensors",
-    devSensorsTip: "Give this device its own energy and cost sensors",
-    deviceCounter: "{n} devices with their own sensors: {sensors} sensors (four for the energy, four for the cost with Tariffy per device). Untick a device to delete its sensors when you save.",
-    deviceCounterNone: "Nothing is selected at first, so no sensors are created: tick the devices you need in the list above with the Sensors button. Every device gets four energy sensors and, with Tariffy, four cost sensors.",
+    devSensorsTip: "Give this device its own cost sensor",
+    deviceCounter: "{n} devices with their own cost sensor: {sensors} sensors (one cost total per device, it needs Tariffy). Untick a device to delete its sensor when you save.",
+    deviceCounterNone: "Nothing is selected at first, so no sensors are created: tick the devices you need in the list above with the Sensors button. With Tariffy every device gets one cost total (no energy sensor: the panel works out the energy of a device from its power sensor).",
     f_device_setup: "Name and tariff of these devices",
     h_device_setup: "The name is the display name of the device and is part of the sensor names. The field shows the name of the device (the display name, else the name of the sensor without the word Leistung) and the sensors get exactly this name; change it as you like and it changes everywhere. A name changed later changes the name of the sensors, but not their entity id. A device whose source is gone or excluded keeps its sensors until you untick it.",
     deviceNameLabel: "Name of the device",
@@ -485,8 +485,8 @@ const STRINGS = {
     uAreasTitle: "Areas",
     uAreasHint: "Energy of the sensors in the area in the shown period, from the long-term statistics of Home Assistant (hourly means of the power times their duration; the power sensors need the state class measurement). Energy Assistant also creates energy sensors per selected area for dashboards and automations, they count from the moment they were created.",
     areaCostTitle: "Cost per area",
-    h_label_sensors: "Every selected label gets four consumption sensors (day, week, month, year) and, with Tariffy, four cost sensors. Nothing is selected at first, so no sensors are created: select only the labels you need.",
-    h_area_sensors: "Every selected area gets four consumption sensors (day, week, month, year) and, with Tariffy, four cost sensors. Nothing is selected at first, so no sensors are created; with no selection the Areas card on the Power tab shows all areas, but no sensors exist.",
+    h_label_sensors: "Every selected label gets one consumption total (kWh) and, with Tariffy, one cost total. The totals never go back to 0, the panel shows day, week, month and year from their statistics. Nothing is selected at first, so no sensors are created: select only the labels you need.",
+    h_area_sensors: "Every selected area gets one consumption total (kWh) and, with Tariffy, one cost total. The totals never go back to 0, the panel shows day, week, month and year from their statistics. Nothing is selected at first, so no sensors are created; with no selection the Areas card on the Power tab shows all areas, but no sensors exist.",
     f_area_tariffs: "Tariff per area (for the cost sensors)",
     h_area_tariffs: "Which Tariffy electricity contract prices the cost of an area. The cost sensors count with the price of that contract from then on; what was counted before stays.",
     labelCostTitle: "Cost per label",
@@ -865,11 +865,11 @@ const STRINGS = {
     uTopTitle: "Größte Verbraucher",
     uLabelsTitle: "Labels",
     costsPeriod: "Kosten im Zeitraum",
-    f_device_ids: "Geräte mit eigenen Sensoren",
+    f_device_ids: "Geräte mit eigenem Kostensensor",
     devSensorsBtn: "Sensoren",
-    devSensorsTip: "Diesem Gerät eigene Verbrauchs- und Kostensensoren geben",
-    deviceCounter: "{n} Geräte mit eigenen Sensoren: {sensors} Sensoren (je Gerät vier für den Verbrauch, mit Tariffy vier für die Kosten). Wählst du ein Gerät ab, werden seine Sensoren beim Speichern gelöscht.",
-    deviceCounterNone: "Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle die Geräte, die du brauchst, in der Liste oben mit dem Knopf Sensoren. Jedes Gerät bekommt vier Verbrauchssensoren und mit Tariffy vier Kostensensoren.",
+    devSensorsTip: "Diesem Gerät einen eigenen Kostensensor geben",
+    deviceCounter: "{n} Geräte mit eigenem Kostensensor: {sensors} Sensoren (je Gerät ein Kostensummen-Sensor, er braucht Tariffy). Wählst du ein Gerät ab, wird sein Sensor beim Speichern gelöscht.",
+    deviceCounterNone: "Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle die Geräte, die du brauchst, in der Liste oben mit dem Knopf Sensoren. Mit Tariffy bekommt jedes Gerät eine Kostensumme (keinen Verbrauchssensor: das Panel rechnet den Verbrauch eines Geräts aus seinem Leistungssensor).",
     f_device_setup: "Name und Tarif dieser Geräte",
     h_device_setup: "Der Name ist der Anzeigename des Geräts und Teil der Sensornamen. Das Feld zeigt den Namen des Geräts (der Anzeigename, sonst der Name des Sensors ohne das Wort Leistung), und die Sensoren bekommen genau diesen Namen; ändere ihn nach Wunsch, dann ändert er sich überall. Ein später geänderter Name ändert den Namen der Sensoren, aber nicht ihre Entity-ID. Ein Gerät, dessen Quelle fehlt oder ausgeschlossen wurde, behält seine Sensoren, bis du es abwählst.",
     deviceNameLabel: "Name des Geräts",
@@ -894,8 +894,8 @@ const STRINGS = {
     uAreasTitle: "Bereiche",
     uAreasHint: "Verbrauch der Sensoren im Bereich im gezeigten Zeitraum, aus der Langzeitstatistik von Home Assistant (Stundenmittel der Leistung mal Dauer; die Leistungssensoren brauchen die Zustandsklasse measurement). Energy Assistant legt außerdem Verbrauchssensoren pro ausgewähltem Bereich für Dashboards und Automationen an, sie zählen ab dem Anlegen.",
     areaCostTitle: "Kosten pro Bereich",
-    h_label_sensors: "Jedes ausgewählte Label bekommt vier Verbrauchssensoren (Tag, Woche, Monat, Jahr) und mit Tariffy vier Kostensensoren. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle nur die Labels, die du brauchst.",
-    h_area_sensors: "Jeder ausgewählte Bereich bekommt vier Verbrauchssensoren (Tag, Woche, Monat, Jahr) und mit Tariffy vier Kostensensoren. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt; ohne Auswahl zeigt die Bereichskarte im Leistung-Tab alle Bereiche, es entstehen aber keine Sensoren.",
+    h_label_sensors: "Jedes ausgewählte Label bekommt eine Verbrauchssumme (kWh) und mit Tariffy eine Kostensumme. Die Summen gehen nie auf 0 zurück, das Panel zeigt Tag, Woche, Monat und Jahr aus ihren Statistiken. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt: wähle nur die Labels, die du brauchst.",
+    h_area_sensors: "Jeder ausgewählte Bereich bekommt eine Verbrauchssumme (kWh) und mit Tariffy eine Kostensumme. Die Summen gehen nie auf 0 zurück, das Panel zeigt Tag, Woche, Monat und Jahr aus ihren Statistiken. Zuerst ist nichts ausgewählt, es werden also keine Sensoren angelegt; ohne Auswahl zeigt die Bereichskarte im Leistung-Tab alle Bereiche, es entstehen aber keine Sensoren.",
     f_area_tariffs: "Tarif pro Bereich (für die Kostensensoren)",
     h_area_tariffs: "Welcher Tariffy-Stromvertrag die Kosten eines Bereichs bewertet. Die Kostensensoren rechnen ab dann mit dem Preis dieses Vertrags; was vorher gezählt wurde, bleibt.",
     labelCostTitle: "Kosten pro Label",
@@ -1948,12 +1948,12 @@ class EnergyAssistantPanel extends HTMLElement {
    * biggest consumers of today in kWh and euro, and the devices that are always on (standby).
    */
   /**
-   * What the home charging of a wallbox cost in a period, from EV Assistant (the real price of every charging session,
-   * the solar share is free), not the kWh of its sensor at the grid price. `home_cost` is cumulative, so the cost is the
-   * difference between its value at the end and at the start of the period (long-term statistics, for the running
-   * period the live value). Null without such a value.
+   * What a cumulative sensor counted in a period: the difference between its value at the end and at the start of the
+   * period (long-term statistics, for the running period the live value). Used for the home charging cost of a wallbox
+   * from EV Assistant (the real price of every charging session, the solar share is free) and for the cost totals of
+   * Energy Assistant (labels, areas, devices). Null without such a value.
    */
-  async _evCostPeriod(entityId, win, range) {
+  async _evCostPeriod(entityId, win, range, fresh = false) {
     const now = Date.now();
     const live = win.end > now;
     const lead = 3 * 86400000; // the last value before the period is the start
@@ -1963,11 +1963,14 @@ class EnergyAssistantPanel extends HTMLElement {
       end_time: new Date(Math.min(win.end, now)).toISOString(),
       statistic_ids: [entityId],
       period: range === "day" ? "hour" : "day",
-      types: ["max", "min"],
+      types: ["max", "min", "state"],
     });
-    const rows = (res?.[entityId] || []).map((r) => ({ t: typeof r.start === "number" ? r.start : Date.parse(r.start), max: r.max, min: r.min })).filter((r) => Number.isFinite(r.t));
+    // A measurement sensor (EV Assistant) has max and min, a total sensor (the cost sensors of Energy Assistant) its state
+    const rows = (res?.[entityId] || []).map((r) => ({ t: typeof r.start === "number" ? r.start : Date.parse(r.start), max: r.state ?? r.max, min: r.min, total: r.state != null })).filter((r) => Number.isFinite(r.t));
     const before = rows.filter((r) => r.t < win.start), inside = rows.filter((r) => r.t >= win.start);
-    const base = before.length ? before[before.length - 1].max : inside.length ? inside[0].min : null;
+    // No value before the period: a total sensor started at 0 (it is new), a measurement sensor starts with its first minimum
+    // `fresh`: a total sensor of ours that has no statistics yet counted from 0 (it is new), its live value is the cost so far
+    const base = before.length ? before[before.length - 1].max : inside.length ? (inside[0].total ? 0 : inside[0].min) : fresh && live ? 0 : null;
     const state = parseFloat(this._hass?.states?.[entityId]?.state);
     const end = live && Number.isFinite(state) ? state : inside.length ? inside[inside.length - 1].max : base;
     if (!Number.isFinite(base) || !Number.isFinite(end)) return null;
@@ -1985,10 +1988,28 @@ class EnergyAssistantPanel extends HTMLElement {
     return v ? this._evCosts?.get(`${v.home_cost}|${range}|${off}`)?.v ?? null : null;
   }
 
+  /** The cost total sensors of the selected labels, areas and devices (entity ids). */
+  _groupCostIds() {
+    const out = [];
+    for (const [kind, sensors] of [["label", this._labelEnergy], ["area", this._areaEnergy], ["device", this._deviceEnergy]]) {
+      for (const id of this._cfg[`${kind}_ids`] || []) {
+        const e = sensors?.[id]?.cost_total;
+        if (e) out.push(e);
+      }
+    }
+    return out;
+  }
+
+  /** What a cumulative sensor counted in a period (see _evCostPeriod), or null while it is not loaded. */
+  _cumOf(entityId, range, off) {
+    return entityId ? this._evCosts?.get(`${entityId}|${range}|${off}`)?.v ?? null : null;
+  }
+
   /** Loads what the periods in view need (the shown period, in the Costs tab the four running ones), at most every 5 minutes. */
   async _maybeLoadEvCost() {
     if (!this._ready || this._evCostLoading || !this._hass) return;
-    const sources = [...new Set((this._int?.ev_assistant?.vehicles || []).filter((v) => v.wallbox_power && v.home_cost).map((v) => v.home_cost))];
+    const groupIds = new Set(this._groupCostIds());
+    const sources = [...new Set([...(this._int?.ev_assistant?.vehicles || []).filter((v) => v.wallbox_power && v.home_cost).map((v) => v.home_cost), ...groupIds])];
     if (!sources.length) return;
     const wanted = this._tab === "costs" ? ["day", "week", "month", "year"].map((r) => [r, 0]) : [[this._usRange ?? "day", this._usOff ?? 0]];
     this._evCosts = this._evCosts || new Map();
@@ -2002,7 +2023,7 @@ class EnergyAssistantPanel extends HTMLElement {
     try {
       for (const [id, r, o] of todo) {
         let v = null;
-        try { v = await this._evCostPeriod(id, this._balWindow(r, o), r); } catch (e) { console.info("Energy Assistant: could not load the cost of the home charging", e); }
+        try { v = await this._evCostPeriod(id, this._balWindow(r, o), r, groupIds.has(id)); } catch (e) { console.info("Energy Assistant: could not load the cost of the home charging", e); }
         this._evCosts.set(`${id}|${r}|${o}`, { v, at: Date.now() });
       }
     } finally {
@@ -3800,8 +3821,8 @@ class EnergyAssistantPanel extends HTMLElement {
   }
 
   /**
-   * Cost per selected label or area for today, this week, this month and this year, from the cost sensors that
-   * Energy Assistant creates (priced step by step, so a tariff change never recalculates the past).
+   * Cost per selected label, area or device for today, this week, this month and this year: the difference of the cost
+   * total sensors that Energy Assistant creates (priced step by step, so a tariff change never recalculates the past).
    * Entries without cost sensors are left out; empty when there are none.
    */
   _renderGroupCosts(kind) {
@@ -3809,13 +3830,14 @@ class EnergyAssistantPanel extends HTMLElement {
     const sensors = { area: this._areaEnergy, device: this._deviceEnergy }[kind] || this._labelEnergy;
     const rows = (this._cfg[`${kind}_ids`] || [])
       .map((id) => {
+        const entity = sensors?.[id]?.cost_total;
+        const unit = this._hass?.states?.[entity]?.attributes?.unit_of_measurement || "EUR";
         const values = periods.map(([p]) => {
-          const state = this._hass?.states?.[sensors?.[id]?.[`cost_${p}`]];
-          const v = state ? parseFloat(state.state) : NaN;
           // A wallbox: what EV Assistant says the home charging cost (the solar share is free), not the grid price
           const ev = kind === "device" ? this._evCostOf(id, p, 0) : null;
           if (ev != null) return { v: ev, unit: this._hass?.states?.[this._evVehicleOf(id).home_cost]?.attributes?.unit_of_measurement || "EUR" };
-          return { v: Number.isFinite(v) ? v : null, unit: state?.attributes?.unit_of_measurement || "EUR" };
+          // Everything else: what the running cost total counted in the period (statistics, the running period live)
+          return { v: this._cumOf(entity, p, 0), unit };
         });
         const cells = values.map((x) => (x.v == null ? "–" : this._money(x.v, x.unit).join(" ")));
         return { id, name: this._groupName(kind, id), cells, values: values.map((x) => x.v), any: cells.some((c) => c !== "–") };
@@ -3885,7 +3907,7 @@ class EnergyAssistantPanel extends HTMLElement {
     return Object.entries(this._pvTargets()).every(([k, v]) => (typeof v === "boolean" ? !!this._draft[k] === v : typeof v === "number" ? this._draft[k] === v : same(v, this._draftList(k))));
   }
 
-  /** The energy and cost sensors of the selected labels and areas: {id: {period: entity_id}} for each. */
+  /** The energy total and cost total sensors of the selected labels, areas and devices: {id: {energy_total, cost_total}} for each. */
   async _loadGroupEnergy() {
     if (!this._hass) return;
     const ask = async (type, current) => {
@@ -4492,7 +4514,7 @@ class EnergyAssistantPanel extends HTMLElement {
   /** "5 devices selected: 40 sensors" and what a selection does (nothing is selected at first). */
   _deviceCounter() {
     const n = (this._draft.device_ids || []).length;
-    const perDevice = this._int?.tariffy ? 8 : 4;
+    const perDevice = this._int?.tariffy ? 1 : 0; // a cost total, it needs a price
     return this._t(n ? "deviceCounter" : "deviceCounterNone", { n, sensors: n * perDevice });
   }
 

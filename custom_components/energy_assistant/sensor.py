@@ -1,12 +1,14 @@
-"""Energy and cost sensors per selected label and area: today, this week, this month and this year.
+"""Energy and cost sensors: one running total per selected label, area and device cost.
 
-The sensors are created for the labels and areas that are selected in the settings (one set of four
-per label or area) and removed when one is deselected, without reloading the entry. The energy is the
-power of the sensors that carry the label or sit in the area (like the cards of the panel), integrated over time. The cost is
-added up step by step with the price of Tariffy that is valid at that moment, so a change of the unit
-price never changes what was already counted. Own solar power is not priced at the grid price: the
-unit price of a moment is the price of the grid weighted with the share the grid delivers of the
-consumption, plus the feed-in tariff (what is lost by using it) for the rest (see mix.py). The periods follow the time zone of Home Assistant.
+The sensors are created for what is selected in the settings and removed when it is deselected, without
+reloading the entry: an energy total for each label and area, a cost total for each label, area and device. The
+energy is the power of the sensors that carry the label or sit in the area (like the cards of the panel),
+integrated over time. The cost is added up step by step with the price of Tariffy that is valid at that moment, so
+a change of the unit price never changes what was already counted. Own solar power is not priced at the grid
+price: the unit price of a moment is the price of the grid weighted with the share the grid delivers of the
+consumption, plus the feed-in tariff (what is lost by using it) for the rest (see mix.py). The totals never go back
+to 0: day, week, month and year are worked out by the panel from the long-term statistics. The sensors of the
+earlier versions (one for each day, week, month and year, and the energy of the devices) are removed.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 from typing import Any
 
@@ -57,8 +59,8 @@ from .settings import (
     normalize,
 )
 
-PERIODS = ("day", "week", "month", "year")
-COST = "cost_"  # prefix of the period in the unique id of a cost sensor
+# The periods of the sensors of the earlier versions (their unique ids are looked up to remove them)
+LEGACY_PERIODS = ("day", "week", "month", "year")
 # Unit of a power sensor -> factor to kW. Other units are ignored.
 _TO_KW = {"W": 0.001, "kW": 1.0}
 _TICK = timedelta(minutes=1)
@@ -79,24 +81,29 @@ def _finite(value: float) -> bool:
     return not (math.isnan(value) or math.isinf(value))
 
 
-def period_start(now: datetime, period: str) -> datetime:
-    """Start of the running day, week (Monday), month or year in the time zone of `now`."""
-    day = now.date()
-    if period == "week":
-        day -= timedelta(days=day.weekday())
-    elif period == "month":
-        day = day.replace(day=1)
-    elif period == "year":
-        day = day.replace(month=1, day=1)
-    return datetime.combine(day, time.min, tzinfo=now.tzinfo)
-
-
 KINDS = ("label", "area", "device")
 
 
-def unique_id(entry_id: str, group_id: str, period: str, kind: str = "label") -> str:
-    """Unique id of the sensor of a label (or area) and period."""
-    return f"{entry_id}_{kind}_{group_id}_{period}"
+ENERGY_KINDS = (
+    "label",
+    "area",
+)  # the kinds that get an energy total (a device only gets a cost total)
+ENERGY = "energy_total"
+COST = "cost_total"
+
+
+def unique_id(entry_id: str, group_id: str, what: str, kind: str = "label") -> str:
+    """Unique id of the energy total (`ENERGY`) or the cost total (`COST`) of a label, area or device."""
+    return f"{entry_id}_{kind}_{group_id}_{what}"
+
+
+def legacy_unique_ids(entry_id: str, group_id: str, kind: str = "label") -> list[str]:
+    """The unique ids of the sensors of the earlier versions: energy and cost for each day, week, month and year."""
+    return [
+        f"{entry_id}_{kind}_{group_id}_{prefix}{period}"
+        for prefix in ("", "cost_")
+        for period in LEGACY_PERIODS
+    ]
 
 
 def _selected(entry: ConfigEntry, kind: str = "label") -> list[str]:
@@ -147,7 +154,7 @@ def _excluded(entry: ConfigEntry) -> Callable[[str], bool]:
 
 
 class GroupEnergy:
-    """Integrates the power of the sensors of one label or area into four period counters."""
+    """Integrates the power of the sensors of one label, area or device into a running energy total and a cost total."""
 
     def __init__(
         self,
@@ -163,8 +170,8 @@ class GroupEnergy:
         self.members: set[str] = set()
         self.powers: dict[str, float] = {}  # kW per member
         self.last = dt_util.now()
-        self.values = dict.fromkeys(PERIODS, 0.0)
-        self.costs = dict.fromkeys(PERIODS, 0.0)
+        self.kwh = 0.0  # running total of the energy
+        self.cost = 0.0  # running total of the cost
         self.price: float | None = None  # last known unit price per kWh
         self.currency: str | None = None
         # What the grid delivers of the consumption (0 to 1) and the feed-in tariff: together they make the unit
@@ -176,8 +183,7 @@ class GroupEnergy:
         self._unsub_mix: Callable[[], None] | None = None
         self._price_entity: str | None = None
         self._unsub_price: Callable[[], None] | None = None
-        self.starts = {p: period_start(self.last, p) for p in PERIODS}
-        self._sensors: list[LabelEnergySensor] = []
+        self._sensors: list[GroupEnergySensor] = []
         self._unsubs: list[Callable[[], None]] = []
         self._unsub_state: Callable[[], None] | None = None
 
@@ -369,18 +375,11 @@ class GroupEnergy:
         total_kw = sum(self.powers.values())
         if gap <= timedelta(0) or gap > MAX_GAP:
             total_kw = 0.0
-        for period in PERIODS:
-            start = period_start(now, period)
-            if start > self.starts[period]:  # a new period began
-                self.values[period] = 0.0
-                self.costs[period] = 0.0
-                self.starts[period] = start
-            since = max(self.last, start)
-            if now > since:
-                kwh = total_kw * (now - since).total_seconds() / 3600
-                self.values[period] += kwh
-                if unit is not None:
-                    self.costs[period] += kwh * unit
+        if total_kw > 0:
+            kwh = total_kw * gap.total_seconds() / 3600
+            self.kwh += kwh
+            if unit is not None:
+                self.cost += kwh * unit
         self.last = now
 
     @callback
@@ -421,17 +420,13 @@ class GroupEnergy:
 
     # -- lifetime ----------------------------------------------------------------
 
-    def restore(
-        self, period: str, value: float, start: datetime, *, cost: bool = False
-    ) -> None:
-        """Take over a stored value when it belongs to the running period and is plausible."""
-        if (
-            start == self.starts[period]
-            and _finite(value)
-            and 0 <= value <= MAX_RESTORED
-        ):
-            target = self.costs if cost else self.values
-            target[period] = max(target[period], value)
+    def restore(self, value: float, *, cost: bool = False) -> None:
+        """Take over a stored total when it is plausible (finite, not negative, not absurdly big); it never shrinks."""
+        if _finite(value) and 0 <= value <= MAX_RESTORED:
+            if cost:
+                self.cost = max(self.cost, value)
+            else:
+                self.kwh = max(self.kwh, value)
 
     def display_name(self) -> str:
         """The current name of the label, area or device (it follows renames)."""
@@ -443,7 +438,7 @@ class GroupEnergy:
         label = lr.async_get(self.hass).async_get_label(self.group_id)
         return label.name if label else self.group_id
 
-    def add_sensor(self, sensor: LabelEnergySensor) -> None:
+    def add_sensor(self, sensor: GroupEnergySensor) -> None:
         self._sensors.append(sensor)
 
     @callback
@@ -471,28 +466,29 @@ class GroupEnergy:
         self._mix_watched = ()
 
 
-class LabelEnergySensor(SensorEntity, RestoreEntity):
-    """Energy of a label in kWh for one period."""
+class GroupEnergySensor(SensorEntity, RestoreEntity):
+    """The running energy total of a label or area in kWh. It never goes back to 0 (the panel works out the periods)."""
 
     _attr_has_entity_name = True
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-    _attr_state_class = SensorStateClass.TOTAL
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_suggested_display_precision = 2
     _attr_should_poll = False
     _cost = False
 
     def __init__(
-        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str, period: str
+        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str
     ) -> None:
         self._tracker = tracker
-        self._period = period
-        prefix = COST if self._cost else ""
         self._attr_unique_id = unique_id(
-            entry.entry_id, tracker.group_id, prefix + period, tracker.kind
+            entry.entry_id,
+            tracker.group_id,
+            COST if self._cost else ENERGY,
+            tracker.kind,
         )
         what = "cost" if self._cost else "energy"
-        self._attr_translation_key = f"{tracker.kind}_{what}_{period}"
+        self._attr_translation_key = f"{tracker.kind}_{what}_total"
         self._attr_translation_placeholders = self._placeholders(group_name)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
@@ -516,17 +512,12 @@ class LabelEnergySensor(SensorEntity, RestoreEntity):
 
     @property
     def native_value(self) -> float:
-        return round(self._tracker.values[self._period], 4)
-
-    @property
-    def last_reset(self) -> datetime:
-        return self._tracker.starts[self._period]
+        return round(self._tracker.kwh, 4)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
             f"{self._tracker.kind}_id": self._tracker.group_id,
-            "period_start": self._tracker.starts[self._period].isoformat(),
             "sensors": sorted(self._tracker.members),
         }
 
@@ -537,36 +528,36 @@ class LabelEnergySensor(SensorEntity, RestoreEntity):
             return
         try:
             value = float(last.state)
-            start = datetime.fromisoformat(last.attributes["period_start"])
-        except (KeyError, TypeError, ValueError):
+        except (TypeError, ValueError):
             return
-        self._tracker.restore(self._period, value, start, cost=self._cost)
+        self._tracker.restore(value, cost=self._cost)
 
 
-class LabelCostSensor(LabelEnergySensor):
-    """Cost of a label for one period: every step is priced with the unit price of that moment."""
+class GroupCostSensor(GroupEnergySensor):
+    """The running cost total of a label, area or device: every step is priced with the unit price of that moment."""
 
     _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.TOTAL
     _attr_suggested_display_precision = 2
     _cost = True
 
     def __init__(
-        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str, period: str
+        self, entry: ConfigEntry, tracker: GroupEnergy, group_name: str
     ) -> None:
-        super().__init__(entry, tracker, group_name, period)
+        super().__init__(entry, tracker, group_name)
         self._attr_native_unit_of_measurement = (
             tracker.currency or tracker.hass.config.currency
         )
 
     @property
     def native_value(self) -> float:
-        return round(self._tracker.costs[self._period], 4)
+        return round(self._tracker.cost, 4)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
             f"{self._tracker.kind}_id": self._tracker.group_id,
-            "period_start": self._tracker.starts[self._period].isoformat(),
+            "sensors": sorted(self._tracker.members),
             "price": self._tracker.price,  # the grid price per kWh now
             # what a kWh costs now: the grid price weighted with the share the grid delivers, the feed-in tariff
             # for the rest
@@ -582,11 +573,12 @@ class LabelCostSensor(LabelEnergySensor):
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Create the sensors of the selected labels and areas and keep them in line with the selection."""
+    """Create the sensors of the selected labels, areas and devices and keep them in line with the selection."""
     trackers: dict[tuple[str, str], GroupEnergy] = {}
     with_cost: set[tuple[str, str]] = (
         set()
-    )  # groups that already have their cost sensors
+    )  # groups that already have their cost sensor
+    registry = er.async_get(hass)
 
     def exists(kind: str, group_id: str) -> bool:
         if kind == "device":
@@ -595,6 +587,11 @@ async def async_setup_entry(
         if kind == "area":
             return ar.async_get(hass).async_get_area(group_id) is not None
         return lr.async_get(hass).async_get_label(group_id) is not None
+
+    def remove(uids: list[str]) -> None:
+        for uid in uids:
+            if entity_id := registry.async_get_entity_id("sensor", DOMAIN, uid):
+                registry.async_remove(entity_id)
 
     @callback
     def sync(*_: Any) -> None:
@@ -607,38 +604,36 @@ async def async_setup_entry(
         ]
         for tracker in trackers.values():
             tracker.options_changed()
-        entities: list[LabelEnergySensor] = []
+        entities: list[GroupEnergySensor] = []
         for key in wanted:
             kind, group_id = key
             if key not in trackers:
                 tracker = GroupEnergy(hass, entry, group_id, kind)
                 trackers[key] = tracker
                 name = tracker.display_name()
-                entities += [
-                    LabelEnergySensor(entry, tracker, name, period)
-                    for period in PERIODS
-                ]
+                # The sensors of the earlier versions (a set for each period, the energy of a device) are not needed any more
+                remove(legacy_unique_ids(entry.entry_id, group_id, kind))
+                if kind in ENERGY_KINDS:
+                    entities.append(GroupEnergySensor(entry, tracker, name))
                 tracker.start()
             tracker = trackers[key]
-            # Cost sensors need a price, so they appear once Tariffy offers one.
+            # The cost sensor needs a price, so it appears once Tariffy offers one.
             if key not in with_cost and tracker.price is not None:
                 with_cost.add(key)
-                name = tracker.display_name()
-                entities += [
-                    LabelCostSensor(entry, tracker, name, period) for period in PERIODS
-                ]
+                entities.append(GroupCostSensor(entry, tracker, tracker.display_name()))
         if entities:
             async_add_entities(entities)
-        registry = er.async_get(hass)
         for key in [k for k in trackers if k not in wanted]:
             kind, group_id = key
             trackers.pop(key).stop()
             with_cost.discard(key)
-            for period in PERIODS:
-                for prefix in ("", COST):
-                    uid = unique_id(entry.entry_id, group_id, prefix + period, kind)
-                    if entity_id := registry.async_get_entity_id("sensor", DOMAIN, uid):
-                        registry.async_remove(entity_id)
+            remove(
+                [
+                    unique_id(entry.entry_id, group_id, ENERGY, kind),
+                    unique_id(entry.entry_id, group_id, COST, kind),
+                    *legacy_unique_ids(entry.entry_id, group_id, kind),
+                ]
+            )
 
     async def _updated(hass_: HomeAssistant, entry_: ConfigEntry) -> None:
         sync()
